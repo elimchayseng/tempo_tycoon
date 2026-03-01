@@ -1,0 +1,53 @@
+{
+  "name": "tempo-zoo-experiment",
+  "version": "1.0.0",
+  "description": "Zoo Tycoon Agentic Commerce Simulation on Tempo Moderato Testnet",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:agents\"",
+    "dev:server": "cd eth_tempo_experiments && npm run dev:server",
+    "dev:web": "cd eth_tempo_experiments && npm run dev:web",
+    "dev:agents": "tsx watch agents/simulation-runner.ts",
+    "build": "cd eth_tempo_experiments && npm run build",
+    "start": "cd eth_tempo_experiments && npm start",
+    "start:agents": "tsx agents/simulation-runner.ts",
+    "check": "tsc --noEmit",
+    "setup:wallets": "tsx scripts/setup-wallets.ts",
+    "fund:agents": "tsx scripts/fund-agents.ts",
+    "health:check": "tsx scripts/health-check.ts"
+  },
+  "dependencies": {
+    "viem": "latest",
+    "hono": "latest",
+    "@hono/node-server": "latest",
+    "@hono/node-ws": "latest",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/uuid": "^9.0.0",
+    "@types/node": "^20",
+    "tsx": "latest",
+    "concurrently": "latest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/tempo-zoo-experiment.git"
+  },
+  "keywords": [
+    "tempo",
+    "blockchain",
+    "simulation",
+    "agentic-commerce",
+    "zoo-tycoon",
+    "ethereum",
+    "testnet"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

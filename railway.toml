@@ -1,0 +1,44 @@
+[build]
+  builder = "nixpacks"
+
+[deploy]
+  startCommand = "cd eth_tempo_experiments && npm start"
+  healthcheckPath = "/api/health"
+  healthcheckTimeout = 30
+  restartPolicyType = "always"
+
+[[services]]
+  name = "zoo-server"
+  source = "."
+
+  [services.variables]
+    NODE_ENV = "production"
+    PORT = "${{ PORT }}"
+    RPC_URL = "https://rpc.moderato.tempo.xyz"
+    EXPLORER_URL = "https://explore.moderato.tempo.xyz"
+    CHAIN_ID = "42431"
+
+    # These should be set in Railway dashboard
+    ZOO_MASTER_PRIVATE_KEY = "${{ ZOO_MASTER_PRIVATE_KEY }}"
+    MERCHANT_A_PRIVATE_KEY = "${{ MERCHANT_A_PRIVATE_KEY }}"
+    ATTENDEE_1_PRIVATE_KEY = "${{ ATTENDEE_1_PRIVATE_KEY }}"
+    ATTENDEE_2_PRIVATE_KEY = "${{ ATTENDEE_2_PRIVATE_KEY }}"
+    ATTENDEE_3_PRIVATE_KEY = "${{ ATTENDEE_3_PRIVATE_KEY }}"
+
+    # Simulation parameters
+    AGENT_POLLING_INTERVAL = "10000"
+    NEED_DECAY_RATE = "2"
+    PURCHASE_THRESHOLD = "30"
+    MIN_BALANCE_THRESHOLD = "10.0"
+
+    # Logging
+    LOG_LEVEL = "info"
+    ENABLE_REQUEST_LOGS = "true"
+
+# Optional: Separate service for agents (can be added later)
+# [[services]]
+#   name = "zoo-agents"
+#   source = "."
+#
+#   [services.build]
+#     startCommand = "npm run start:agents"

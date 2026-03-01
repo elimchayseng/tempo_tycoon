@@ -1,0 +1,113 @@
+{
+  "zoo_info": {
+    "name": "Tempo Zoo Simulation",
+    "version": "1.0.0",
+    "facilitator_address": "0xZooMasterAddress_PLACEHOLDER",
+    "chain_id": 42431,
+    "currency": "AlphaUSD",
+    "currency_address": "0x20c0000000000000000000000000000000000001",
+    "polling_interval_ms": 10000,
+    "created_at": "2024-12-01T00:00:00Z",
+    "updated_at": "2024-12-01T00:00:00Z"
+  },
+  "merchants": [
+    {
+      "id": "food_stand_01",
+      "name": "Zoo Snacks",
+      "category": "food",
+      "description": "Delicious snacks and beverages for hungry zoo visitors",
+      "endpoint": "/api/merchant/food",
+      "wallet_address": "0xMerchantAddress_PLACEHOLDER",
+      "menu": [
+        {
+          "sku": "hotdog",
+          "name": "Hot Dog",
+          "description": "Classic grilled hot dog with your choice of toppings",
+          "price": "3.50",
+          "category": "main",
+          "available": true
+        },
+        {
+          "sku": "nachos",
+          "name": "Nachos",
+          "description": "Crispy tortilla chips with cheese and jalapeños",
+          "price": "4.00",
+          "category": "snack",
+          "available": true
+        },
+        {
+          "sku": "soda",
+          "name": "Soda",
+          "description": "Refreshing cold beverage",
+          "price": "2.50",
+          "category": "beverage",
+          "available": true
+        },
+        {
+          "sku": "popcorn",
+          "name": "Popcorn",
+          "description": "Fresh buttered popcorn",
+          "price": "3.00",
+          "category": "snack",
+          "available": true
+        },
+        {
+          "sku": "ice_cream",
+          "name": "Ice Cream",
+          "description": "Cool and creamy ice cream",
+          "price": "4.50",
+          "category": "dessert",
+          "available": true
+        }
+      ],
+      "operating_hours": {
+        "start": 9,
+        "end": 18,
+        "timezone": "UTC"
+      },
+      "location": {
+        "zone": "food_court",
+        "coordinates": [100, 200],
+        "description": "Near the main entrance"
+      },
+      "payment_methods": ["AlphaUSD"],
+      "status": "active"
+    }
+  ],
+  "agent_needs": {
+    "food_need": {
+      "categories": ["food"],
+      "decay_rate": 2,
+      "purchase_threshold": 30,
+      "satisfaction_gain": {
+        "main": 50,
+        "snack": 30,
+        "beverage": 20,
+        "dessert": 25
+      }
+    },
+    "fun_need": {
+      "categories": ["entertainment", "games"],
+      "decay_rate": 1,
+      "purchase_threshold": 25,
+      "satisfaction_gain": {
+        "game": 40,
+        "show": 60,
+        "ride": 70
+      }
+    }
+  },
+  "simulation_config": {
+    "max_agents": 3,
+    "simulation_speed": 1.0,
+    "random_factor": 0.2,
+    "min_balance_threshold": 10.0,
+    "max_purchase_frequency_minutes": 5,
+    "session_timeout_minutes": 5
+  },
+  "meta": {
+    "schema_version": "1.0.0",
+    "description": "Zoo Tycoon Agentic Commerce Protocol Registry",
+    "documentation": "https://github.com/yourusername/tempo-zoo-experiment/blob/main/SPEC.md"
+  }
+}
