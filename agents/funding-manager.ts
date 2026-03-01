@@ -1,4 +1,3 @@
-import { AccountState } from "../eth_tempo_experiments/server/accounts.js";
 import { batchAction } from "../eth_tempo_experiments/server/actions/batch.js";
 import { ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
 import type { BatchFundingRequest, BatchFundingResult, AgentConfig } from "./types.js";

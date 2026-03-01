@@ -15,7 +15,9 @@
     "check": "tsc --noEmit",
     "setup:wallets": "tsx scripts/setup-wallets.ts",
     "fund:agents": "tsx scripts/fund-agents.ts",
-    "health:check": "tsx scripts/health-check.ts"
+    "health:check": "tsx scripts/health-check.ts",
+    "test:integration": "tsx scripts/integration-test.ts",
+    "test:load": "tsx scripts/load-test.ts"
   },
   "dependencies": {
     "viem": "latest",

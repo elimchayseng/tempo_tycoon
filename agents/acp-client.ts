@@ -1,3 +1,4 @@
+import { merchantCircuitBreaker } from './circuit-breaker.js';
 import type {
   ZooRegistry,
   MerchantCatalog,
@@ -6,37 +7,53 @@ import type {
   MerchantProduct
 } from './types.js';
 
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
 export class ACPClient {
   private readonly baseUrl: string;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly cacheTtlMs: number;
 
-  constructor(baseUrl: string = 'http://localhost:4002', maxRetries: number = 3, retryDelayMs: number = 1000) {
+  private registryCache: CacheEntry<ZooRegistry> | null = null;
+  private catalogCache: Map<string, CacheEntry<MerchantCatalog>> = new Map();
+
+  constructor(baseUrl: string = 'http://localhost:4000', maxRetries: number = 3, retryDelayMs: number = 1000) {
     this.baseUrl = baseUrl;
     this.maxRetries = maxRetries;
     this.retryDelayMs = retryDelayMs;
+    this.cacheTtlMs = 60000; // 60s TTL
 
-    console.log(`[ACPClient] 🌐 ACP Client initialized: ${this.baseUrl}`);
+    console.log(`[ACPClient] ACP Client initialized: ${this.baseUrl}`);
   }
 
   /**
    * Fetch the zoo registry to discover available merchants
    */
   async fetchZooRegistry(): Promise<ZooRegistry> {
+    // Check cache
+    if (this.registryCache && Date.now() < this.registryCache.expiresAt) {
+      console.log(`[ACPClient] Cache hit: zoo registry`);
+      return this.registryCache.data;
+    }
+    console.log(`[ACPClient] Cache miss: zoo registry`);
+
     const url = `${this.baseUrl}/api/zoo/registry`;
 
-    console.log(`[ACPClient] 🗺️  Fetching zoo registry from ${url}`);
-
     try {
-      const registry = await this.makeRequest<ZooRegistry>('GET', url);
+      const registry = await merchantCircuitBreaker.execute(() =>
+        this.makeRequest<ZooRegistry>('GET', url)
+      );
 
-      console.log(`[ACPClient] ✓ Registry loaded: ${registry.merchants.length} merchants available`);
-      console.log(`[ACPClient] 📍 Available merchants:`, registry.merchants.map(m => `${m.name} (${m.category})`));
-
+      this.registryCache = { data: registry, expiresAt: Date.now() + this.cacheTtlMs };
+      console.log(`[ACPClient] Registry loaded: ${registry.merchants.length} merchants available`);
       return registry;
 
     } catch (error) {
-      console.error(`[ACPClient] ❌ Failed to fetch zoo registry:`, error);
+      console.error(`[ACPClient] Failed to fetch zoo registry:`, error);
       throw new Error(`Failed to fetch zoo registry: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -45,21 +62,28 @@ export class ACPClient {
    * Get merchant catalog for a specific category (e.g., 'food')
    */
   async getMerchantCatalog(category: string): Promise<MerchantCatalog> {
+    // Check cache
+    const cached = this.catalogCache.get(category);
+    if (cached && Date.now() < cached.expiresAt) {
+      console.log(`[ACPClient] Cache hit: ${category} catalog`);
+      return cached.data;
+    }
+    console.log(`[ACPClient] Cache miss: ${category} catalog`);
+
     const url = `${this.baseUrl}/api/merchant/${category}/catalog`;
 
-    console.log(`[ACPClient] 🛒 Fetching ${category} catalog from ${url}`);
-
     try {
-      const catalog = await this.makeRequest<MerchantCatalog>('GET', url);
+      const catalog = await merchantCircuitBreaker.execute(() =>
+        this.makeRequest<MerchantCatalog>('GET', url)
+      );
 
+      this.catalogCache.set(category, { data: catalog, expiresAt: Date.now() + this.cacheTtlMs });
       const availableProducts = catalog.products.filter(p => p.available);
-      console.log(`[ACPClient] ✓ Catalog loaded: ${availableProducts.length}/${catalog.products.length} products available`);
-      console.log(`[ACPClient] 🍕 Available products:`, availableProducts.map(p => `${p.name} ($${p.price})`));
-
+      console.log(`[ACPClient] Catalog loaded: ${availableProducts.length}/${catalog.products.length} products available`);
       return catalog;
 
     } catch (error) {
-      console.error(`[ACPClient] ❌ Failed to fetch ${category} catalog:`, error);
+      console.error(`[ACPClient] Failed to fetch ${category} catalog:`, error);
       throw new Error(`Failed to fetch merchant catalog: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

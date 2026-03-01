@@ -1,13 +1,15 @@
 import { BuyerAgent } from './buyer-agent.js';
 import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
+import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
 import { getAllZooAccounts, getZooAccountByRole } from '../eth_tempo_experiments/server/zoo-accounts.js';
 import type {
   AgentConfig,
   AgentStatus,
   AgentMetrics,
   AgentEvent,
-  AgentEventType
+  AgentEventType,
+  MetricPoint
 } from './types.js';
 
 export class AgentRunner {
@@ -23,6 +25,10 @@ export class AgentRunner {
   private eventHandlers: Map<AgentEventType, Array<(event: AgentEvent) => void>> = new Map();
   private totalPurchases = 0;
   private totalSpent = 0;
+
+  // Rolling metrics window
+  private readonly metricPoints: MetricPoint[] = [];
+  private readonly maxMetricPoints = 1000;
 
   constructor() {
     console.log(`[AgentRunner] 🎪 Initializing Agent Runner...`);
@@ -182,6 +188,39 @@ export class AgentRunner {
   }
 
   /**
+   * Record a metric point from a purchase event
+   */
+  private recordMetric(point: MetricPoint): void {
+    this.metricPoints.push(point);
+    if (this.metricPoints.length > this.maxMetricPoints) {
+      this.metricPoints.shift();
+    }
+  }
+
+  /**
+   * Get time-series stats over a rolling window
+   */
+  getTimeSeriesStats(windowMs: number = 60000) {
+    const cutoff = Date.now() - windowMs;
+    const recent = this.metricPoints.filter(p => p.timestamp >= cutoff);
+
+    if (recent.length === 0) {
+      return { totalTx: 0, successRate: 0, avgLatencyMs: 0, txPerMinute: 0 };
+    }
+
+    const successes = recent.filter(p => p.success).length;
+    const avgLatency = recent.reduce((s, p) => s + p.latencyMs, 0) / recent.length;
+    const windowMinutes = windowMs / 60000;
+
+    return {
+      totalTx: recent.length,
+      successRate: Math.round((successes / recent.length) * 10000) / 100,
+      avgLatencyMs: Math.round(avgLatency),
+      txPerMinute: Math.round((recent.length / windowMinutes) * 100) / 100,
+    };
+  }
+
+  /**
    * Force funding check and refill if needed
    */
   async checkAndRefundAgents(): Promise<void> {
@@ -250,6 +289,11 @@ export class AgentRunner {
       uptime_seconds: uptimeSeconds,
       funding_manager: this.fundingManager.getStatus(),
       metrics,
+      time_series: this.getTimeSeriesStats(),
+      circuit_breakers: {
+        rpc: rpcCircuitBreaker.getStatus(),
+        merchant: merchantCircuitBreaker.getStatus(),
+      },
       agents: this.getAgentStatuses().map(status => ({
         agent_id: status.agent_id,
         status: status.status,
@@ -321,6 +365,23 @@ export class AgentRunner {
     agent.on('purchase_completed', (event) => {
       this.totalPurchases++;
       this.totalSpent += parseFloat(event.data.purchase_record.amount);
+      this.recordMetric({
+        timestamp: Date.now(),
+        latencyMs: event.data.latencyMs ?? 0,
+        success: true,
+        agentId: event.agent_id,
+        amount: parseFloat(event.data.purchase_record.amount),
+      });
+    });
+
+    agent.on('purchase_failed', (event) => {
+      this.recordMetric({
+        timestamp: Date.now(),
+        latencyMs: event.data.latencyMs ?? 0,
+        success: false,
+        agentId: event.agent_id,
+        amount: 0,
+      });
     });
 
     // Forward all events with runner context
