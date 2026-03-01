@@ -16,9 +16,8 @@ cd eth_tempo_experiments && npm install && cd ..
 # Generate wallets
 npm run setup:wallets
 
-# Set environment variables (copy from setup:wallets output)
-cp .env.example .env
-# Edit .env with your private keys
+# Create .env and paste the output keys (there is no .env.example in the repo)
+# Also add: RPC_URL=https://rpc.moderato.tempo.xyz and CHAIN_ID=42431
 
 # Fund agent wallets (requires Zoo Master to be funded with AlphaUSD)
 npm run fund:agents
@@ -49,33 +48,34 @@ npm run dev
 
 ## Documentation
 
+- **[docs/testing-and-scripts.md](docs/testing-and-scripts.md)** - **Scripts, testing, and environment guide** (start here for running anything)
 - **[SPEC.md](SPEC.md)** - Complete project specification and requirements
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture and integration strategy
 - **[API_SPEC.md](API_SPEC.md)** - Complete ACP REST API documentation
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Railway deployment guide
 - **[docs/integration-strategy.md](docs/integration-strategy.md)** - Integration with eth_tempo_experiments
 - **[docs/phase-breakdown.md](docs/phase-breakdown.md)** - Detailed implementation phases
-- **[scripts/setup.md](scripts/setup.md)** - Setup script documentation
 
 ## Development Phases
 
-### ✅ Phase 1: ACP Infrastructure (1-2 weeks)
+### Phase 1: ACP Infrastructure
 - Server extension with zoo routes
 - Merchant registry and catalog endpoints
 - Checkout session management
 - Transaction verification
 
-### 🔄 Phase 2: Autonomous Agents (1-2 weeks)
+### Phase 2: Autonomous Agents
 - Need-based decision engine
 - Registry discovery and merchant communication
 - Agent state management and persistence
 
-### ⏳ Phase 3: Blockchain Integration (1-2 weeks)
-- End-to-end purchase automation
+### Phase 3: Blockchain Integration
+- End-to-end purchase automation with retry and circuit breakers
 - Real transaction signing and broadcasting
-- Error recovery and resilience
+- Integration test, load test, and health check scripts
+- Transaction queue, request caching, rolling metrics
 
-### ⏳ Phase 4: Monitoring Dashboard (0.5-1 weeks)
+### Phase 4: Monitoring Dashboard
 - Simple HTML dashboard
 - Real-time agent status updates
 - Transaction feed with blockchain links
@@ -128,13 +128,17 @@ MIN_BALANCE_THRESHOLD=10.0
 ## Scripts
 
 ```bash
-npm run setup:wallets     # Generate new wallet private keys
-npm run fund:agents       # Distribute AlphaUSD to all agents
-npm run health:check      # Comprehensive system health check
-npm run dev              # Start server + agents in development
-npm run dev:server       # Start server only
-npm run dev:agents       # Start agents only
+npm run setup:wallets      # Generate new wallet private keys
+npm run fund:agents        # Distribute AlphaUSD to all agents
+npm run health:check       # Comprehensive system health check
+npm run test:integration   # End-to-end single purchase cycle test
+npm run test:load          # Multi-agent load test (default: 2 min)
+npm run dev                # Start server + agents in development
+npm run dev:server         # Start server only
+npm run dev:agents         # Start agents only
 ```
+
+> For detailed usage, prerequisites, and troubleshooting for each script, see **[docs/testing-and-scripts.md](docs/testing-and-scripts.md)**.
 
 ## Agent Behavior
 
@@ -207,31 +211,24 @@ Set all required environment variables in Railway dashboard under "Variables". N
 
 ## Testing
 
-### Manual Testing
+> Full details, prerequisites, and troubleshooting: **[docs/testing-and-scripts.md](docs/testing-and-scripts.md)**
+
 ```bash
-# Test registry
-curl http://localhost:4000/api/zoo/registry
-
-# Test catalog
-curl http://localhost:4000/api/merchant/food/catalog
-
-# Test checkout
-curl -X POST http://localhost:4000/api/merchant/food/checkout/create \
-  -H "Content-Type: application/json" \
-  -d '{"sku":"hotdog","quantity":1,"buyer_address":"0x..."}'
-```
-
-### Health Verification
-```bash
-# Comprehensive health check
+# Health check (no server required)
 npm run health:check
 
-# Expected output:
-# ✓ Tempo Blockchain: Connected (Chain ID: 42431)
-# ✓ Zoo Master Wallet: 450.50 AlphaUSD
-# ✓ Merchant A Wallet: 100.00 AlphaUSD
-# ✓ Attendee 1 Wallet: 45.30 AlphaUSD
-# System Status: HEALTHY
+# Integration test — single end-to-end purchase cycle
+# Requires server running in another terminal:
+#   ZOO_SIMULATION_ENABLED=false npm run dev:server
+npm run test:integration
+
+# Load test — all agents for N minutes (default 2)
+npm run test:load
+npm run test:load -- 5    # run for 5 minutes
+
+# Manual API testing
+curl http://localhost:4000/api/zoo/registry
+curl http://localhost:4000/api/merchant/food/catalog
 ```
 
 ## Troubleshooting
