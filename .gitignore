@@ -68,3 +68,6 @@ transaction-history/
 tmp/
 temp/
 *.tmp
+
+# Backup directories
+eth_tempo_experiments_backup/

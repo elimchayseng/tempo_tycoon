@@ -1,0 +1,32 @@
+{
+  "name": "tempo-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "latest",
+    "hono": "latest",
+    "@hono/node-server": "latest",
+    "@hono/node-ws": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19",
+    "react-dom": "^19",
+    "tailwindcss": "^4",
+    "@tailwindcss/vite": "^4",
+    "tsx": "latest",
+    "concurrently": "latest"
+  }
+}
