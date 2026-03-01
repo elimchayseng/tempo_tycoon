@@ -2,7 +2,7 @@ import { BuyerAgent } from './buyer-agent.js';
 import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
 import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
-import { getAllZooAccounts, getZooAccountByRole } from '../eth_tempo_experiments/server/zoo-accounts.js';
+import { getAllZooAccounts, getZooAccountByRole } from '../server/zoo-accounts.js';
 import type {
   AgentConfig,
   AgentStatus,

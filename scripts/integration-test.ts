@@ -10,7 +10,7 @@
  * Exit 0 on success, 1 on failure.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../eth_tempo_experiments/server/zoo-accounts.js';
+import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const TIMEOUT_MS = 60_000;

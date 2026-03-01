@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This project transforms the existing `eth_tempo_experiments` wallet prototype into an autonomous "Zoo Tycoon" simulation using the **Agentic Commerce Protocol (ACP)** on the **Tempo Moderato Testnet**. The simulation features autonomous buyer agents (zoo attendees) that make need-based purchases from seller agents (zoo merchants) using real blockchain transactions.
+This project transforms the existing `tempo-zoo-experiment` wallet prototype into an autonomous "Zoo Tycoon" simulation using the **Agentic Commerce Protocol (ACP)** on the **Tempo Moderato Testnet**. The simulation features autonomous buyer agents (zoo attendees) that make need-based purchases from seller agents (zoo merchants) using real blockchain transactions.
 
 ## Project Architecture
 
@@ -185,7 +185,7 @@ interface AgentState {
 
 ### Phase 1: ACP Infrastructure (1-2 weeks)
 
-**Extend Existing eth_tempo_experiments Server:**
+**Extend Existing tempo-zoo-experiment Server:**
 - Add zoo routes to existing Hono application
 - Create ACP merchant endpoints
 - Implement session management for checkout flow
@@ -279,21 +279,26 @@ interface AgentState {
 
 ```
 tempo-zoo-experiment/
-├── eth_tempo_experiments/ (existing foundation)
-│   ├── server/
-│   │   ├── index.ts (extend with zoo routes)
-│   │   ├── routes/zoo.ts (NEW - ACP endpoints)
-│   │   ├── zoo-accounts.ts (NEW - simulation wallets)
-│   │   └── middleware/session-verifier.ts (NEW)
-│   ├── agents/ (NEW directory)
-│   │   ├── buyer-agent.ts
-│   │   ├── decision-engine.ts
-│   │   ├── acp-client.ts
-│   │   └── payment-manager.ts
-│   ├── config/ (NEW directory)
-│   │   └── zoo_map.json
-│   └── web/
-│       └── zoo-dashboard.html (NEW - minimal monitoring)
+├── server/
+│   ├── index.ts (main server entry)
+│   ├── routes/zoo.ts (ACP endpoints)
+│   ├── zoo-accounts.ts (simulation wallets)
+│   └── middleware/session-verifier.ts
+├── agents/
+│   ├── buyer-agent.ts
+│   ├── agent-runner.ts
+│   ├── acp-client.ts
+│   └── payment-manager.ts
+├── config/
+│   └── zoo_map.json
+├── web/
+│   └── (React dashboard)
+├── scripts/
+│   ├── setup-wallets.ts
+│   ├── fund-agents.ts
+│   └── health-check.ts
+├── shared/
+│   └── types.ts
 ├── SPEC.md (this document)
 ├── ARCHITECTURE.md (technical details)
 ├── DEPLOYMENT.md (Railway setup)
@@ -303,14 +308,14 @@ tempo-zoo-experiment/
 ## Railway Deployment
 
 ### Configuration
-The project builds on the existing Railway setup in `eth_tempo_experiments`:
+The project builds on the existing Railway setup:
 - Use existing `railway.toml` as base
 - Extend with zoo-specific environment variables
 - Leverage existing health check and monitoring endpoints
 
 ### Environment Variables
 ```bash
-# Existing variables (from eth_tempo_experiments)
+# Core variables
 RPC_URL=https://rpc.moderato.tempo.xyz
 EXPLORER_URL=https://explore.moderato.tempo.xyz
 PORT=4000
@@ -330,7 +335,7 @@ MIN_BALANCE_THRESHOLD=10.0
 ```
 
 ### Service Architecture
-- **Web Service**: Extended eth_tempo_experiments server with zoo routes
+- **Web Service**: Server with zoo routes
 - **Worker Service**: Autonomous agents running as separate Railway worker
 - **Shared Database**: Use Railway's built-in storage for session management
 
@@ -403,4 +408,4 @@ MIN_BALANCE_THRESHOLD=10.0
 
 ---
 
-This specification provides a complete blueprint for implementing the Zoo Tycoon Agentic Commerce Simulation while leveraging the robust foundation of the existing eth_tempo_experiments infrastructure.
+This specification provides a complete blueprint for implementing the Zoo Tycoon Agentic Commerce Simulation while leveraging the robust Tempo testnet infrastructure.

@@ -10,7 +10,7 @@
  * Exit 0 on success, 1 if success rate < 50%.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../eth_tempo_experiments/server/zoo-accounts.js';
+import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const DEFAULT_MINUTES = 2;

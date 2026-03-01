@@ -1,5 +1,5 @@
-import { sendAction } from "../eth_tempo_experiments/server/actions/send.js";
-import { accountStore } from "../eth_tempo_experiments/server/accounts.js";
+import { sendAction } from "../server/actions/send.js";
+import { accountStore } from "../server/accounts.js";
 import { rpcCircuitBreaker } from './circuit-breaker.js';
 import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
 

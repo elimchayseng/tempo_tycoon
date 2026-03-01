@@ -5,12 +5,12 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:agents\"",
-    "dev:server": "cd eth_tempo_experiments && npm run dev:server",
-    "dev:web": "cd eth_tempo_experiments && npm run dev:web",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
     "dev:agents": "tsx watch agents/simulation-runner.ts",
-    "build": "cd eth_tempo_experiments && npm run build",
-    "start": "cd eth_tempo_experiments && npm start",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
     "start:agents": "tsx agents/simulation-runner.ts",
     "check": "tsc --noEmit",
     "setup:wallets": "tsx scripts/setup-wallets.ts",
@@ -31,8 +31,16 @@
     "typescript": "^5",
     "@types/uuid": "^9.0.0",
     "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "tsx": "latest",
-    "concurrently": "latest"
+    "concurrently": "latest",
+    "vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "react": "^19",
+    "react-dom": "^19",
+    "tailwindcss": "^4",
+    "@tailwindcss/vite": "^4"
   },
   "engines": {
     "node": ">=18.0.0"

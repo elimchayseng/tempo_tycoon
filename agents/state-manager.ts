@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
+import { randomBytes } from 'crypto';
 import type { AgentState, PurchaseRecord } from './types.js';
 
 export class StateManager {
@@ -103,8 +104,8 @@ export class StateManager {
       // Convert to JSON with pretty printing for readability
       const data = JSON.stringify(stateToSave, null, 2);
 
-      // Atomic write: write to temp file then rename
-      const tempFile = `${stateFile}.tmp`;
+      // Atomic write: write to unique temp file then rename
+      const tempFile = `${stateFile}.${randomBytes(4).toString('hex')}.tmp`;
       await fs.writeFile(tempFile, data, 'utf-8');
       await fs.rename(tempFile, stateFile);
 

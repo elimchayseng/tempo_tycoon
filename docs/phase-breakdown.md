@@ -7,7 +7,7 @@ This document provides a granular breakdown of tasks for each implementation pha
 ## Phase 1: ACP Infrastructure (1-2 weeks)
 
 ### Goal
-Establish the foundational ACP server endpoints and merchant functionality by extending the existing `eth_tempo_experiments` server.
+Establish the foundational ACP server endpoints and merchant functionality by extending the existing server.
 
 ### Week 1: Server Extensions
 
@@ -19,7 +19,7 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] Add zoo feature toggle for conditional enabling
 
 **Files Modified:**
-- `eth_tempo_experiments/server/config.ts`
+- `server/config.ts`
 
 **Deliverables:**
 - Zoo configuration properly integrated with existing system
@@ -39,10 +39,10 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] Ensure accounts are properly funded and accessible
 
 **Files Created:**
-- `eth_tempo_experiments/server/zoo-accounts.ts`
+- `server/zoo-accounts.ts`
 
 **Files Modified:**
-- `eth_tempo_experiments/server/index.ts` (import zoo accounts)
+- `server/index.ts` (import zoo accounts)
 
 **Deliverables:**
 - 5 zoo wallets (ZooMaster, MerchantA, Attendee1-3) properly initialized
@@ -62,10 +62,10 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] Create zoo status endpoint for monitoring
 
 **Files Created:**
-- `eth_tempo_experiments/server/routes/zoo.ts`
+- `server/routes/zoo.ts`
 
 **Files Modified:**
-- `eth_tempo_experiments/server/index.ts` (add zoo routes)
+- `server/index.ts` (add zoo routes)
 
 **Deliverables:**
 - `GET /api/zoo/registry` returns complete merchant registry
@@ -88,8 +88,8 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] Add session storage (in-memory for MVP)
 
 **Files Created:**
-- `eth_tempo_experiments/server/routes/merchant.ts`
-- `eth_tempo_experiments/server/middleware/session-verifier.ts`
+- `server/routes/merchant.ts`
+- `server/middleware/session-verifier.ts`
 
 **Deliverables:**
 - `GET /api/merchant/food/catalog` returns product catalog
@@ -110,7 +110,7 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] Add transaction logging integration
 
 **Files Modified:**
-- `eth_tempo_experiments/server/routes/merchant.ts`
+- `server/routes/merchant.ts`
 
 **Deliverables:**
 - Transaction verification using Tempo blockchain
@@ -127,7 +127,7 @@ Establish the foundational ACP server endpoints and merchant functionality by ex
 - [ ] All health check endpoints return success
 - [ ] Registry endpoint returns valid merchant data
 - [ ] Manual checkout flow completes successfully via API testing
-- [ ] Existing eth_tempo_experiments functionality unchanged
+- [ ] Existing existing functionality unchanged
 - [ ] Zoo routes integrated without conflicts
 
 ### Testing Checklist for Phase 1
@@ -279,7 +279,7 @@ Complete end-to-end autonomous purchase cycles with real blockchain transactions
 #### 3.1 Transaction Manager (2 days)
 **Tasks:**
 - [ ] Create `agents/transaction-manager.ts` using existing send utilities
-- [ ] Integrate with `eth_tempo_experiments/server/actions/send.ts`
+- [ ] Integrate with `server/actions/send.ts`
 - [ ] Add transaction signing and broadcasting for agents
 - [ ] Implement transaction result handling
 
@@ -287,7 +287,7 @@ Complete end-to-end autonomous purchase cycles with real blockchain transactions
 - `agents/transaction-manager.ts`
 
 **Files Modified:**
-- `eth_tempo_experiments/server/actions/send.ts` (return transaction hash)
+- `server/actions/send.ts` (return transaction hash)
 
 **Deliverables:**
 - Agent transaction manager that reuses existing infrastructure
@@ -435,7 +435,7 @@ Create simple monitoring dashboard and analytics to visualize the autonomous sim
 - [ ] Implement Server-Sent Events for real-time updates
 
 **Files Modified:**
-- `eth_tempo_experiments/server/routes/zoo.ts`
+- `server/routes/zoo.ts`
 
 **Deliverables:**
 - Comprehensive status API with agent states
@@ -455,12 +455,12 @@ Create simple monitoring dashboard and analytics to visualize the autonomous sim
 - [ ] Create simple charts for need levels and transaction volume
 
 **Files Created:**
-- `eth_tempo_experiments/web/zoo-dashboard.html`
-- `eth_tempo_experiments/web/zoo-dashboard.js`
-- `eth_tempo_experiments/web/zoo-dashboard.css`
+- `web/zoo-dashboard.html`
+- `web/zoo-dashboard.js`
+- `web/zoo-dashboard.css`
 
 **Files Modified:**
-- `eth_tempo_experiments/server/index.ts` (serve static files)
+- `server/index.ts` (serve static files)
 
 **Deliverables:**
 - Simple HTML dashboard accessible at `/zoo-dashboard.html`
@@ -525,7 +525,7 @@ open http://localhost:4000/zoo-dashboard.html
 - [ ] All 4 phases completed successfully
 - [ ] Autonomous agents operate without manual intervention
 - [ ] Real blockchain transactions on Tempo testnet
-- [ ] Integration with existing eth_tempo_experiments infrastructure
+- [ ] Integration with existing existing infrastructure
 - [ ] Railway deployment successful and stable
 
 ### Functional Requirements

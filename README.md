@@ -11,7 +11,6 @@ cd tempo-zoo-experiment
 
 # Install dependencies
 npm install
-cd eth_tempo_experiments && npm install && cd ..
 
 # Generate wallets
 npm run setup:wallets
@@ -32,7 +31,7 @@ npm run dev
 ## Project Overview
 
 ### Architecture
-- **Built on eth_tempo_experiments**: Extends existing Tempo testnet infrastructure
+- **Built on Tempo**: Extends existing Tempo testnet infrastructure
 - **Autonomous Agents**: 3 buyer agents with internal "needs" systems
 - **ACP-Compliant Merchants**: REST API following Agentic Commerce Protocol
 - **Real Blockchain**: All transactions occur on Tempo Moderato Testnet
@@ -53,7 +52,7 @@ npm run dev
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture and integration strategy
 - **[API_SPEC.md](API_SPEC.md)** - Complete ACP REST API documentation
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Railway deployment guide
-- **[docs/integration-strategy.md](docs/integration-strategy.md)** - Integration with eth_tempo_experiments
+- **[docs/integration-strategy.md](docs/integration-strategy.md)** - Integration strategy
 - **[docs/phase-breakdown.md](docs/phase-breakdown.md)** - Detailed implementation phases
 
 ## Development Phases
@@ -133,9 +132,10 @@ npm run fund:agents        # Distribute AlphaUSD to all agents
 npm run health:check       # Comprehensive system health check
 npm run test:integration   # End-to-end single purchase cycle test
 npm run test:load          # Multi-agent load test (default: 2 min)
-npm run dev                # Start server + agents in development
-npm run dev:server         # Start server only
-npm run dev:agents         # Start agents only
+npm run dev                # Start server + web dashboard (concurrently)
+npm run dev:server         # Server only (port 4000)
+npm run dev:web            # Vite dev server (port 5173, proxies to 4000)
+npm run dev:agents         # Autonomous agents only
 ```
 
 > For detailed usage, prerequisites, and troubleshooting for each script, see **[docs/testing-and-scripts.md](docs/testing-and-scripts.md)**.
@@ -277,7 +277,7 @@ LOG_LEVEL=debug npm run dev
 
 ### Code Style
 - TypeScript for all new code
-- Follow existing eth_tempo_experiments patterns
+- Follow existing project patterns
 - Comprehensive error handling
 - Clear logging for debugging
 
