@@ -1,5 +1,5 @@
-import { accountStore } from "../eth_tempo_experiments/server/accounts.js";
-import { formatUsdAmount, ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
+import { accountStore } from "../server/accounts.js";
+import { formatUsdAmount, ALPHA_USD } from "../server/tempo-client.js";
 
 /**
  * Utility to sync agent balances between blockchain and local state

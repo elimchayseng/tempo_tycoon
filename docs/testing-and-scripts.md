@@ -33,7 +33,7 @@ MIN_BALANCE_THRESHOLD=10.0     # AlphaUSD — triggers refunding
 
 ### How `.env` is loaded
 
-- **Dev server** (`npm run dev:server`): loaded via `eth_tempo_experiments/server/env.ts`, which calls `dotenv.config()` pointing at the root `.env`.
+- **Dev server** (`npm run dev:server`): loaded via `server/env.ts`, which calls `dotenv.config()` pointing at the root `.env`.
 - **Scripts** (`npm run fund:agents`, `test:integration`, etc.): loaded via `import 'dotenv/config'` at the top of each script.
 - **Agents** (`npm run dev:agents`): loaded through the server's env.ts when imported transitively.
 
@@ -251,7 +251,6 @@ Requires the dev server to already be running on port 4000 so agents can reach m
 ```bash
 # 1. Install dependencies
 npm install
-cd eth_tempo_experiments && npm install && cd ..
 
 # 2. Generate wallets
 npm run setup:wallets

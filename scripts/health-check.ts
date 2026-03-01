@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 
 import 'dotenv/config';
-import { publicClient, ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
+import { publicClient, ALPHA_USD } from "../server/tempo-client.js";
 import { privateKeyToAccount } from "viem/accounts";
-import { formatUsdAmount } from "../eth_tempo_experiments/server/tempo-client.js";
+import { formatUsdAmount } from "../server/tempo-client.js";
 
 interface HealthCheck {
   name: string;

@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
     "strict": true,
     "noEmit": true,
@@ -13,25 +14,29 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@/eth_tempo/*": ["./eth_tempo_experiments/*"],
+      "@/server/*": ["./server/*"],
       "@/agents/*": ["./agents/*"],
       "@/config/*": ["./config/*"],
       "@/shared/*": ["./shared/*"]
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.js",
-    "**/*.jsx"
+    "server/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
+    "shared/**/*.ts",
+    "agents/**/*.ts",
+    "scripts/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "build"
+    "build",
+    "eth_tempo_experiments"
   ]
 }

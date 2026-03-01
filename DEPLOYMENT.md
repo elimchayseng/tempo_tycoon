@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers deploying the Zoo Tycoon Agentic Commerce Simulation to Railway, building on the existing `eth_tempo_experiments` infrastructure.
+This guide covers deploying the Zoo Tycoon Agentic Commerce Simulation to Railway.
 
 ## Prerequisites
 
@@ -126,7 +126,7 @@ Railway automatically detects the configuration from `railway.toml`:
   builder = "nixpacks"
 
 [deploy]
-  startCommand = "cd eth_tempo_experiments && npm start"
+  startCommand = "npm start"
   healthcheckPath = "/api/health"
   healthcheckTimeout = 30
   restartPolicyType = "always"
@@ -137,10 +137,10 @@ If Railway doesn't properly detect the setup, you can override the build:
 
 ```bash
 # Set custom build command
-railway variables set NIXPACKS_BUILD_CMD="cd eth_tempo_experiments && npm install"
+railway variables set NIXPACKS_BUILD_CMD="npm install"
 
 # Set custom start command
-railway variables set NIXPACKS_START_CMD="cd eth_tempo_experiments && npm start"
+railway variables set NIXPACKS_START_CMD="npm start"
 ```
 
 ### 6. Domain and SSL

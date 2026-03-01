@@ -1,5 +1,5 @@
-import { batchAction } from "../eth_tempo_experiments/server/actions/batch.js";
-import { ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
+import { batchAction } from "../server/actions/batch.js";
+import { ALPHA_USD } from "../server/tempo-client.js";
 import type { BatchFundingRequest, BatchFundingResult, AgentConfig } from "./types.js";
 
 export class FundingManager {

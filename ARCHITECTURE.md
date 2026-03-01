@@ -1,13 +1,13 @@
 # Zoo Tycoon ACP - Technical Architecture
 
-## Integration Strategy with eth_tempo_experiments
+## Technical Architecture
 
-This document details how the Zoo Tycoon simulation integrates with and extends the existing `eth_tempo_experiments` infrastructure.
+This document details the Zoo Tycoon simulation architecture and how the components integrate.
 
-## Existing Infrastructure Analysis
+## Infrastructure Analysis
 
-### What We Have
-The `eth_tempo_experiments` repository provides:
+### Core Components
+The project provides:
 
 1. **Hono-based Server** (`server/index.ts`)
    - Express-like routing with TypeScript support
@@ -103,7 +103,7 @@ export class SessionManager {
 Independent TypeScript processes that use the existing infrastructure:
 
 ```typescript
-import { createTempoWalletClient } from "../eth_tempo_experiments/server/tempo-client.js";
+import { createTempoWalletClient } from "./server/tempo-client.js";
 import { Actions } from "viem/tempo";
 
 export class BuyerAgent {
@@ -228,7 +228,7 @@ app.get("/registry", async (c) => {
 Use the existing `instrumented-client.ts` system:
 
 ```typescript
-import { emitLog } from "../eth_tempo_experiments/server/instrumented-client.js";
+import { emitLog } from "./server/instrumented-client.js";
 
 export function logAgentAction(agent: string, action: string, data: any) {
   emitLog({
@@ -328,7 +328,7 @@ export class AgentStateManager {
 All configuration through Railway environment variables:
 
 ```bash
-# Existing eth_tempo_experiments variables
+# Core variables
 RPC_URL=https://rpc.moderato.tempo.xyz
 EXPLORER_URL=https://explore.moderato.tempo.xyz
 PORT=4000
@@ -362,13 +362,13 @@ ATTENDEE_1_PRIVATE_KEY=0x...
 
 #### 1. Local Development
 ```bash
-# Start existing server with zoo extensions
-cd eth_tempo_experiments
-npm run dev:server
+# Start server and web dashboard
+npm run dev
 
-# In another terminal, start agents
-cd ..
-npm run dev:agents
+# Or start components individually
+npm run dev:server    # Server only (port 4000)
+npm run dev:web       # Vite dev server (port 5173)
+npm run dev:agents    # Autonomous agents only
 ```
 
 #### 2. Testing Strategy
@@ -382,4 +382,4 @@ npm run dev:agents
 - Add zoo-specific metrics endpoints
 - Monitor agent performance and success rates
 
-This architecture leverages the proven foundation of eth_tempo_experiments while adding the minimum necessary components for the zoo simulation, ensuring reliability and maintainability.
+This architecture leverages proven Tempo testnet infrastructure while adding the minimum necessary components for the zoo simulation, ensuring reliability and maintainability.

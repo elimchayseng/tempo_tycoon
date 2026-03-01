@@ -1,8 +1,8 @@
-# Integration Strategy with eth_tempo_experiments
+# Integration Strategy
 
 ## Overview
 
-This document provides detailed guidance on how to integrate the Zoo Tycoon ACP simulation with the existing `eth_tempo_experiments` codebase, ensuring maximum reuse of proven infrastructure while adding new functionality.
+This document provides detailed guidance on how the Zoo Tycoon ACP simulation integrates its components, ensuring maximum reuse of proven infrastructure.
 
 ## Existing Infrastructure Analysis
 
@@ -56,7 +56,7 @@ This document provides detailed guidance on how to integrate the Zoo Tycoon ACP 
 Extend the main server with zoo routes:
 
 ```typescript
-// In eth_tempo_experiments/server/index.ts
+// In server/index.ts
 
 // Add imports
 import { zooRoutes } from "./routes/zoo.js";
@@ -73,7 +73,7 @@ console.log(`[tempo-explorer] Zoo simulation routes enabled`);
 Extend the existing config system:
 
 ```typescript
-// In eth_tempo_experiments/server/config.ts
+// In server/config.ts
 
 export const config = {
   // ... existing config properties
@@ -120,7 +120,7 @@ export function validateConfig(): void {
 Create zoo-specific account management:
 
 ```typescript
-// New file: eth_tempo_experiments/server/zoo-accounts.ts
+// New file: server/zoo-accounts.ts
 
 import { accountStore } from "./accounts.js";
 import { config } from "./config.js";
@@ -176,7 +176,7 @@ if (config.zoo.enabled) {
 Add zoo account initialization to the main server:
 
 ```typescript
-// In eth_tempo_experiments/server/index.ts
+// In server/index.ts
 
 // Add import after existing imports
 import "./zoo-accounts.js"; // This will auto-initialize zoo accounts
@@ -188,7 +188,7 @@ import "./zoo-accounts.js"; // This will auto-initialize zoo accounts
 
 #### 3.1 Zoo Registry Route
 ```typescript
-// New file: eth_tempo_experiments/server/routes/zoo.ts
+// New file: server/routes/zoo.ts
 
 import { Hono } from "hono";
 import { accountStore } from "../accounts.js";
@@ -257,7 +257,7 @@ export { zoo as zooRoutes };
 
 #### 3.2 Merchant Route Implementation
 ```typescript
-// New file: eth_tempo_experiments/server/routes/merchant.ts
+// New file: server/routes/merchant.ts
 
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
@@ -395,8 +395,8 @@ export { merchant as merchantRoutes };
 ```typescript
 // New file: agents/transaction-wrapper.ts
 
-import { sendAction } from "../eth_tempo_experiments/server/actions/send.js";
-import { accountStore } from "../eth_tempo_experiments/server/accounts.js";
+import { sendAction } from "../server/actions/send.js";
+import { accountStore } from "../server/accounts.js";
 
 export class AgentTransactionManager {
   constructor(private agentWalletId: string) {}
@@ -437,18 +437,17 @@ export class AgentTransactionManager {
 
 #### 5.1 Development Setup
 ```bash
-# Install dependencies in both directories
-cd eth_tempo_experiments && npm install
-cd .. && npm install
+# Install dependencies
+npm install
 
 # Start development servers
-npm run dev  # This will start both server and agents
+npm run dev  # This will start server + web dashboard
 ```
 
 #### 5.2 Build Process
 ```bash
-# Build the main application
-cd eth_tempo_experiments && npm run build
+# Build the web frontend
+npm run build
 
 # Check TypeScript across the entire project
 npm run check
@@ -474,7 +473,7 @@ The existing WebSocket infrastructure will automatically broadcast zoo events th
 ## Migration Checklist
 
 ### Pre-Integration
-- [ ] Backup existing eth_tempo_experiments repository
+- [ ] Backup existing repository
 - [ ] Ensure all existing functionality still works
 - [ ] Set up environment variables for zoo wallets
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 
 import 'dotenv/config';
-import { config } from "../eth_tempo_experiments/server/config.js";
-import { createTempoWalletClient, publicClient, ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
+import { config } from "../server/config.js";
+import { createTempoWalletClient, publicClient, ALPHA_USD } from "../server/tempo-client.js";
 import { Actions } from "viem/tempo";
 import { privateKeyToAccount } from "viem/accounts";
-import { parseUsdAmount, formatUsdAmount } from "../eth_tempo_experiments/server/tempo-client.js";
+import { parseUsdAmount, formatUsdAmount } from "../server/tempo-client.js";
 
 const FUNDING_AMOUNTS = {
   MERCHANT_A: "100.0",

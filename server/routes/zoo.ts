@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import { getZooAccountByRole, getAllZooAccounts } from "../zoo-accounts.js";
 import { config } from "../config.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
-import { AgentRunner } from "../../../agents/agent-runner.js";
+import { AgentRunner } from "../../agents/agent-runner.js";
 import { emitLog } from "../instrumented-client.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,7 +66,7 @@ if (config.zoo.enabled) {
 function loadZooRegistry() {
   try {
     // Load the zoo_map.json file from the config directory
-    const zooMapPath = join(__dirname, '../../../config/zoo_map.json');
+    const zooMapPath = join(__dirname, '../../config/zoo_map.json');
     const zooMapContent = readFileSync(zooMapPath, 'utf-8');
     const zooMap = JSON.parse(zooMapContent);
 
