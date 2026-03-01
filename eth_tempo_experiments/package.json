@@ -11,6 +11,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "dotenv": "^16.3.0",
     "viem": "latest",
     "hono": "latest",
     "@hono/node-server": "latest",

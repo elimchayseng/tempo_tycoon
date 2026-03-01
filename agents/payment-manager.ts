@@ -1,6 +1,48 @@
 import { sendAction } from "../eth_tempo_experiments/server/actions/send.js";
 import { accountStore } from "../eth_tempo_experiments/server/accounts.js";
+import { rpcCircuitBreaker } from './circuit-breaker.js';
 import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
+
+// --- Transaction Queue (singleton) ---
+// Ensures sequential tx processing with minimum gap to avoid nonce collisions.
+class TransactionQueue {
+  private queue: Array<{ fn: () => Promise<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
+  private processing = false;
+  private readonly minGapMs = 500;
+
+  enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ fn, resolve, reject });
+      if (!this.processing) this.process();
+    });
+  }
+
+  private async process(): Promise<void> {
+    this.processing = true;
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      try {
+        const result = await item.fn();
+        item.resolve(result);
+      } catch (err) {
+        item.reject(err);
+      }
+      if (this.queue.length > 0) {
+        await new Promise(r => setTimeout(r, this.minGapMs));
+      }
+    }
+    this.processing = false;
+  }
+}
+
+const txQueue = new TransactionQueue();
+
+const NON_RECOVERABLE_PATTERNS = [
+  'insufficient funds',
+  'insufficient balance',
+  'unknown account',
+  'account not found',
+];
 
 export interface PaymentResult {
   success: boolean;
@@ -77,6 +119,59 @@ export class PaymentManager {
         error: `Payment failed: ${errorMessage}`
       };
     }
+  }
+
+  /**
+   * Execute payment with retry logic and circuit breaker protection.
+   * Retries up to 3 times with exponential backoff (2s base).
+   * Non-recoverable errors (insufficient funds, unknown accounts) skip retry.
+   * All attempts go through the global TransactionQueue to prevent nonce collisions.
+   */
+  async makePaymentWithRetry(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
+    const maxRetries = 3;
+    const baseDelayMs = 2000;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await rpcCircuitBreaker.execute(() =>
+          txQueue.enqueue(() => this.makePayment(session, product))
+        );
+
+        if (result.success) return result;
+
+        // Check for non-recoverable error
+        const errLower = (result.error || '').toLowerCase();
+        if (NON_RECOVERABLE_PATTERNS.some(p => errLower.includes(p))) {
+          console.log(`[PaymentManager:${this.agentId}] Non-recoverable error, skipping retry: ${result.error}`);
+          return result;
+        }
+
+        if (attempt < maxRetries) {
+          const delay = baseDelayMs * Math.pow(2, attempt - 1);
+          console.log(`[PaymentManager:${this.agentId}] Payment attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        } else {
+          return result;
+        }
+      } catch (error) {
+        // Circuit breaker open or other thrown error
+        const msg = error instanceof Error ? error.message : String(error);
+
+        if (NON_RECOVERABLE_PATTERNS.some(p => msg.toLowerCase().includes(p))) {
+          return { success: false, amount: session.amount, error: msg };
+        }
+
+        if (attempt < maxRetries) {
+          const delay = baseDelayMs * Math.pow(2, attempt - 1);
+          console.log(`[PaymentManager:${this.agentId}] Payment attempt ${attempt}/${maxRetries} threw, retrying in ${delay}ms: ${msg}`);
+          await new Promise(r => setTimeout(r, delay));
+        } else {
+          return { success: false, amount: session.amount, error: msg };
+        }
+      }
+    }
+
+    return { success: false, amount: session.amount, error: 'Exhausted all retries' };
   }
 
   /**

@@ -209,7 +209,7 @@ export class BuyerAgent {
       // Step 3: Execute payment
       console.log(`[BuyerAgent:${this.config.agent_id}] 💳 Making payment for ${product.name}...`);
 
-      const paymentResult = await this.paymentManager.makePayment(session, product);
+      const paymentResult = await this.paymentManager.makePaymentWithRetry(session, product);
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || 'Payment failed');

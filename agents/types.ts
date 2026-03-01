@@ -182,6 +182,23 @@ export interface AgentMetrics {
   error_rate: number;
 }
 
+export interface MetricPoint {
+  timestamp: number;
+  latencyMs: number;
+  success: boolean;
+  agentId: string;
+  amount: number;
+}
+
+export interface CircuitBreakerStatusInfo {
+  name: string;
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  failures: number;
+  successes: number;
+  lastFailureTime: number | null;
+  nextRetryTime: number | null;
+}
+
 export type AgentEventType =
   | 'agent_started'
   | 'agent_stopped'
