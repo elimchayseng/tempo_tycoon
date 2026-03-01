@@ -290,4 +290,10 @@ export async function sendAction(params: {
     data: {},
     annotations: annotations.send.comparison,
   });
+
+  return {
+    txHash: result.receipt.transactionHash,
+    blockNumber: result.receipt.blockNumber.toString(),
+    gasUsed: result.receipt.gasUsed.toString(),
+  };
 }

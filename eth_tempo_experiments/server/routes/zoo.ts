@@ -5,11 +5,62 @@ import { fileURLToPath } from "url";
 import { getZooAccountByRole, getAllZooAccounts } from "../zoo-accounts.js";
 import { config } from "../config.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
+import { AgentRunner } from "../../../agents/agent-runner.js";
+import { emitLog } from "../instrumented-client.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export const zooRoutes = new Hono();
+
+// Global AgentRunner instance
+let agentRunner: AgentRunner | null = null;
+
+// Initialize AgentRunner if zoo simulation is enabled
+if (config.zoo.enabled) {
+  agentRunner = new AgentRunner();
+
+  // Subscribe to agent events and broadcast via WebSocket
+  agentRunner.on('simulation_started', (event) => {
+    emitLog({
+      action: 'zoo_simulation',
+      type: 'info',
+      label: '🎪 Zoo Simulation Started',
+      data: event.data
+    });
+  });
+
+  agentRunner.on('purchase_completed', (event) => {
+    emitLog({
+      action: 'zoo_purchase',
+      type: 'info',
+      label: `🛍️  Purchase: ${event.data.purchase_record.name} ($${event.data.purchase_record.amount})`,
+      data: {
+        agent_id: event.agent_id,
+        product: event.data.purchase_record.name,
+        amount: event.data.purchase_record.amount,
+        tx_hash: event.data.purchase_record.tx_hash,
+        new_needs: event.data.new_needs
+      }
+    });
+  });
+
+  agentRunner.on('needs_updated', (event) => {
+    // Broadcast need updates for dashboard visualization
+    emitLog({
+      action: 'zoo_needs',
+      type: 'rpc_result',
+      label: `📊 ${event.agent_id} needs: food=${event.data.current_needs.food_need}`,
+      data: {
+        agent_id: event.agent_id,
+        needs: event.data.current_needs,
+        cycle: event.data.cycle_count
+      }
+    });
+  });
+
+  console.log('[zoo-routes] 🤖 AgentRunner initialized and ready');
+}
 
 // Helper to load and process zoo registry
 function loadZooRegistry() {
@@ -93,32 +144,26 @@ zooRoutes.get("/status", async (c) => {
           ])
         ),
       })),
-      agents: {
-        // Placeholder for agent states - will be populated when agents are running
+      agents: agentRunner ? (() => {
+        const runnerStatus = agentRunner.getStatus();
+        return {
+          total_agents: runnerStatus.agents.length,
+          active_agents: runnerStatus.agents.filter((a: any) => a.status !== 'offline').length,
+          agent_states: runnerStatus.agents.map((a: any) => ({
+            id: a.agent_id,
+            status: a.status,
+            needs: a.needs,
+            last_purchase: null,
+            balance: a.balance
+          }))
+        };
+      })() : {
         total_agents: 3,
         active_agents: 0,
         agent_states: [
-          {
-            id: "attendee_1",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          },
-          {
-            id: "attendee_2",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          },
-          {
-            id: "attendee_3",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          }
+          { id: "attendee_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "attendee_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "attendee_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
         ]
       }
     };
@@ -472,6 +517,204 @@ zooRoutes.get("/transactions", async (c) => {
     console.error('[zoo-routes] Transactions endpoint error:', error);
     return c.json({
       error: "Failed to load transactions",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Agent Management Endpoints
+// ---------------------------------------------------------------------------
+
+// GET /api/zoo/agents/status - Get status of all agents
+zooRoutes.get("/agents/status", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    const status = agentRunner.getStatus();
+    return c.json(status);
+
+  } catch (error) {
+    console.error('[zoo-routes] Agent status error:', error);
+    return c.json({
+      error: "Failed to get agent status",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// GET /api/zoo/agents/metrics - Get aggregate metrics
+zooRoutes.get("/agents/metrics", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    const metrics = agentRunner.getMetrics();
+    return c.json(metrics);
+
+  } catch (error) {
+    console.error('[zoo-routes] Agent metrics error:', error);
+    return c.json({
+      error: "Failed to get agent metrics",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// POST /api/zoo/agents/start - Start all agents
+zooRoutes.post("/agents/start", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    await agentRunner.start();
+
+    return c.json({
+      success: true,
+      message: "All agents started successfully",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[zoo-routes] Agent start error:', error);
+    return c.json({
+      error: "Failed to start agents",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// POST /api/zoo/agents/stop - Stop all agents
+zooRoutes.post("/agents/stop", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    await agentRunner.stop();
+
+    return c.json({
+      success: true,
+      message: "All agents stopped successfully",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[zoo-routes] Agent stop error:', error);
+    return c.json({
+      error: "Failed to stop agents",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// POST /api/zoo/agents/fund - Trigger funding check and refill
+zooRoutes.post("/agents/fund", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    await agentRunner.checkAndRefundAgents();
+
+    return c.json({
+      success: true,
+      message: "Funding check completed",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[zoo-routes] Agent funding error:', error);
+    return c.json({
+      error: "Failed to trigger funding",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// POST /api/zoo/agents/:agentId/purchase - Force a purchase for testing
+zooRoutes.post("/agents/:agentId/purchase", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    const agentId = c.req.param('agentId');
+    const body = await c.req.json().catch(() => ({}));
+    const maxBudget = body.max_budget;
+
+    await agentRunner.forcePurchase(agentId, maxBudget);
+
+    return c.json({
+      success: true,
+      message: `Purchase triggered for agent ${agentId}`,
+      agent_id: agentId,
+      max_budget: maxBudget,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[zoo-routes] Force purchase error:', error);
+    return c.json({
+      error: "Failed to trigger purchase",
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// GET /api/zoo/agents/:agentId - Get specific agent status
+zooRoutes.get("/agents/:agentId", async (c) => {
+  try {
+    if (!config.zoo.enabled) {
+      return c.json({ error: "Zoo simulation is disabled" }, 404);
+    }
+
+    if (!agentRunner) {
+      return c.json({ error: "Agent runner not initialized" }, 500);
+    }
+
+    const agentId = c.req.param('agentId');
+    const agent = agentRunner.getAgent(agentId);
+
+    if (!agent) {
+      return c.json({ error: `Agent ${agentId} not found` }, 404);
+    }
+
+    const status = agent.getStatus();
+    return c.json(status);
+
+  } catch (error) {
+    console.error('[zoo-routes] Individual agent status error:', error);
+    return c.json({
+      error: "Failed to get agent status",
       details: error instanceof Error ? error.message : String(error)
     }, 500);
   }

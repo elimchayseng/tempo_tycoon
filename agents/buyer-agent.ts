@@ -1,0 +1,424 @@
+import { StateManager } from './state-manager.js';
+import { DecisionEngine } from './decision-engine.js';
+import { ACPClient } from './acp-client.js';
+import { PaymentManager } from './payment-manager.js';
+import { BalanceSync } from './balance-sync.js';
+import type {
+  AgentConfig,
+  AgentState,
+  AgentStatus,
+  AgentEvent,
+  AgentEventType
+} from './types.js';
+
+export class BuyerAgent {
+  private readonly config: AgentConfig;
+  private readonly stateManager: StateManager;
+  private readonly decisionEngine: DecisionEngine;
+  private readonly acpClient: ACPClient;
+  private readonly paymentManager: PaymentManager;
+  private readonly balanceSync: BalanceSync;
+
+  private state: AgentState | null = null;
+  private isRunning = false;
+  private loopInterval: NodeJS.Timeout | null = null;
+  private errorCount = 0;
+  private startTime: Date | null = null;
+
+  // Event handlers
+  private eventHandlers: Map<AgentEventType, Array<(event: AgentEvent) => void>> = new Map();
+
+  constructor(config: AgentConfig) {
+    this.config = config;
+
+    console.log(`[BuyerAgent:${config.agent_id}] 🤖 Initializing buyer agent...`);
+
+    // Initialize components
+    this.stateManager = new StateManager();
+    this.decisionEngine = new DecisionEngine(config.agent_id, {
+      pollingIntervalMs: config.polling_interval_ms,
+      needDecayRate: config.need_decay_rate,
+      purchaseThreshold: config.purchase_threshold,
+      needRecovery: config.need_recovery,
+      minBalanceThreshold: parseFloat(config.refund_threshold),
+    });
+    this.acpClient = new ACPClient(); // Uses default localhost:4002
+    this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
+    this.balanceSync = new BalanceSync();
+
+    console.log(`[BuyerAgent:${config.agent_id}] ✓ All components initialized`);
+  }
+
+  /**
+   * Start the autonomous agent
+   */
+  async start(): Promise<void> {
+    if (this.isRunning) {
+      console.log(`[BuyerAgent:${this.config.agent_id}] ⚠️  Agent already running`);
+      return;
+    }
+
+    console.log(`[BuyerAgent:${this.config.agent_id}] 🚀 Starting autonomous buyer agent...`);
+
+    try {
+      // Initialize state management
+      await this.stateManager.initialize();
+
+      // Load or create agent state
+      this.state = await this.stateManager.loadState(this.config.agent_id, this.config.address);
+
+      // Update state to online
+      this.state.status = 'online';
+      await this.stateManager.saveState(this.state);
+
+      // Start the autonomous loop
+      this.isRunning = true;
+      this.startTime = new Date();
+      this.scheduleNextCycle();
+
+      console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Agent started successfully`);
+      console.log(`[BuyerAgent:${this.config.agent_id}] ⏱️  Polling every ${this.config.polling_interval_ms}ms`);
+
+      this.emitEvent('agent_started', { config: this.config });
+
+    } catch (error) {
+      console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Failed to start agent:`, error);
+      await this.stop();
+      throw error;
+    }
+  }
+
+  /**
+   * Stop the autonomous agent
+   */
+  async stop(): Promise<void> {
+    console.log(`[BuyerAgent:${this.config.agent_id}] 🛑 Stopping agent...`);
+
+    this.isRunning = false;
+
+    // Clear the loop timer
+    if (this.loopInterval) {
+      clearTimeout(this.loopInterval);
+      this.loopInterval = null;
+    }
+
+    // Update state to offline
+    if (this.state) {
+      this.state.status = 'offline';
+      await this.stateManager.saveState(this.state);
+    }
+
+    console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Agent stopped`);
+    this.emitEvent('agent_stopped', { reason: 'manual_stop' });
+  }
+
+  /**
+   * Main autonomous decision and action loop
+   */
+  private async runCycle(): Promise<void> {
+    if (!this.isRunning || !this.state) {
+      return;
+    }
+
+    try {
+      console.log(`[BuyerAgent:${this.config.agent_id}] 🔄 Starting cycle ${this.state.cycle_count + 1}...`);
+
+      // Step 1: Update needs (degradation)
+      const previousNeeds = { ...this.state.needs };
+      this.state.needs = this.decisionEngine.degradeNeeds(this.state.needs);
+      this.state.cycle_count += 1;
+
+      // Emit needs update event
+      this.emitEvent('needs_updated', {
+        previous_needs: previousNeeds,
+        current_needs: this.state.needs,
+        cycle_count: this.state.cycle_count
+      });
+
+      // Step 2: Get current balance from blockchain
+      const currentBalance = await this.balanceSync.getBlockchainBalance(this.config.agent_id);
+
+      // Log balance comparison for debugging
+      await this.balanceSync.logBalanceComparison(this.config.agent_id, this.state.balance);
+
+      // Update local state balance to match blockchain
+      const balanceStr = currentBalance.toFixed(2);
+      this.state.balance = balanceStr;
+
+      // Sync to persistent state
+      await this.stateManager.syncBalance(this.config.agent_id, balanceStr);
+
+      // Step 3: Make purchase decision
+      const decision = this.decisionEngine.evaluatePurchaseDecision(
+        this.state.needs,
+        currentBalance,
+        this.state.last_purchase_time
+      );
+
+      console.log(`[BuyerAgent:${this.config.agent_id}] 🤔 Decision: ${decision.shouldPurchase ? 'PURCHASE' : 'WAIT'} (${decision.reason})`);
+
+      // Step 4: Execute purchase if needed
+      if (decision.shouldPurchase) {
+        await this.executePurchase(decision.maxBudget, decision.preferredCategory);
+      }
+
+      // Step 5: Save updated state
+      await this.stateManager.saveState(this.state);
+
+      // Schedule next cycle
+      this.scheduleNextCycle();
+
+    } catch (error) {
+      await this.handleError(error);
+    }
+  }
+
+  /**
+   * Execute a purchase transaction
+   */
+  private async executePurchase(maxBudget: number, preferredCategory?: string): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      console.log(`[BuyerAgent:${this.config.agent_id}] 🛍️  Executing purchase (budget: $${maxBudget.toFixed(2)})...`);
+
+      // Update status to purchasing
+      this.state.status = 'purchasing';
+      await this.stateManager.saveState(this.state);
+
+      this.emitEvent('purchase_initiated', {
+        max_budget: maxBudget,
+        preferred_category: preferredCategory,
+        current_needs: this.state.needs
+      });
+
+      // Step 1: Initiate ACP purchase flow
+      const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory);
+
+      if (!purchaseFlow) {
+        throw new Error('Failed to initiate ACP purchase flow');
+      }
+
+      const { session, product, merchantCategory } = purchaseFlow;
+
+      // Step 2: Validate payment amount
+      if (!this.paymentManager.validatePaymentAmount(session, maxBudget)) {
+        throw new Error(`Product price ($${session.amount}) exceeds budget ($${maxBudget.toFixed(2)})`);
+      }
+
+      // Step 3: Execute payment
+      console.log(`[BuyerAgent:${this.config.agent_id}] 💳 Making payment for ${product.name}...`);
+
+      const paymentResult = await this.paymentManager.makePayment(session, product);
+
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || 'Payment failed');
+      }
+
+      console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Payment successful: ${paymentResult.tx_hash}`);
+
+      // Step 4: Complete checkout with merchant
+      const checkoutResult = await this.acpClient.completeCheckout(
+        merchantCategory,
+        session.session_id,
+        paymentResult.tx_hash!
+      );
+
+      if (!checkoutResult.success || !checkoutResult.verified) {
+        console.error(`[BuyerAgent:${this.config.agent_id}] ⚠️  Checkout verification failed:`, checkoutResult.error);
+        // Note: Payment already went through, so we continue with need recovery
+      }
+
+      // Step 5: Update needs based on purchase
+      const needsBefore = { ...this.state.needs };
+      this.state.needs = this.decisionEngine.calculateNeedRecovery(this.state.needs, product);
+
+      // Step 6: Create purchase record
+      const purchaseRecord = this.paymentManager.createPurchaseRecord(
+        session,
+        product,
+        paymentResult,
+        needsBefore,
+        this.state.needs
+      );
+
+      // Step 7: Update state
+      await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
+
+      // Step 8: Update balance (subtract payment + estimated fee)
+      const newBalance = parseFloat(this.state.balance) - parseFloat(paymentResult.amount) - this.paymentManager.estimateTransactionFee();
+      this.state.balance = Math.max(0, newBalance).toFixed(2);
+      this.state.status = 'online';
+
+      console.log(`[BuyerAgent:${this.config.agent_id}] 🎉 Purchase completed successfully!`);
+      console.log(`[BuyerAgent:${this.config.agent_id}] 📊 Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
+
+      this.emitEvent('purchase_completed', {
+        purchase_record: purchaseRecord,
+        new_needs: this.state.needs,
+        new_balance: this.state.balance
+      });
+
+    } catch (error) {
+      console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Purchase failed:`, error);
+
+      // Reset status
+      if (this.state) {
+        this.state.status = 'online';
+        await this.stateManager.saveState(this.state);
+      }
+
+      this.emitEvent('purchase_failed', {
+        error: error instanceof Error ? error.message : String(error),
+        max_budget: maxBudget,
+        current_needs: this.state?.needs
+      });
+
+      // Don't throw - we want the agent to continue running
+    }
+  }
+
+  /**
+   * Handle errors with exponential backoff
+   */
+  private async handleError(error: unknown): Promise<void> {
+    this.errorCount++;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Cycle error #${this.errorCount}:`, errorMessage);
+
+    // Update state to error status
+    if (this.state) {
+      this.state.status = 'error';
+      await this.stateManager.saveState(this.state);
+    }
+
+    this.emitEvent('error_occurred', {
+      error: errorMessage,
+      error_count: this.errorCount
+    });
+
+    // If too many consecutive errors, stop the agent
+    if (this.errorCount >= 5) {
+      console.error(`[BuyerAgent:${this.config.agent_id}] 🚨 Too many consecutive errors, stopping agent`);
+      await this.stop();
+      return;
+    }
+
+    // Exponential backoff: wait longer after each error
+    const backoffMs = Math.min(30000, 1000 * Math.pow(2, this.errorCount - 1));
+    console.log(`[BuyerAgent:${this.config.agent_id}] ⏳ Backing off for ${backoffMs}ms before retry...`);
+
+    setTimeout(() => {
+      if (this.isRunning) {
+        this.runCycle();
+      }
+    }, backoffMs);
+  }
+
+  /**
+   * Schedule the next cycle
+   */
+  private scheduleNextCycle(): void {
+    if (!this.isRunning) return;
+
+    // Reset error count on successful cycle
+    this.errorCount = 0;
+
+    if (this.state) {
+      this.state.status = 'online';
+    }
+
+    this.loopInterval = setTimeout(() => {
+      this.runCycle();
+    }, this.config.polling_interval_ms);
+  }
+
+  /**
+   * Get current agent status
+   */
+  getStatus(): AgentStatus {
+    const now = new Date();
+    const uptimeSeconds = this.startTime ? Math.floor((now.getTime() - this.startTime.getTime()) / 1000) : 0;
+
+    // Get wallet address for reporting
+    const walletAddress = this.balanceSync.getWalletAddress(this.config.agent_id);
+
+    return {
+      agent_id: this.config.agent_id,
+      status: this.state?.status || 'offline',
+      needs: this.state?.needs || { food_need: 100, fun_need: 100 },
+      balance: this.state?.balance || '0.00',
+      wallet_address: walletAddress,
+      last_purchase_time: this.state?.last_purchase_time || null,
+      cycle_count: this.state?.cycle_count || 0,
+      purchase_count: this.state?.purchase_count || 0,
+      total_spent: this.state?.total_spent || '0.00',
+      uptime_seconds: uptimeSeconds,
+      error_count: this.errorCount
+    };
+  }
+
+  /**
+   * Get agent configuration
+   */
+  getConfig(): AgentConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Event handling
+   */
+  on(eventType: AgentEventType, handler: (event: AgentEvent) => void): void {
+    if (!this.eventHandlers.has(eventType)) {
+      this.eventHandlers.set(eventType, []);
+    }
+    this.eventHandlers.get(eventType)!.push(handler);
+  }
+
+  private emitEvent(type: AgentEventType, data: any): void {
+    const event: AgentEvent = {
+      type,
+      agent_id: this.config.agent_id,
+      timestamp: new Date(),
+      data
+    };
+
+    const handlers = this.eventHandlers.get(type);
+    if (handlers) {
+      handlers.forEach(handler => {
+        try {
+          handler(event);
+        } catch (error) {
+          console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Event handler error:`, error);
+        }
+      });
+    }
+  }
+
+  /**
+   * Get agent label for account operations
+   */
+  private getAgentLabel(): string {
+    // Convert agent_id to account label format
+    // e.g., "attendee_1" -> "Attendee 1"
+    return this.config.agent_id
+      .split('_')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  /**
+   * Force an immediate purchase for testing
+   */
+  async forcePurchase(maxBudget?: number): Promise<void> {
+    if (!this.isRunning || !this.state) {
+      throw new Error('Agent must be running to force purchase');
+    }
+
+    console.log(`[BuyerAgent:${this.config.agent_id}] 🎯 Forcing immediate purchase...`);
+
+    const budget = maxBudget || parseFloat(this.state.balance) * 0.5;
+    await this.executePurchase(budget);
+  }
+}

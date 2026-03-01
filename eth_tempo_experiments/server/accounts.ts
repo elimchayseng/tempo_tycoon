@@ -24,7 +24,10 @@ class AccountStore {
   }
 
   get(label: string): Account | undefined {
-    return this.accounts.get(label.toLowerCase());
+    const normalized = label.toLowerCase();
+    // Try exact match first, then try with spaces replaced by underscores
+    // (zoo accounts use underscore keys like "attendee_1" but labels like "Attendee 1")
+    return this.accounts.get(normalized) || this.accounts.get(normalized.replace(/ /g, '_'));
   }
 
   getByAddress(address: string): Account | undefined {
