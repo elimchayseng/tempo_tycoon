@@ -144,32 +144,26 @@ zooRoutes.get("/status", async (c) => {
           ])
         ),
       })),
-      agents: {
-        // Placeholder for agent states - will be populated when agents are running
+      agents: agentRunner ? (() => {
+        const runnerStatus = agentRunner.getStatus();
+        return {
+          total_agents: runnerStatus.agents.length,
+          active_agents: runnerStatus.agents.filter((a: any) => a.status !== 'offline').length,
+          agent_states: runnerStatus.agents.map((a: any) => ({
+            id: a.agent_id,
+            status: a.status,
+            needs: a.needs,
+            last_purchase: null,
+            balance: a.balance
+          }))
+        };
+      })() : {
         total_agents: 3,
         active_agents: 0,
         agent_states: [
-          {
-            id: "attendee_1",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          },
-          {
-            id: "attendee_2",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          },
-          {
-            id: "attendee_3",
-            status: "offline",
-            needs: { food_need: 100, fun_need: 100 },
-            last_purchase: null,
-            balance: "0.00"
-          }
+          { id: "attendee_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "attendee_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "attendee_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
         ]
       }
     };

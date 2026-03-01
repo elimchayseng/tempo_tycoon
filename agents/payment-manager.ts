@@ -1,4 +1,5 @@
 import { sendAction } from "../eth_tempo_experiments/server/actions/send.js";
+import { accountStore } from "../eth_tempo_experiments/server/accounts.js";
 import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
 
 export interface PaymentResult {
@@ -49,18 +50,16 @@ export class PaymentManager {
       });
 
       // Execute the payment using the existing sendAction
-      await sendAction(paymentParams);
+      const sendResult = await sendAction(paymentParams);
 
-      // If we reach here, the transaction was successful
-      // The sendAction logs all transaction details, so we just need to extract the key info
       console.log(`[PaymentManager:${this.agentId}] ✅ Payment completed successfully!`);
 
-      // Note: In a production system, we would capture the actual transaction hash and details
-      // from the sendAction result, but for this implementation the logging provides visibility
       const result: PaymentResult = {
         success: true,
         amount: session.amount,
-        tx_hash: "0x" + Math.random().toString(16).substr(2, 64), // Placeholder - sendAction logs the real hash
+        tx_hash: sendResult.txHash,
+        block_number: sendResult.blockNumber,
+        gas_used: sendResult.gasUsed,
       };
 
       console.log(`[PaymentManager:${this.agentId}] 🧾 Payment result:`, result);
@@ -114,15 +113,15 @@ export class PaymentManager {
    * In a production system, this would query the account store
    */
   private async getMerchantLabelFromAddress(address: string): Promise<string> {
-    // For our simulation, we know there's only one merchant: "Merchant A"
-    // In a real system, we'd look this up in the account store
-
-    // This is a simple mapping based on our known zoo accounts
-    // The zoo routes populate the merchant address, so we can map it back
     console.log(`[PaymentManager:${this.agentId}] 🔍 Mapping merchant address ${address} to label`);
 
-    // For now, we know there's only one food merchant
-    return "Merchant A";
+    const account = accountStore.getByAddress(address);
+    if (account) {
+      console.log(`[PaymentManager:${this.agentId}] ✓ Resolved to ${account.label}`);
+      return account.label;
+    }
+
+    throw new Error(`No account found for address ${address}`);
   }
 
   /**

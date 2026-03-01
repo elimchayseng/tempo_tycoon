@@ -327,4 +327,11 @@ export async function batchAction(params: {
       `DEMONSTRATION: This shows the workflow and gas efficiency potential. In production, native batching would provide atomic execution — if any transfer fails, the entire batch reverts.`,
     ],
   });
+
+  // Return transaction hashes for verification
+  return {
+    txHashes: results.map(r => r.receipt.transactionHash),
+    totalGasUsed: totalGasUsed.toString(),
+    feePerPayment: feePerPayment.toFixed(6)
+  };
 }

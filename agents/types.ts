@@ -112,6 +112,7 @@ export interface AgentStatus {
   status: 'offline' | 'online' | 'purchasing' | 'error';
   needs: AgentNeeds;
   balance: string;
+  wallet_address: string | null;
   last_purchase_time: Date | null;
   cycle_count: number;
   purchase_count: number;
@@ -140,6 +141,8 @@ export interface BatchFundingResult {
   funded_agents: string[];
   total_amount: string;
   error?: string;
+  transaction_hashes?: string[];
+  wallet_addresses?: Record<string, string>;
 }
 
 export interface ZooRegistry {

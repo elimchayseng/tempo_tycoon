@@ -2,6 +2,7 @@ import { StateManager } from './state-manager.js';
 import { DecisionEngine } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
 import { PaymentManager } from './payment-manager.js';
+import { BalanceSync } from './balance-sync.js';
 import type {
   AgentConfig,
   AgentState,
@@ -16,6 +17,7 @@ export class BuyerAgent {
   private readonly decisionEngine: DecisionEngine;
   private readonly acpClient: ACPClient;
   private readonly paymentManager: PaymentManager;
+  private readonly balanceSync: BalanceSync;
 
   private state: AgentState | null = null;
   private isRunning = false;
@@ -42,6 +44,7 @@ export class BuyerAgent {
     });
     this.acpClient = new ACPClient(); // Uses default localhost:4002
     this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
+    this.balanceSync = new BalanceSync();
 
     console.log(`[BuyerAgent:${config.agent_id}] ✓ All components initialized`);
   }
@@ -132,8 +135,18 @@ export class BuyerAgent {
         cycle_count: this.state.cycle_count
       });
 
-      // Step 2: Get current balance (from our known state - in reality we'd query the blockchain)
-      const currentBalance = parseFloat(this.state.balance);
+      // Step 2: Get current balance from blockchain
+      const currentBalance = await this.balanceSync.getBlockchainBalance(this.config.agent_id);
+
+      // Log balance comparison for debugging
+      await this.balanceSync.logBalanceComparison(this.config.agent_id, this.state.balance);
+
+      // Update local state balance to match blockchain
+      const balanceStr = currentBalance.toFixed(2);
+      this.state.balance = balanceStr;
+
+      // Sync to persistent state
+      await this.stateManager.syncBalance(this.config.agent_id, balanceStr);
 
       // Step 3: Make purchase decision
       const decision = this.decisionEngine.evaluatePurchaseDecision(
@@ -328,11 +341,15 @@ export class BuyerAgent {
     const now = new Date();
     const uptimeSeconds = this.startTime ? Math.floor((now.getTime() - this.startTime.getTime()) / 1000) : 0;
 
+    // Get wallet address for reporting
+    const walletAddress = this.balanceSync.getWalletAddress(this.config.agent_id);
+
     return {
       agent_id: this.config.agent_id,
       status: this.state?.status || 'offline',
       needs: this.state?.needs || { food_need: 100, fun_need: 100 },
       balance: this.state?.balance || '0.00',
+      wallet_address: walletAddress,
       last_purchase_time: this.state?.last_purchase_time || null,
       cycle_count: this.state?.cycle_count || 0,
       purchase_count: this.state?.purchase_count || 0,

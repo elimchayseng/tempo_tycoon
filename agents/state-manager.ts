@@ -250,6 +250,23 @@ export class StateManager {
   }
 
   /**
+   * Sync balance from blockchain to local state
+   */
+  async syncBalance(agentId: string, blockchainBalance: string): Promise<void> {
+    try {
+      await this.updateState(agentId, {
+        balance: blockchainBalance,
+        last_funding_time: new Date()
+      });
+
+      console.log(`[StateManager] 💰 Synced balance for ${agentId}: $${blockchainBalance}`);
+
+    } catch (error) {
+      console.error(`[StateManager] ❌ Failed to sync balance for ${agentId}:`, error);
+    }
+  }
+
+  /**
    * Get basic stats about state management
    */
   async getStats() {

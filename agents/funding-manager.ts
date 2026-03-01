@@ -1,5 +1,6 @@
 import { AccountState } from "../eth_tempo_experiments/server/accounts.js";
 import { batchAction } from "../eth_tempo_experiments/server/actions/batch.js";
+import { ALPHA_USD } from "../eth_tempo_experiments/server/tempo-client.js";
 import type { BatchFundingRequest, BatchFundingResult, AgentConfig } from "./types.js";
 
 export class FundingManager {
@@ -42,7 +43,7 @@ export class FundingManager {
    * Check attendee balances and fund those below threshold
    */
   async checkAndRefundAttendees(
-    attendeeAccounts: { label: string; address: string; balances: Map<string, bigint> }[]
+    attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): Promise<BatchFundingResult | null> {
     const lowBalanceAttendees = this.findLowBalanceAttendees(attendeeAccounts);
 
@@ -71,13 +72,13 @@ export class FundingManager {
    * Find attendees with balance below threshold
    */
   private findLowBalanceAttendees(
-    attendeeAccounts: { label: string; address: string; balances: Map<string, bigint> }[]
+    attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): { label: string; address: string; balance: number }[] {
     const lowBalanceAttendees = [];
-    const ALPHA_USD = "0x20c0000000000000000000000000000000000001";
+    // Use imported ALPHA_USD constant for consistency
 
     for (const account of attendeeAccounts) {
-      const balanceBigInt = account.balances.get(ALPHA_USD) || BigInt(0);
+      const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
       // Convert from 6-decimal TIP20 format to USD
       const balanceUsd = Number(balanceBigInt) / 1_000_000;
 
@@ -106,6 +107,12 @@ export class FundingManager {
 
       console.log(`[FundingManager] 🚀 Executing batch ${request.reason} for ${request.recipients.length} attendees (Total: $${totalAmount.toFixed(2)})`);
 
+      // Log wallet addresses for each agent being funded
+      console.log(`[FundingManager] 💳 Wallet Address Mapping:`);
+      request.recipients.forEach((recipient, index) => {
+        console.log(`[FundingManager]   ${recipient.agent_id} → 💰 ${recipient.address} (funding $${recipient.amount})`);
+      });
+
       // Prepare batch payment request in the format expected by batchAction
       const batchParams = {
         from: this.zooMasterLabel,
@@ -124,19 +131,42 @@ export class FundingManager {
       });
 
       // Execute the batch payment using the existing batch system
-      await batchAction(batchParams);
+      const batchResult = await batchAction(batchParams);
+
+      // Extract transaction hashes from batch result if available
+      const txHashes = batchResult?.txHashes || [];
+
+      console.log(`[FundingManager] 🔗 Transaction Details:`);
+      if (txHashes && txHashes.length > 0) {
+        txHashes.forEach((txHash, index) => {
+          const recipient = request.recipients[index];
+          if (recipient) {
+            console.log(`[FundingManager]   ${recipient.agent_id} (${recipient.address}) funded $${recipient.amount} - TX: ${txHash}`);
+            console.log(`[FundingManager]   🔍 Verify: https://testnet.tempoexplorer.com/tx/${txHash}`);
+          }
+        });
+      } else {
+        console.log(`[FundingManager]   ℹ️  Transaction hashes not available from batch operation`);
+      }
 
       const result: BatchFundingResult = {
         success: true,
         funded_agents: request.recipients.map(r => r.agent_id),
-        total_amount: totalAmount.toFixed(2)
+        total_amount: totalAmount.toFixed(2),
+        transaction_hashes: txHashes,
+        wallet_addresses: request.recipients.reduce((acc, r) => {
+          acc[r.agent_id] = r.address;
+          return acc;
+        }, {} as Record<string, string>)
       };
 
       console.log(`[FundingManager] ✅ Batch funding completed successfully!`);
       console.log(`[FundingManager] 📊 Funding Summary:`, {
         funded_agents: result.funded_agents,
         total_amount: `$${result.total_amount}`,
-        reason: request.reason
+        reason: request.reason,
+        transaction_count: txHashes.length,
+        wallet_mapping: result.wallet_addresses
       });
 
       return result;

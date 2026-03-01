@@ -1,3 +1,4 @@
+import { parseEventLogs } from "viem";
 import { publicClient, ALPHA_USD, parseUsdAmount, formatUsdAmount, shortAddress } from "../tempo-client.js";
 import { Abis } from "viem/tempo";
 
@@ -75,7 +76,7 @@ export class SessionVerifier {
         if (log.address.toLowerCase() === ALPHA_USD.toLowerCase()) {
           try {
             // Decode the Transfer event
-            const decodedLog = publicClient.parseEventLogs({
+            const decodedLog = parseEventLogs({
               abi: Abis.tip20,
               logs: [log]
             })[0];
@@ -84,7 +85,7 @@ export class SessionVerifier {
               const args = decodedLog.args as any;
               actualFrom = args.from;
               actualTo = args.to;
-              actualAmount = args.value;
+              actualAmount = args.amount;
               transferFound = true;
               break;
             }
