@@ -48,11 +48,16 @@ if (config.zoo.enabled) {
 
     // Broadcast typed purchase receipt for dashboard
     const rec = event.data.purchase_record;
+    const registry = loadZooRegistry();
+    const merchantName = registry.merchants?.[0]?.name ?? 'Unknown Merchant';
+    const merchantAccount = getZooAccountByRole('merchantA');
     const receipt: ZooPurchaseReceipt = {
       agent_id: event.agent_id,
       product_name: rec.name ?? rec.product_name ?? '',
       sku: rec.sku ?? '',
       amount: String(rec.amount),
+      merchant_name: merchantName,
+      merchant_address: merchantAccount?.address ?? '',
       tx_hash: rec.tx_hash ?? '',
       block_number: String(rec.block_number ?? ''),
       gas_used: String(rec.gas_used ?? ''),

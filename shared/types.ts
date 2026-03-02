@@ -43,6 +43,8 @@ export interface ZooPurchaseReceipt {
   product_name: string;
   sku: string;
   amount: string;
+  merchant_name: string;
+  merchant_address: string;
   tx_hash: string;
   block_number: string;
   gas_used: string;

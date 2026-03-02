@@ -4,9 +4,10 @@ import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
 import AgentCardRow from "./components/zoo/AgentCardRow";
 import ReceiptFeed from "./components/zoo/ReceiptFeed";
+import ZooFooter from "./components/zoo/ZooFooter";
 
 export default function App() {
-  const { connected, zooAgents, receipts } = useWebSocket();
+  const { connected, accounts, zooAgents, receipts } = useWebSocket();
   const {
     phase,
     preflightChecks,
@@ -19,6 +20,7 @@ export default function App() {
 
   const showPreflight = phase === "preflight" || phase === "ready";
   const showDashboard = phase === "running" || phase === "starting" || phase === "stopping";
+  const zooMaster = accounts.find(a => a.label === "Zoo Master");
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
@@ -75,6 +77,8 @@ export default function App() {
           </>
         )}
       </div>
+
+      {showDashboard && <ZooFooter zooMaster={zooMaster} />}
     </div>
   );
 }
