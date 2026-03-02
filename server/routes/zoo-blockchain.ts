@@ -7,7 +7,7 @@ import { accountStore } from "../accounts.js";
 import { config } from "../config.js";
 import { getAllZooAccounts } from "../zoo-accounts.js";
 import { balanceHistoryTracker } from "../balance-history.js";
-import { getAgentRunner } from "./zoo-shared.js";
+import { getAgentRunner, refreshZooBalances } from "./zoo-shared.js";
 import type { NetworkStats, TokenInfo, WalletInfo } from "../../shared/types.js";
 
 const log = createLogger('zoo-blockchain');
@@ -95,6 +95,7 @@ zooBlockchainRoutes.get("/network/token-info", async (c) => {
 // GET /network/wallets
 zooBlockchainRoutes.get("/network/wallets", async (c) => {
   try {
+    await refreshZooBalances();
     const zooAccounts = getAllZooAccounts();
     const wallets: WalletInfo[] = [];
 

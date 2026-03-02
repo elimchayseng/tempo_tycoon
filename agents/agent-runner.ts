@@ -4,6 +4,7 @@ import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
 import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
 import { getAllZooAccounts, getZooAccountByRole } from '../server/zoo-accounts.js';
+import { refreshZooBalances } from '../server/routes/zoo-shared.js';
 import type {
   AgentConfig,
   AgentStatus,
@@ -201,6 +202,7 @@ export class AgentRunner {
     log.info('Performing funding check...');
 
     try {
+      await refreshZooBalances();
       const zooAccounts = getAllZooAccounts();
       const attendeeAccounts = zooAccounts.filter(account =>
         account.label.startsWith('Attendee')

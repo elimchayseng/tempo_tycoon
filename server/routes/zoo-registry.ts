@@ -170,6 +170,7 @@ zooRegistryRoutes.get("/status", async (c) => {
       return c.json({ zoo_enabled: false, message: "Zoo simulation is disabled" });
     }
 
+    await refreshZooBalances();
     const zooAccounts = getAllZooAccounts();
     const status = {
       zoo_enabled: true,

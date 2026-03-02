@@ -142,15 +142,9 @@ export class BuyerAgent {
       // Step 2: Get current balance from blockchain
       const currentBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
 
-      // Log balance comparison for debugging
-      await this.balanceSync.logBalanceComparison(this.config.agent_id, this.state.balance);
-
       // Update local state balance to match blockchain
       const balanceStr = currentBalance.toFixed(2);
       this.state.balance = balanceStr;
-
-      // Sync to persistent state
-      await this.stateManager.syncBalance(this.config.agent_id, balanceStr);
 
       // Step 3: Make purchase decision
       const decision = this.decisionEngine.evaluatePurchaseDecision(
