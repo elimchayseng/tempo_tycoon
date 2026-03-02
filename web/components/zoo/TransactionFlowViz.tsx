@@ -1,5 +1,5 @@
 import type { TransactionFlowEvent, TxFlowStage } from "../../lib/types";
-import { ANIMAL_EMOJI } from "../../utils/formatting";
+import { ANIMAL_EMOJI, formatGuestLabel } from "../../utils/formatting";
 
 interface TransactionFlowVizProps {
   events: TransactionFlowEvent[];
@@ -82,7 +82,7 @@ export default function TransactionFlowViz({ events }: TransactionFlowVizProps) 
       <div className="flex items-center gap-2 mb-2">
         <span className="text-lg">{agentEmoji}</span>
         <span className="font-pixel text-[8px] text-[var(--zt-tan)]">
-          {activeAgentId}
+          {formatGuestLabel(activeAgentId!)}
         </span>
       </div>
 

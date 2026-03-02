@@ -136,6 +136,7 @@ export interface ZooAgentState {
 
 export interface ZooPurchaseReceipt {
   agent_id: string;
+  agent_address?: string;
   product_name: string;
   sku: string;
   amount: string;
@@ -154,6 +155,7 @@ export interface PreflightCheck {
   label: string;
   status: "pending" | "checking" | "pass" | "fail";
   detail?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PreflightResult {

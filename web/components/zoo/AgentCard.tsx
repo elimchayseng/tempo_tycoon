@@ -1,19 +1,8 @@
 import type { ZooAgentState } from "../../lib/types";
-import { shortAddr, ANIMAL_EMOJI } from "../../utils/formatting";
+import { formatGuestLabel } from "../../utils/formatting";
 
 interface AgentCardProps {
   agent: ZooAgentState;
-}
-
-function getAnimalEmoji(agentId: string): string {
-  return ANIMAL_EMOJI[agentId] ?? "🦊";
-}
-
-function formatGuestName(agent: ZooAgentState): string {
-  if (agent.address) {
-    return `Guest: ${shortAddr(agent.address)} ${getAnimalEmoji(agent.agent_id)}`;
-  }
-  return `Guest ${agent.agent_id.replace(/\D/g, "")} ${getAnimalEmoji(agent.agent_id)}`;
 }
 
 function needBarClass(value: number): string {
@@ -38,12 +27,12 @@ export default function AgentCard({ agent }: AgentCardProps) {
   return (
     <div className="zt-bevel overflow-hidden">
       {/* Green title bar */}
-      <div className="zt-titlebar flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 ${statusDot(agent.status)}`} />
-          <span className="truncate">{formatGuestName(agent)}</span>
+      <div className="zt-titlebar flex items-center justify-between overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`inline-block w-2 h-2 shrink-0 ${statusDot(agent.status)}`} />
+          <span className="truncate">{formatGuestLabel(agent.agent_id, agent.address)}</span>
         </div>
-        <span className="text-[10px] opacity-70">{agent.status}</span>
+        <span className="text-[10px] opacity-70 shrink-0 ml-2">{agent.status}</span>
       </div>
 
       {/* Dark green body */}

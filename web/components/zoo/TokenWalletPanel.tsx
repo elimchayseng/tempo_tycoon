@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { TokenInfo, WalletInfo, BalanceHistoryEntry } from "../../lib/types";
-import { shortAddr } from "../../utils/formatting";
+import { shortAddr, ANIMAL_EMOJI, formatGuestLabel } from "../../utils/formatting";
 import BalanceHistorySparkline from "./BalanceHistorySparkline";
 
 interface TokenWalletPanelProps {
@@ -78,7 +78,9 @@ export default function TokenWalletPanel({
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">{roleIcon(wallet.role)}</span>
                     <span className="font-pixel text-[8px] text-[var(--zt-tan)]">
-                      {wallet.label}
+                      {wallet.role === "agent"
+                        ? formatGuestLabel(wallet.label.toLowerCase().replace(/ /g, "_"), wallet.address)
+                        : wallet.label}
                     </span>
                   </div>
                   <span className="font-pixel text-[9px] text-[var(--zt-gold)]">

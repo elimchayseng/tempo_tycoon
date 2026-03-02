@@ -1,5 +1,5 @@
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, productEmoji } from "../../utils/formatting";
+import { shortAddr, productEmoji, formatGuestLabel } from "../../utils/formatting";
 
 interface ReceiptCardProps {
   receipt: ZooPurchaseReceipt;
@@ -39,7 +39,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
           {receipt.merchant_name && (
             <Row label="Merchant">{receipt.merchant_name}</Row>
           )}
-          <Row label="Guest">{shortAddr(receipt.agent_id)}</Row>
+          <Row label="Guest">{formatGuestLabel(receipt.agent_id, receipt.agent_address)}</Row>
           <Row label="Tx Hash">
             {receipt.tx_hash ? (
               <a

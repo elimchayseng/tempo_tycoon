@@ -4,7 +4,7 @@ import { getZooAccountByRole, getAllZooAccounts } from "../zoo-accounts.js";
 import { config } from "../config.js";
 import { publicClient } from "../tempo-client.js";
 import type { PreflightCheck, PreflightResult } from "../../shared/types.js";
-import { loadZooRegistry, getAgentRunner } from "./zoo-shared.js";
+import { loadZooRegistry, getAgentRunner, refreshZooBalances } from "./zoo-shared.js";
 
 const log = createLogger('zoo-registry');
 
@@ -20,20 +20,34 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     { id: "runner", label: "Agent runner", status: "pending" },
   ];
 
+  // 1. Blockchain connectivity
   try {
     const blockNumber = await publicClient.getBlockNumber();
     checks[0].status = "pass";
     checks[0].detail = `Block #${blockNumber}`;
+    checks[0].metadata = {
+      chainName: config.chain.chainName,
+      chainId: config.chain.chainId,
+      rpcUrl: config.chain.rpcUrl,
+      explorerUrl: config.chain.explorerUrl,
+      tokenContract: config.contracts.alphaUsd,
+      tokenStandard: "TIP-20",
+      tokenDecimals: 6,
+    };
   } catch (e) {
     checks[0].status = "fail";
     checks[0].detail = e instanceof Error ? e.message : "Cannot reach chain";
   }
 
+  // 2. Zoo accounts
   try {
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
       checks[1].status = "pass";
       checks[1].detail = `${accounts.length} accounts found`;
+      checks[1].metadata = {
+        accounts: accounts.map((a) => ({ label: a.label, address: a.address })),
+      };
     } else {
       checks[1].status = "fail";
       checks[1].detail = `Only ${accounts.length}/5 accounts found`;
@@ -43,8 +57,11 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     checks[1].detail = e instanceof Error ? e.message : "Account check failed";
   }
 
+  // 3. Wallet balances — fetch live on-chain balances first
   try {
+    await refreshZooBalances();
     const master = getZooAccountByRole("zooMaster");
+    const merchantA = getZooAccountByRole("merchantA");
     const attendees = [
       getZooAccountByRole("attendee1"),
       getZooAccountByRole("attendee2"),
@@ -54,6 +71,22 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     if (allFunded) {
       checks[2].status = "pass";
       checks[2].detail = "Master + 3 attendees available";
+      const walletList: { label: string; address: string; balance: string }[] = [];
+      if (master) {
+        const bal = master.balances[config.contracts.alphaUsd]?.toString() ?? "0";
+        walletList.push({ label: "Zoo Master", address: master.address, balance: bal });
+      }
+      if (merchantA) {
+        const bal = merchantA.balances[config.contracts.alphaUsd]?.toString() ?? "0";
+        walletList.push({ label: "Merchant A", address: merchantA.address, balance: bal });
+      }
+      attendees.forEach((a, i) => {
+        if (a) {
+          const bal = a.balances[config.contracts.alphaUsd]?.toString() ?? "0";
+          walletList.push({ label: `Attendee ${i + 1}`, address: a.address, balance: bal });
+        }
+      });
+      checks[2].metadata = { wallets: walletList };
     } else {
       checks[2].status = "fail";
       checks[2].detail = "Some wallets missing";
@@ -63,12 +96,26 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     checks[2].detail = e instanceof Error ? e.message : "Balance check failed";
   }
 
+  // 4. Merchant registry
   try {
     const registry = loadZooRegistry();
-    const merchantCount = registry.merchants?.length ?? 0;
+    const merchants = registry.merchants ?? [];
+    const merchantCount = merchants.length;
     if (merchantCount > 0) {
       checks[3].status = "pass";
       checks[3].detail = `${merchantCount} merchant(s) loaded`;
+      checks[3].metadata = {
+        merchants: merchants.map((m: any) => ({
+          name: m.name,
+          category: m.category ?? "general",
+          itemCount: m.menu?.length ?? 0,
+          menu: (m.menu ?? []).map((item: any) => ({
+            name: item.name,
+            price: item.price,
+            category: item.category,
+          })),
+        })),
+      };
     } else {
       checks[3].status = "fail";
       checks[3].detail = "No merchants in registry";
@@ -78,9 +125,15 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     checks[3].detail = e instanceof Error ? e.message : "Registry load failed";
   }
 
+  // 5. Agent runner
   if (getAgentRunner()) {
     checks[4].status = "pass";
     checks[4].detail = "Agent runner ready";
+    checks[4].metadata = {
+      pollingInterval: config.zoo.agentPollingInterval,
+      needDecayRate: config.zoo.needDecayRate,
+      purchaseThreshold: config.zoo.purchaseThreshold,
+    };
   } else {
     checks[4].status = "fail";
     checks[4].detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";

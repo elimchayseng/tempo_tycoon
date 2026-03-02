@@ -66,11 +66,18 @@ export const ANIMAL_EMOJI: Record<string, string> = {
   attendee_3: "🐧",
 };
 
-export const ANIMAL_NAME: Record<string, string> = {
-  attendee_1: "Leo the Lion",
-  attendee_2: "Ellie the Elephant",
-  attendee_3: "Penny the Penguin",
-};
+/**
+ * Build the standardized guest label: `Guest: 0xABCD...1234 🦁`
+ * @param agentId - e.g. "attendee_1"
+ * @param address - optional wallet address
+ */
+export function formatGuestLabel(agentId: string, address?: string): string {
+  const emoji = ANIMAL_EMOJI[agentId] ?? "🦊";
+  if (address) {
+    return `Guest: ${shortAddr(address)} ${emoji}`;
+  }
+  return `Guest: ${agentId} ${emoji}`;
+}
 
 /**
  * Get the emoji for a product name

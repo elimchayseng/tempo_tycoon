@@ -119,8 +119,12 @@ if (config.zoo.enabled) {
     const registry = loadZooRegistry();
     const merchantName = registry.merchants?.[0]?.name ?? 'Unknown Merchant';
     const merchantAccount = getZooAccountByRole('merchantA');
+    // Map agent_id (attendee_1) → role key (attendee1) for account lookup
+    const agentRoleKey = event.agent_id.replace('_', '') as any;
+    const agentAccount = getZooAccountByRole(agentRoleKey);
     const receipt: ZooPurchaseReceipt = {
       agent_id: event.agent_id,
+      agent_address: agentAccount?.address ?? '',
       product_name: rec.name ?? rec.product_name ?? '',
       sku: rec.sku ?? '',
       amount: String(rec.amount),
