@@ -335,8 +335,8 @@ export class AgentRunner {
         refund_amount: "30.00",
         polling_interval_ms: 3000, // 3 seconds for fast testing
         need_decay_rate: {
-          food_need: 12, // Fast degradation for testing
-          fun_need: 8
+          food_need: 5, // Slower degradation so purchases don't overlap
+          fun_need: 4
         },
         purchase_threshold: {
           food_need: 40, // Purchase when food < 40
@@ -392,7 +392,11 @@ export class AgentRunner {
 
     for (const eventType of eventTypes) {
       agent.on(eventType, (event) => {
-        this.emitEvent(eventType, event.data);
+        // Forward the original event to preserve the agent's agent_id
+        const handlers = this.eventHandlers.get(eventType);
+        if (handlers) {
+          handlers.forEach(handler => handler(event));
+        }
       });
     }
   }

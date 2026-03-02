@@ -42,8 +42,8 @@ export class DecisionEngine {
     this.config = {
       pollingIntervalMs: 3000, // 3 seconds
       needDecayRate: {
-        food_need: 12, // 12 points per 3-second cycle = high degradation
-        fun_need: 8   // 8 points per 3-second cycle (future feature)
+        food_need: 5, // 5 points per 3-second cycle = slower degradation
+        fun_need: 4   // 4 points per 3-second cycle (future feature)
       },
       purchaseThreshold: {
         food_need: 40,  // Purchase when food need < 40

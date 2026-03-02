@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { LogEntry, AccountsState, WsMessage } from "../lib/types";
+import type { LogEntry, AccountsState, WsMessage, ZooAgentState, ZooPurchaseReceipt } from "../lib/types";
 
 const RECONNECT_DELAYS = [500, 1000, 2000, 4000];
 
@@ -8,6 +8,8 @@ export function useWebSocket() {
   const [accounts, setAccounts] = useState<AccountsState>([]);
   const [connected, setConnected] = useState(false);
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [zooAgents, setZooAgents] = useState<ZooAgentState[]>([]);
+  const [receipts, setReceipts] = useState<ZooPurchaseReceipt[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
@@ -74,6 +76,12 @@ export function useWebSocket() {
           case "action_error":
             setActiveAction(null);
             break;
+          case "zoo_agents":
+            setZooAgents(msg.agents);
+            break;
+          case "zoo_purchase":
+            setReceipts((prev) => [msg.receipt, ...prev].slice(0, 200));
+            break;
         }
       };
     }
@@ -87,6 +95,7 @@ export function useWebSocket() {
   }, []);
 
   const clearLogs = useCallback(() => setLogs([]), []);
+  const clearReceipts = useCallback(() => setReceipts([]), []);
 
-  return { logs, accounts, connected, activeAction, clearLogs };
+  return { logs, accounts, connected, activeAction, clearLogs, zooAgents, receipts, clearReceipts };
 }

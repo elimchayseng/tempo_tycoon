@@ -28,12 +28,52 @@ export interface Account {
 
 export type AccountsState = Account[];
 
+// Zoo Dashboard types
+export interface ZooAgentState {
+  agent_id: string;
+  address: string;
+  status: string;
+  needs: { food_need: number; fun_need: number };
+  balance: string;
+  purchase_count: number;
+  total_spent: string;
+}
+
+export interface ZooPurchaseReceipt {
+  agent_id: string;
+  product_name: string;
+  sku: string;
+  amount: string;
+  merchant_name: string;
+  merchant_address: string;
+  tx_hash: string;
+  block_number: string;
+  gas_used: string;
+  need_before: number;
+  need_after: number;
+  timestamp: number;
+}
+
+export interface PreflightCheck {
+  id: string;
+  label: string;
+  status: "pending" | "checking" | "pass" | "fail";
+  detail?: string;
+}
+
+export interface PreflightResult {
+  success: boolean;
+  checks: PreflightCheck[];
+}
+
 export type WsMessage =
   | { type: "log"; entry: LogEntry }
   | { type: "accounts"; accounts: AccountsState }
   | { type: "action_start"; action: string }
   | { type: "action_complete"; action: string }
-  | { type: "action_error"; action: string; error: string };
+  | { type: "action_error"; action: string; error: string }
+  | { type: "zoo_agents"; agents: ZooAgentState[] }
+  | { type: "zoo_purchase"; receipt: ZooPurchaseReceipt };
 
 // API Request types for validation
 export interface SendRequest {

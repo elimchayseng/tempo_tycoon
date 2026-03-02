@@ -8,4 +8,8 @@ export type {
   SendRequest,
   BatchRequest,
   HistoryRequest,
+  ZooAgentState,
+  ZooPurchaseReceipt,
+  PreflightCheck,
+  PreflightResult,
 } from '../../shared/types.js';

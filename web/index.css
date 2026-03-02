@@ -1,1 +1,239 @@
 @import "tailwindcss";
+
+:root {
+  /* Zoo Tycoon palette */
+  --zt-green-dark: #1a3a12;
+  --zt-green-mid: #2d5a1e;
+  --zt-green-light: #3a7528;
+  --zt-brown-dark: #3d2b1f;
+  --zt-brown-mid: #6b4226;
+  --zt-brown-light: #8b6914;
+  --zt-parchment: #f0e4c8;
+  --zt-parchment-dark: #d9c89e;
+  --zt-gold: #ffd700;
+  --zt-tan: #d4b87a;
+  --zt-text-dark: #2a1f14;
+  --zt-text-mid: #5a4a3a;
+  --zt-border-light: #a8c090;
+  --zt-border-dark: #1a2e10;
+
+  /* Legacy aliases */
+  --zoo-green: var(--zt-green-mid);
+  --zoo-green-light: var(--zt-green-light);
+  --zoo-brown: var(--zt-brown-light);
+  --zoo-tan: var(--zt-tan);
+}
+
+/* Pixel font class */
+.font-pixel {
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* Pixel art rendering for future assets */
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ── Beveled Border (outer raised frame) ── */
+.zt-bevel {
+  border: 3px solid;
+  border-color: var(--zt-border-light) var(--zt-border-dark) var(--zt-border-dark) var(--zt-border-light);
+  box-shadow:
+    inset 1px 1px 0 rgba(255,255,255,0.15),
+    inset -1px -1px 0 rgba(0,0,0,0.25),
+    2px 2px 4px rgba(0,0,0,0.4);
+}
+
+/* ── Inset panel (sunken area) ── */
+.zt-inset {
+  border: 2px solid;
+  border-color: var(--zt-border-dark) var(--zt-border-light) var(--zt-border-light) var(--zt-border-dark);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
+}
+
+/* ── Parchment background ── */
+.zt-parchment {
+  background: linear-gradient(
+    180deg,
+    var(--zt-parchment) 0%,
+    var(--zt-parchment-dark) 100%
+  );
+  color: var(--zt-text-dark);
+}
+
+/* ── Green title bar ── */
+.zt-titlebar {
+  background: linear-gradient(
+    180deg,
+    var(--zt-green-light) 0%,
+    var(--zt-green-mid) 60%,
+    #1e4a14 100%
+  );
+  color: #fff;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  border-bottom: 2px solid var(--zt-border-dark);
+}
+
+/* ── Chrome status bar (header/footer) ── */
+.zt-statusbar {
+  background: linear-gradient(
+    180deg,
+    var(--zt-brown-mid) 0%,
+    var(--zt-brown-dark) 40%,
+    var(--zt-brown-mid) 100%
+  );
+  border: 2px solid;
+  border-color: #a08060 #2a1a0e #2a1a0e #a08060;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.2);
+}
+
+/* ── Raised button ── */
+.zt-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 6px 14px;
+  border: 2px solid;
+  border-color: var(--zt-border-light) var(--zt-border-dark) var(--zt-border-dark) var(--zt-border-light);
+  background: linear-gradient(180deg, var(--zt-green-light) 0%, var(--zt-green-mid) 100%);
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+.zt-btn:hover {
+  filter: brightness(1.15);
+}
+.zt-btn:active {
+  border-color: var(--zt-border-dark) var(--zt-border-light) var(--zt-border-light) var(--zt-border-dark);
+  filter: brightness(0.9);
+}
+
+/* ── Brown variant button ── */
+.zt-btn-brown {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 6px 14px;
+  border: 2px solid;
+  border-color: #c09060 #3a2010 #3a2010 #c09060;
+  background: linear-gradient(180deg, var(--zt-brown-light) 0%, var(--zt-brown-mid) 100%);
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+.zt-btn-brown:hover {
+  filter: brightness(1.15);
+}
+.zt-btn-brown:active {
+  border-color: #3a2010 #c09060 #c09060 #3a2010;
+  filter: brightness(0.9);
+}
+
+/* ── Need bar track (inset, blocky) ── */
+.zt-bar-track {
+  height: 14px;
+  background: #1a2e10;
+  border: 2px solid;
+  border-color: #0e1a08 #4a6a38 #4a6a38 #0e1a08;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ── Need bar fill (striped) ── */
+.zt-bar-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+  background-size: 8px 8px;
+}
+.zt-bar-fill-green {
+  background-color: #4caf50;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.12) 3px,
+    rgba(255,255,255,0.12) 4px
+  );
+}
+.zt-bar-fill-yellow {
+  background-color: #ff9800;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.12) 3px,
+    rgba(255,255,255,0.12) 4px
+  );
+}
+.zt-bar-fill-red {
+  background-color: #e53935;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.12) 3px,
+    rgba(255,255,255,0.12) 4px
+  );
+}
+
+/* ── Merchant Panel Animations ── */
+
+/* Coin flies left-to-right (guest → merchant) */
+@keyframes zt-coin-fly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  30%  { transform: translate(40%, -30px) scale(1.3); opacity: 1; }
+  70%  { transform: translate(70%, -10px) scale(1.1); opacity: 1; }
+  100% { transform: translate(100%, 0) scale(1); opacity: 0; }
+}
+.zt-coin-fly {
+  animation: zt-coin-fly 1.5s ease-in-out forwards;
+}
+
+/* Product flies right-to-left (merchant → guest) */
+@keyframes zt-item-fly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  30%  { transform: translate(-30%, -25px) scale(1.2); opacity: 1; }
+  70%  { transform: translate(-70%, -8px) scale(1.1); opacity: 1; }
+  100% { transform: translate(-100%, 0) scale(1); opacity: 0; }
+}
+.zt-item-fly {
+  animation: zt-item-fly 1.5s ease-in-out 0.5s forwards;
+  opacity: 0;
+  animation-fill-mode: backwards;
+}
+
+/* Balance flashes gold on purchase */
+@keyframes zt-balance-flash {
+  0%   { color: #fff; text-shadow: 0 0 0 transparent; }
+  30%  { color: var(--zt-gold); text-shadow: 0 0 12px rgba(255,215,0,0.8); }
+  100% { color: var(--zt-gold); text-shadow: none; }
+}
+.zt-balance-flash {
+  animation: zt-balance-flash 1.2s ease-out;
+}
+
+/* Shop emoji bounces on interaction */
+@keyframes zt-shop-bounce {
+  0%, 100% { transform: scale(1); }
+  20%      { transform: scale(1.3) rotate(-5deg); }
+  40%      { transform: scale(0.95) rotate(3deg); }
+  60%      { transform: scale(1.1) rotate(-2deg); }
+  80%      { transform: scale(1); }
+}
+.zt-shop-bounce {
+  animation: zt-shop-bounce 0.8s ease-in-out;
+}
+
+/* Protocol step text fade-in + slide up */
+@keyframes zt-step-fade {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.zt-step-fade {
+  animation: zt-step-fade 0.3s ease-out;
+}

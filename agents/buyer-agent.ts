@@ -245,6 +245,11 @@ export class BuyerAgent {
       // Step 7: Update state
       await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
 
+      // Step 7b: Sync in-memory state with persisted purchase data
+      this.state.purchase_count = (this.state.purchase_count || 0) + 1;
+      this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
+      this.state.last_purchase_time = purchaseRecord.completed_at;
+
       // Step 8: Update balance (subtract payment + estimated fee)
       const newBalance = parseFloat(this.state.balance) - parseFloat(paymentResult.amount) - this.paymentManager.estimateTransactionFee();
       this.state.balance = Math.max(0, newBalance).toFixed(2);

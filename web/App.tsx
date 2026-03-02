@@ -1,54 +1,89 @@
 import { useWebSocket } from "./hooks/useWebSocket";
-import ActionPanel from "./components/ActionPanel";
-import InteractionLog from "./components/InteractionLog";
+import { useZoo } from "./hooks/useZoo";
+import ZooHeader from "./components/zoo/ZooHeader";
+import PreflightPanel from "./components/zoo/PreflightPanel";
+import MerchantPanel from "./components/zoo/MerchantPanel";
+import AgentCardRow from "./components/zoo/AgentCardRow";
+import ReceiptFeed from "./components/zoo/ReceiptFeed";
+import ZooFooter from "./components/zoo/ZooFooter";
 
 export default function App() {
-  const { logs, accounts, connected, activeAction, clearLogs } =
-    useWebSocket();
+  const { connected, accounts, zooAgents, receipts } = useWebSocket();
+  const {
+    phase,
+    preflightChecks,
+    error,
+    startPreflight,
+    openGates,
+    stopZoo,
+    restart,
+  } = useZoo();
+
+  const showPreflight = phase === "preflight" || phase === "ready";
+  const showDashboard = phase === "running" || phase === "starting" || phase === "stopping";
+  const zooMaster = accounts.find(a => a.label === "Zoo Master");
+  const merchant = accounts.find(a => a.label === "Merchant A");
 
   return (
-    <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
-      {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gray-900/80 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-bold tracking-tight">
-            <span className="text-indigo-400">Tempo</span> Explorer
-          </h1>
-          <span className="text-[10px] text-gray-600 font-mono bg-gray-800/50 px-1.5 py-0.5 rounded">
-            Moderato Testnet
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {activeAction && (
-            <span className="text-xs text-yellow-400/80 animate-pulse font-mono">
-              {activeAction}...
-            </span>
-          )}
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`inline-block w-1.5 h-1.5 rounded-full ${
-                connected ? "bg-emerald-400" : "bg-red-500"
-              }`}
-            />
-            <span className="text-[10px] text-gray-500">
-              {connected ? "connected" : "disconnected"}
-            </span>
+    <div className="h-screen flex flex-col bg-[var(--zt-green-dark)] text-gray-100">
+      <ZooHeader
+        phase={phase}
+        connected={connected}
+        error={error}
+        onStartPreflight={startPreflight}
+        onOpenGates={openGates}
+        onStopZoo={stopZoo}
+        onRestart={restart}
+      />
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Idle state — dialog popup */}
+        {phase === "idle" && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-sm zt-bevel overflow-hidden">
+              {/* Title bar */}
+              <div className="zt-titlebar text-center">
+                🦁 TEMPO TYCOON
+              </div>
+              {/* Parchment body */}
+              <div className="zt-parchment px-6 py-6 text-center">
+                <p className="font-pixel text-[8px] text-[var(--zt-text-mid)] mb-5 leading-relaxed">
+                  Autonomous agent commerce<br />
+                  on Tempo Moderato Testnet
+                </p>
+                <button onClick={startPreflight} className="zt-btn-brown">
+                  Start Zoo
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
+        )}
 
-      {/* Two-panel layout */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left: Actions */}
-        <aside className="w-72 border-r border-gray-800/80 bg-gray-900/30 shrink-0 overflow-hidden">
-          <ActionPanel accounts={accounts} activeAction={activeAction} />
-        </aside>
+        {/* Preflight phase */}
+        {showPreflight && (
+          <PreflightPanel
+            checks={preflightChecks}
+            phase={phase}
+            error={error}
+            onOpenGates={openGates}
+            onRetry={startPreflight}
+          />
+        )}
 
-        {/* Right: Log */}
-        <main className="flex-1 min-w-0">
-          <InteractionLog logs={logs} onClear={clearLogs} />
-        </main>
+        {/* Running dashboard */}
+        {showDashboard && (
+          <>
+            <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} />
+            <div className="border-b border-[var(--zt-green-mid)] shrink-0">
+              <AgentCardRow agents={zooAgents} />
+            </div>
+            <ReceiptFeed receipts={receipts} />
+          </>
+        )}
       </div>
+
+      {showDashboard && <ZooFooter zooMaster={zooMaster} />}
     </div>
   );
 }
