@@ -4,9 +4,9 @@ import type { BatchFundingRequest, BatchFundingResult, AgentConfig } from "./typ
 
 export class FundingManager {
   private readonly zooMasterLabel = 'zoo_master';
-  private readonly refundThreshold: number;
-  private readonly initialFundingAmount: string;
-  private readonly refundAmount: string;
+  private refundThreshold: number;
+  private initialFundingAmount: string;
+  private refundAmount: string;
 
   constructor(config: {
     refundThreshold?: number;

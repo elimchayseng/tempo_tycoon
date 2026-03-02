@@ -202,11 +202,14 @@ export interface CircuitBreakerStatusInfo {
 export type AgentEventType =
   | 'agent_started'
   | 'agent_stopped'
+  | 'simulation_started'
+  | 'simulation_stopped'
   | 'needs_updated'
   | 'purchase_initiated'
   | 'purchase_completed'
   | 'purchase_failed'
   | 'funding_received'
+  | 'funding_completed'
   | 'funding_failed'
   | 'error_occurred';
 

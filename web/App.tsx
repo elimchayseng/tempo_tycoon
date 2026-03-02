@@ -2,6 +2,7 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import { useZoo } from "./hooks/useZoo";
 import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
+import MerchantPanel from "./components/zoo/MerchantPanel";
 import AgentCardRow from "./components/zoo/AgentCardRow";
 import ReceiptFeed from "./components/zoo/ReceiptFeed";
 import ZooFooter from "./components/zoo/ZooFooter";
@@ -21,6 +22,7 @@ export default function App() {
   const showPreflight = phase === "preflight" || phase === "ready";
   const showDashboard = phase === "running" || phase === "starting" || phase === "stopping";
   const zooMaster = accounts.find(a => a.label === "Zoo Master");
+  const merchant = accounts.find(a => a.label === "Merchant A");
 
   return (
     <div className="h-screen flex flex-col bg-[var(--zt-green-dark)] text-gray-100">
@@ -72,6 +74,7 @@ export default function App() {
         {/* Running dashboard */}
         {showDashboard && (
           <>
+            <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} />
             <div className="border-b border-[var(--zt-green-mid)] shrink-0">
               <AgentCardRow agents={zooAgents} />
             </div>

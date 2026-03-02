@@ -2,16 +2,16 @@
   "agent_id": "attendee_2",
   "address": "0x7564105E977516C53bE337314c7E53838967bDaC",
   "needs": {
-    "food_need": 32,
+    "food_need": 57,
     "fun_need": 0
   },
-  "balance": "234.49",
+  "balance": "157.28",
   "status": "online",
-  "last_purchase_time": null,
+  "last_purchase_time": "2026-03-02T06:01:29.154Z",
   "last_funding_time": null,
-  "purchase_count": 0,
-  "total_spent": "0.00",
-  "cycle_count": 401,
+  "purchase_count": 111,
+  "total_spent": "378.00",
+  "cycle_count": 1319,
   "created_at": "2026-03-01T04:22:55.649Z",
-  "updated_at": "2026-03-01T22:04:51.082Z"
+  "updated_at": "2026-03-02T06:01:35.173Z"
 }

@@ -1,15 +1,9 @@
 import type { ZooAgentState } from "../../lib/types";
-import { shortAddr } from "../../utils/formatting";
+import { shortAddr, ANIMAL_EMOJI } from "../../utils/formatting";
 
 interface AgentCardProps {
   agent: ZooAgentState;
 }
-
-const ANIMAL_EMOJI: Record<string, string> = {
-  attendee_1: "🦁",
-  attendee_2: "🐘",
-  attendee_3: "🐧",
-};
 
 function getAnimalEmoji(agentId: string): string {
   return ANIMAL_EMOJI[agentId] ?? "🦊";
@@ -49,16 +43,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
           <span className={`inline-block w-2 h-2 ${statusDot(agent.status)}`} />
           <span className="truncate">{formatGuestName(agent)}</span>
         </div>
-        <span className="text-[8px] opacity-70">{agent.status}</span>
+        <span className="text-[10px] opacity-70">{agent.status}</span>
       </div>
 
       {/* Dark green body */}
-      <div className="bg-[var(--zt-green-dark)] px-3 py-3 space-y-2.5">
+      <div className="bg-[var(--zt-green-dark)] px-4 py-4 space-y-3">
         {/* Food need bar */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="font-pixel text-[7px] text-[var(--zt-tan)]">🍖 Food</span>
-            <span className="font-pixel text-[7px] text-gray-400">{agent.needs.food_need}</span>
+            <span className="font-pixel text-[10px] text-[var(--zt-tan)]">🍖 Food</span>
+            <span className="font-pixel text-[10px] text-gray-400">{agent.needs.food_need}</span>
           </div>
           <div className="zt-bar-track">
             <div
@@ -71,8 +65,8 @@ export default function AgentCard({ agent }: AgentCardProps) {
         {/* Fun need bar */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="font-pixel text-[7px] text-[var(--zt-tan)]">🎪 Fun</span>
-            <span className="font-pixel text-[7px] text-gray-400">{agent.needs.fun_need}</span>
+            <span className="font-pixel text-[10px] text-[var(--zt-tan)]">🎪 Fun</span>
+            <span className="font-pixel text-[10px] text-gray-400">{agent.needs.fun_need}</span>
           </div>
           <div className="zt-bar-track">
             <div
@@ -84,10 +78,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
 
         {/* Stats row */}
         <div className="flex items-center justify-between pt-1 border-t border-[var(--zt-green-mid)]">
-          <span className="font-pixel text-[7px] text-[var(--zt-gold)]">
+          <span className="font-pixel text-[10px] text-[var(--zt-gold)]">
             🪙 ${agent.balance}
           </span>
-          <span className="font-pixel text-[7px] text-gray-500">
+          <span className="font-pixel text-[10px] text-gray-500">
             {agent.purchase_count} buy{agent.purchase_count !== 1 ? "s" : ""}
           </span>
         </div>

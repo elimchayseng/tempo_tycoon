@@ -51,3 +51,38 @@ export function isValidMemo(memo: string): boolean {
   if (typeof memo !== 'string') return false;
   return memo.length > 0 && memo.length <= 31;
 }
+
+/**
+ * Map agent IDs to animal emojis
+ */
+export const ANIMAL_EMOJI: Record<string, string> = {
+  attendee_1: "🦁",
+  attendee_2: "🐘",
+  attendee_3: "🐧",
+};
+
+export const ANIMAL_NAME: Record<string, string> = {
+  attendee_1: "Leo the Lion",
+  attendee_2: "Ellie the Elephant",
+  attendee_3: "Penny the Penguin",
+};
+
+/**
+ * Get the emoji for a product name
+ */
+export function productEmoji(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("hotdog") || lower.includes("hot dog")) return "🌭";
+  if (lower.includes("burger") || lower.includes("hamburger")) return "🍔";
+  if (lower.includes("soda") || lower.includes("drink")) return "🥤";
+  if (lower.includes("popcorn")) return "🍿";
+  if (lower.includes("nacho")) return "🧀";
+  if (lower.includes("ice cream") || lower.includes("icecream")) return "🍦";
+  if (lower.includes("pretzel")) return "🥨";
+  if (lower.includes("pizza")) return "🍕";
+  if (lower.includes("fries") || lower.includes("french")) return "🍟";
+  if (lower.includes("cotton candy")) return "🍬";
+  if (lower.includes("water") || lower.includes("bottle")) return "💧";
+  if (lower.includes("coffee")) return "☕";
+  return "🍽️";
+}

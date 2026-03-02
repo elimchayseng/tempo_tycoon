@@ -1,5 +1,5 @@
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr } from "../../utils/formatting";
+import { shortAddr, productEmoji } from "../../utils/formatting";
 
 interface ReceiptCardProps {
   receipt: ZooPurchaseReceipt;
@@ -7,30 +7,13 @@ interface ReceiptCardProps {
 
 const EXPLORER_URL = "https://explore.moderato.tempo.xyz";
 
-function productEmoji(name: string): string {
-  const lower = name.toLowerCase();
-  if (lower.includes("hotdog") || lower.includes("hot dog")) return "🌭";
-  if (lower.includes("burger") || lower.includes("hamburger")) return "🍔";
-  if (lower.includes("soda") || lower.includes("drink")) return "🥤";
-  if (lower.includes("popcorn")) return "🍿";
-  if (lower.includes("nacho")) return "🧀";
-  if (lower.includes("ice cream") || lower.includes("icecream")) return "🍦";
-  if (lower.includes("pretzel")) return "🥨";
-  if (lower.includes("pizza")) return "🍕";
-  if (lower.includes("fries") || lower.includes("french")) return "🍟";
-  if (lower.includes("cotton candy")) return "🍬";
-  if (lower.includes("water") || lower.includes("bottle")) return "💧";
-  if (lower.includes("coffee")) return "☕";
-  return "🍽️";
-}
-
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex justify-between items-center py-0.5">
-      <span className="font-pixel text-[7px] text-[var(--zt-text-mid)] uppercase tracking-wide">
+    <div className="flex flex-col gap-0.5 py-1">
+      <span className="font-pixel text-[8px] text-[var(--zt-text-mid)] uppercase tracking-wide">
         {label}
       </span>
-      <span className="text-xs text-[var(--zt-text-dark)] font-mono">{children}</span>
+      <span className="text-sm text-[var(--zt-text-dark)] font-mono break-all">{children}</span>
     </div>
   );
 }
@@ -51,8 +34,8 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
       </div>
 
       {/* Parchment body */}
-      <div className="zt-parchment px-3 py-2">
-        <div className="space-y-0.5">
+      <div className="zt-parchment px-3 py-3">
+        <div className="space-y-1">
           {receipt.merchant_name && (
             <Row label="Merchant">{receipt.merchant_name}</Row>
           )}
