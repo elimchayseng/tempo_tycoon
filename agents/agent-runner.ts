@@ -77,7 +77,7 @@ export class AgentRunner {
       }
 
       log.info('Performing initial funding...');
-      const fundingResult = await this.fundingManager.fundAllAttendees(agentConfigs);
+      const fundingResult = await this.fundingManager.fundAllAgentWallets(agentConfigs);
 
       if (!fundingResult.success) {
         throw new Error(`Initial funding failed: ${fundingResult.error}`);
@@ -211,7 +211,7 @@ export class AgentRunner {
         return;
       }
 
-      const fundingResult = await this.fundingManager.checkAndRefundAttendees(attendeeAccounts);
+      const fundingResult = await this.fundingManager.checkAndTopUpAgentWallets(attendeeAccounts);
 
       if (fundingResult) {
         log.info(`Refunding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
@@ -343,7 +343,8 @@ export class AgentRunner {
 
     const eventTypes: AgentEventType[] = [
       'agent_started', 'agent_stopped', 'needs_updated', 'purchase_initiated',
-      'purchase_completed', 'purchase_failed', 'funding_received', 'funding_failed', 'error_occurred'
+      'purchase_completed', 'purchase_failed', 'funding_received', 'funding_failed', 'error_occurred',
+      'tx_flow' as AgentEventType,
     ];
 
     for (const eventType of eventTypes) {

@@ -48,7 +48,7 @@ export const CHAIN_CONFIG = config.chain;
 export const TIP20_DECIMALS = 6;
 
 /** Convert a human-readable USD amount (e.g. "5.00") to raw TIP-20 units */
-export function parseUsdAmount(amount: string): bigint {
+export function parseAlphaUsd(amount: string): bigint {
   const parts = amount.split(".");
   const whole = BigInt(parts[0]) * BigInt(10 ** TIP20_DECIMALS);
   if (parts[1]) {
@@ -59,7 +59,7 @@ export function parseUsdAmount(amount: string): bigint {
 }
 
 /** Convert raw TIP-20 units to a human-readable USD string */
-export function formatUsdAmount(raw: bigint | number | string): string {
+export function formatAlphaUsd(raw: bigint | number | string): string {
   // If raw is undefined or null, force it to 0n
   const bigRaw = (raw === undefined || raw === null) ? 0n : BigInt(raw);
   

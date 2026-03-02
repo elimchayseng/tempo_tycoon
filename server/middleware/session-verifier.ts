@@ -1,5 +1,5 @@
 import { parseEventLogs } from "viem";
-import { publicClient, ALPHA_USD, parseUsdAmount, formatUsdAmount, shortAddress } from "../tempo-client.js";
+import { publicClient, ALPHA_USD, parseAlphaUsd, formatAlphaUsd, shortAddress } from "../tempo-client.js";
 import { Abis } from "viem/tempo";
 
 export interface TransactionVerificationResult {
@@ -63,7 +63,7 @@ export class SessionVerifier {
       }
 
       // Parse expected amount to raw TIP-20 units for comparison
-      const expectedRawAmount = parseUsdAmount(expectedAmount);
+      const expectedRawAmount = parseAlphaUsd(expectedAmount);
 
       // Look for TransferWithMemo event in the logs
       let transferFound = false;
@@ -121,12 +121,12 @@ export class SessionVerifier {
       if (actualAmount !== expectedRawAmount) {
         return {
           verified: false,
-          error: `Amount mismatch: expected $${expectedAmount} (${expectedRawAmount.toString()}), got $${formatUsdAmount(actualAmount!)} (${actualAmount?.toString()})`
+          error: `Amount mismatch: expected $${expectedAmount} (${expectedRawAmount.toString()}), got $${formatAlphaUsd(actualAmount!)} (${actualAmount?.toString()})`
         };
       }
 
       console.log(`[session-verifier] ✓ Transaction verified successfully`);
-      console.log(`[session-verifier] Details: ${shortAddress(actualFrom)} → ${shortAddress(actualTo)} $${formatUsdAmount(actualAmount)} (block #${receipt.blockNumber})`);
+      console.log(`[session-verifier] Details: ${shortAddress(actualFrom)} → ${shortAddress(actualTo)} $${formatAlphaUsd(actualAmount)} (block #${receipt.blockNumber})`);
 
       return {
         verified: true,
@@ -134,7 +134,7 @@ export class SessionVerifier {
           hash: txHash,
           from: actualFrom,
           to: actualTo,
-          amount: formatUsdAmount(actualAmount),
+          amount: formatAlphaUsd(actualAmount),
           blockNumber: receipt.blockNumber,
           gasUsed: receipt.gasUsed,
         }

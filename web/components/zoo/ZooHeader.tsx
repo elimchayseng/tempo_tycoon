@@ -8,6 +8,8 @@ interface ZooHeaderProps {
   onOpenGates: () => void;
   onStopZoo: () => void;
   onRestart: () => void;
+  explorerOpen?: boolean;
+  onToggleExplorer?: () => void;
 }
 
 export default function ZooHeader({
@@ -18,7 +20,11 @@ export default function ZooHeader({
   onOpenGates,
   onStopZoo,
   onRestart,
+  explorerOpen,
+  onToggleExplorer,
 }: ZooHeaderProps) {
+  const showDashboard = phase === "running" || phase === "starting" || phase === "stopping";
+
   return (
     <header className="zt-statusbar flex items-center justify-between px-5 py-2.5 shrink-0">
       <div className="flex items-center gap-3">
@@ -75,6 +81,17 @@ export default function ZooHeader({
           <span className="font-pixel text-[8px] text-[var(--zt-gold)] animate-pulse">
             Stopping...
           </span>
+        )}
+
+        {/* Control Room toggle */}
+        {showDashboard && onToggleExplorer && (
+          <button
+            onClick={onToggleExplorer}
+            className={`zt-btn font-pixel text-[8px] ${explorerOpen ? "zt-btn-active" : ""}`}
+            title="Toggle Blockchain Explorer"
+          >
+            🖥️
+          </button>
         )}
 
         {/* Connection indicator */}

@@ -1,4 +1,99 @@
 // Shared types between server and client
+
+// ---------------------------------------------------------------------------
+// Blockchain / AlphaUSD types for the Crypto Dashboard Explorer
+// ---------------------------------------------------------------------------
+
+/** Live network stats from the Tempo Moderato Testnet */
+export interface NetworkStats {
+  chain_id: number;
+  chain_name: string;
+  latest_block: number;
+  gas_price_gwei: string;
+  rpc_latency_ms: number;
+  zoo_tx_count: number;
+  zoo_tx_throughput_per_min: number;
+}
+
+/** AlphaUSD token metadata */
+export interface TokenInfo {
+  name: string;
+  symbol: string;
+  address: string;
+  standard: string;
+  decimals: number;
+  transfer_with_memo_signature: string;
+}
+
+/** Wallet info for the explorer panel */
+export interface WalletInfo {
+  role: string;
+  label: string;
+  address: string;
+  /** AlphaUSD balance (TIP-20, 6 decimals) — human-readable */
+  balance: string;
+  /** AlphaUSD balance — raw TIP-20 units */
+  balance_raw: string;
+  nonce: number;
+  explorer_link: string;
+}
+
+/** Timestamped balance history entry */
+export interface BalanceHistoryEntry {
+  timestamp: number;
+  /** AlphaUSD balance (TIP-20, 6 decimals) — human-readable */
+  balance: string;
+  event: 'purchase' | 'funding' | 'initial';
+  tx_hash?: string;
+}
+
+/** Full transaction details returned by /network/tx/:txHash */
+export interface TransactionDetail {
+  tx_hash: string;
+  block_number: number;
+  gas_used: string;
+  /** Fee in AUSD (TIP-20, 6 decimals) */
+  fee_ausd: string;
+  decoded_memo: string;
+  confirmations: number;
+  from: string;
+  to: string;
+  amount: string;
+  explorer_link: string;
+}
+
+/** Transaction flow stages for real-time visualization */
+export type TxFlowStage =
+  | 'decision'
+  | 'checkout_created'
+  | 'signing'
+  | 'broadcast'
+  | 'block_inclusion'
+  | 'confirmed'
+  | 'merchant_verified';
+
+/** Real-time transaction lifecycle event */
+export interface TransactionFlowEvent {
+  agent_id: string;
+  stage: TxFlowStage;
+  timestamp: number;
+  data: Record<string, unknown>;
+}
+
+/** Balance change event */
+export interface BalanceUpdate {
+  agent_id: string;
+  /** AlphaUSD balance (TIP-20, 6 decimals) */
+  balance: string;
+  previous: string;
+  event: 'purchase' | 'funding';
+  tx_hash?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Core shared types
+// ---------------------------------------------------------------------------
+
 export type LogEntryType =
   | "info"
   | "rpc_call"
@@ -41,6 +136,7 @@ export interface ZooAgentState {
 
 export interface ZooPurchaseReceipt {
   agent_id: string;
+  agent_address?: string;
   product_name: string;
   sku: string;
   amount: string;
@@ -59,6 +155,7 @@ export interface PreflightCheck {
   label: string;
   status: "pending" | "checking" | "pass" | "fail";
   detail?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PreflightResult {
@@ -73,7 +170,10 @@ export type WsMessage =
   | { type: "action_complete"; action: string }
   | { type: "action_error"; action: string; error: string }
   | { type: "zoo_agents"; agents: ZooAgentState[] }
-  | { type: "zoo_purchase"; receipt: ZooPurchaseReceipt };
+  | { type: "zoo_purchase"; receipt: ZooPurchaseReceipt }
+  | { type: "zoo_network_stats"; stats: NetworkStats }
+  | { type: "zoo_tx_flow"; event: TransactionFlowEvent }
+  | { type: "zoo_balance_update"; update: BalanceUpdate };
 
 // API Request types for validation
 export interface SendRequest {

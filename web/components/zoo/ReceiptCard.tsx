@@ -1,5 +1,5 @@
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, productEmoji } from "../../utils/formatting";
+import { shortAddr, productEmoji, formatGuestLabel } from "../../utils/formatting";
 
 interface ReceiptCardProps {
   receipt: ZooPurchaseReceipt;
@@ -30,7 +30,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
         <span>
           {emoji} {receipt.product_name}
         </span>
-        <span className="text-[var(--zt-gold)]">${receipt.amount}</span>
+        <span className="text-[var(--zt-gold)]">${receipt.amount} AUSD</span>
       </div>
 
       {/* Parchment body */}
@@ -39,7 +39,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
           {receipt.merchant_name && (
             <Row label="Merchant">{receipt.merchant_name}</Row>
           )}
-          <Row label="Guest">{shortAddr(receipt.agent_id)}</Row>
+          <Row label="Guest">{formatGuestLabel(receipt.agent_id, receipt.agent_address)}</Row>
           <Row label="Tx Hash">
             {receipt.tx_hash ? (
               <a
@@ -55,6 +55,9 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
             )}
           </Row>
           <Row label="Block">{receipt.block_number || "—"}</Row>
+          {receipt.gas_used && (
+            <Row label="Gas Used">{Number(receipt.gas_used).toLocaleString()}</Row>
+          )}
           <Row label="Time">{time}</Row>
         </div>
       </div>

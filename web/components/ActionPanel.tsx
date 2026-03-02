@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Account } from "../lib/types";
 import { ApiService, formatApiError } from "../services/api";
-import { formatBalance, shortAddr, capitalize } from "../utils/formatting";
+import { formatAlphaUsdBalance, shortAddr, capitalize } from "../utils/formatting";
 
 type Props = {
   accounts: Account[];
@@ -81,7 +81,7 @@ export default function ActionPanel({ accounts, activeAction }: Props) {
                   </span>
                   <span className="text-sm font-mono text-emerald-400">
                     {a.balances[alphaUsd]
-                      ? formatBalance(a.balances[alphaUsd])
+                      ? formatAlphaUsdBalance(a.balances[alphaUsd])
                       : "\u2014"}
                   </span>
                 </div>

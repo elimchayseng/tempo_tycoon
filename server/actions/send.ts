@@ -7,8 +7,8 @@ import {
   ALPHA_USD,
   CHAIN_CONFIG,
   TIP20_DECIMALS,
-  parseUsdAmount,
-  formatUsdAmount,
+  parseAlphaUsd,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import { emitLog } from "../instrumented-client.js";
@@ -16,7 +16,7 @@ import { annotations } from "../annotations.js";
 
 const ACTION = "send";
 
-export async function sendAction(params: {
+export async function transferAlphaUsdAction(params: {
   from: string;
   to: string;
   amount: string;
@@ -35,7 +35,7 @@ export async function sendAction(params: {
     throw new Error("Cannot send to yourself");
   }
 
-  const rawAmount = parseUsdAmount(amount);
+  const rawAmount = parseAlphaUsd(amount);
 
   emitLog({
     action: ACTION,
@@ -101,8 +101,8 @@ export async function sendAction(params: {
     type: "rpc_result",
     label: `Balances before`,
     data: {
-      [senderAcct.label]: `$${formatUsdAmount(senderBalanceBefore)}`,
-      [recipientAcct.label]: `$${formatUsdAmount(recipientBalanceBefore)}`,
+      [senderAcct.label]: `$${formatAlphaUsd(senderBalanceBefore)}`,
+      [recipientAcct.label]: `$${formatAlphaUsd(recipientBalanceBefore)}`,
     },
     indent: 1,
   });
@@ -177,7 +177,7 @@ export async function sendAction(params: {
       transfer_event: {
         from: shortAddress(result.from),
         to: shortAddress(result.to),
-        amount: `${result.amount.toString()} (= $${formatUsdAmount(result.amount)})`,
+        amount: `${result.amount.toString()} (= $${formatAlphaUsd(result.amount)})`,
         memo: memoHex,
       },
       explorer: `${CHAIN_CONFIG.explorerUrl}/tx/${result.receipt.transactionHash}`,
@@ -234,16 +234,16 @@ export async function sendAction(params: {
     label: `Balance changes`,
     data: {
       [`${senderAcct.label} (AlphaUSD)`]: {
-        before: `$${formatUsdAmount(senderBalanceBefore)}`,
-        after: `$${formatUsdAmount(senderBalanceAfter)}`,
-        change: `−$${formatUsdAmount(senderAlphaDiff)}`,
-        breakdown: `$${amount} transfer + $${formatUsdAmount(feePaid)} fee`,
+        before: `$${formatAlphaUsd(senderBalanceBefore)}`,
+        after: `$${formatAlphaUsd(senderBalanceAfter)}`,
+        change: `−$${formatAlphaUsd(senderAlphaDiff)}`,
+        breakdown: `$${amount} transfer + $${formatAlphaUsd(feePaid)} fee`,
         note: "Self-pay: sender pays the fee in AlphaUSD (same token as the transfer)",
       },
       [recipientAcct.label + " (AlphaUSD)"]: {
-        before: `$${formatUsdAmount(recipientBalanceBefore)}`,
-        after: `$${formatUsdAmount(recipientBalanceAfter)}`,
-        change: `+$${formatUsdAmount(recipientDiff)}`,
+        before: `$${formatAlphaUsd(recipientBalanceBefore)}`,
+        after: `$${formatAlphaUsd(recipientBalanceAfter)}`,
+        change: `+$${formatAlphaUsd(recipientDiff)}`,
       },
     },
   });
@@ -269,8 +269,8 @@ export async function sendAction(params: {
       },
       "2_formula": `fee = gasUsed × effectiveGasPrice`,
       "3_calculation": `${gasUsed} gas × ${formatGwei(effectiveGasPrice)} Gwei = ${formatGwei(computedFeeWei)} Gwei`,
-      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatUsdAmount(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
-      "5_actual_fee": `$${formatUsdAmount(feePaid)} (from balance: $${formatUsdAmount(senderAlphaDiff)} deducted − $${amount} transferred)`,
+      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatAlphaUsd(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
+      "5_actual_fee": `$${formatAlphaUsd(feePaid)} (from balance: $${formatAlphaUsd(senderAlphaDiff)} deducted − $${amount} transferred)`,
     },
     indent: 1,
   });

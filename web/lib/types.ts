@@ -12,4 +12,12 @@ export type {
   ZooPurchaseReceipt,
   PreflightCheck,
   PreflightResult,
+  NetworkStats,
+  TokenInfo,
+  WalletInfo,
+  BalanceHistoryEntry,
+  TransactionDetail,
+  TxFlowStage,
+  TransactionFlowEvent,
+  BalanceUpdate,
 } from '../../shared/types.js';

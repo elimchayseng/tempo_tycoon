@@ -8,13 +8,16 @@ export interface AgentState {
   agent_id: string;
   address: string;
   needs: AgentNeeds;
-  balance: string;        // AlphaUSD balance as string
+  /** AlphaUSD balance (TIP-20, 6 decimals) as human-readable string */
+  balance: string;
   status: 'offline' | 'online' | 'purchasing' | 'error';
   last_purchase_time: Date | null;
   last_funding_time: Date | null;
   purchase_count: number;
-  total_spent: string;    // Total AlphaUSD spent as string
-  cycle_count: number;    // Number of poll cycles completed
+  /** Total AlphaUSD spent (TIP-20, 6 decimals) as human-readable string */
+  total_spent: string;
+  /** Number of poll cycles completed */
+  cycle_count: number;
   created_at: Date;
   updated_at: Date;
 }

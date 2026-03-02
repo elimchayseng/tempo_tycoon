@@ -1,4 +1,14 @@
-import type { SendRequest, BatchRequest, HistoryRequest, PreflightResult } from '../lib/types.js';
+import type {
+  SendRequest,
+  BatchRequest,
+  HistoryRequest,
+  PreflightResult,
+  NetworkStats,
+  TokenInfo,
+  WalletInfo,
+  BalanceHistoryEntry,
+  TransactionDetail,
+} from '../lib/types.js';
 
 // Configuration for API calls
 const API_BASE_URL = '/api';
@@ -138,6 +148,27 @@ export class ApiService {
 
   static async zooFundAgents(): Promise<{ success: boolean }> {
     return apiRequest('/zoo/agents/fund');
+  }
+
+  // Blockchain explorer data endpoints
+  static async getNetworkStats(): Promise<NetworkStats> {
+    return apiRequest<NetworkStats>('/zoo/network/stats', { method: 'GET' });
+  }
+
+  static async getTokenInfo(): Promise<TokenInfo> {
+    return apiRequest<TokenInfo>('/zoo/network/token-info', { method: 'GET' });
+  }
+
+  static async getWallets(): Promise<{ wallets: WalletInfo[] }> {
+    return apiRequest<{ wallets: WalletInfo[] }>('/zoo/network/wallets', { method: 'GET' });
+  }
+
+  static async getBalanceHistory(agentId: string): Promise<{ agent_id: string; history: BalanceHistoryEntry[] }> {
+    return apiRequest<{ agent_id: string; history: BalanceHistoryEntry[] }>(`/zoo/network/balance-history/${agentId}`, { method: 'GET' });
+  }
+
+  static async getTransactionDetails(txHash: string): Promise<TransactionDetail> {
+    return apiRequest<TransactionDetail>(`/zoo/network/tx/${txHash}`, { method: 'GET' });
   }
 }
 

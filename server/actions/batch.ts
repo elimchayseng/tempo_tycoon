@@ -7,8 +7,8 @@ import {
   ALPHA_USD,
   CHAIN_CONFIG,
   TIP20_DECIMALS,
-  parseUsdAmount,
-  formatUsdAmount,
+  parseAlphaUsd,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import { emitLog } from "../instrumented-client.js";
@@ -46,7 +46,7 @@ export async function batchAction(params: {
       throw new Error(`Cannot send to yourself at index ${index}`);
     }
 
-    const rawAmount = parseUsdAmount(payment.amount);
+    const rawAmount = parseAlphaUsd(payment.amount);
     const memoHex = toHex(payment.memo);
 
     return {
@@ -67,7 +67,7 @@ export async function batchAction(params: {
     data: {
       sender: `${senderAcct.label} (${shortAddress(senderAcct.address)})`,
       batch_size: payments.length,
-      total_amount: `$${formatUsdAmount(totalAmount)}`,
+      total_amount: `$${formatAlphaUsd(totalAmount)}`,
       payments: processedPayments.map((p, i) => ({
         [`payment_${i + 1}`]: `$${p.amount} → ${p.recipientAcct.label} memo: "${p.memo}"`,
       })),
@@ -100,8 +100,8 @@ export async function batchAction(params: {
     type: "rpc_result",
     label: `Sender balance before batch`,
     data: {
-      [senderAcct.label]: `$${formatUsdAmount(senderBalanceBefore)}`,
-      total_to_send: `$${formatUsdAmount(totalAmount)}`,
+      [senderAcct.label]: `$${formatAlphaUsd(senderBalanceBefore)}`,
+      total_to_send: `$${formatAlphaUsd(totalAmount)}`,
       sufficient_balance: senderBalanceBefore >= totalAmount ? "✓" : "✗ INSUFFICIENT",
     },
     indent: 1,
@@ -109,7 +109,7 @@ export async function batchAction(params: {
 
   if (senderBalanceBefore < totalAmount) {
     throw new Error(
-      `Insufficient balance: ${senderAcct.label} has $${formatUsdAmount(senderBalanceBefore)} but needs $${formatUsdAmount(totalAmount)}`
+      `Insufficient balance: ${senderAcct.label} has $${formatAlphaUsd(senderBalanceBefore)} but needs $${formatAlphaUsd(totalAmount)}`
     );
   }
 
@@ -213,7 +213,7 @@ export async function batchAction(params: {
       last_tx_hash: receipt.transactionHash,
       last_block_number: receipt.blockNumber.toString(),
       total_gas_used: totalGasUsed.toString(),
-      cost_efficiency: `${payments.length} payments = ~$${formatUsdAmount(totalGasUsed / BigInt(payments.length))} gas per payment`,
+      cost_efficiency: `${payments.length} payments = ~$${formatAlphaUsd(totalGasUsed / BigInt(payments.length))} gas per payment`,
       batch_result: `✓ All ${payments.length} payments succeeded`,
       explorer: `${CHAIN_CONFIG.explorerUrl}/tx/${receipt.transactionHash}`,
     },
@@ -271,17 +271,17 @@ export async function batchAction(params: {
     label: `Batch payment results`,
     data: {
       [`${senderAcct.label} (sender)`]: {
-        before: `$${formatUsdAmount(senderBalanceBefore)}`,
-        after: `$${formatUsdAmount(senderBalanceAfter)}`,
-        total_deducted: `−$${formatUsdAmount(senderTotalDeducted)}`,
-        breakdown: `$${formatUsdAmount(totalAmount)} payments + $${formatUsdAmount(feePaid)} fee`,
+        before: `$${formatAlphaUsd(senderBalanceBefore)}`,
+        after: `$${formatAlphaUsd(senderBalanceAfter)}`,
+        total_deducted: `−$${formatAlphaUsd(senderTotalDeducted)}`,
+        breakdown: `$${formatAlphaUsd(totalAmount)} payments + $${formatAlphaUsd(feePaid)} fee`,
         note: "Single fee for entire batch",
       },
       recipients: processedPayments.map((payment, i) => ({
         [`${payment.recipientAcct.label}`]: {
           received: `+$${payment.amount}`,
           memo: `"${payment.memo}"`,
-          balance_after: `$${formatUsdAmount(recipientBalancesAfter[i])}`,
+          balance_after: `$${formatAlphaUsd(recipientBalancesAfter[i])}`,
         },
       })),
     },
@@ -294,7 +294,7 @@ export async function batchAction(params: {
   const computedFeeWei = totalGasUsed * effectiveGasPrice;
   const WEI_TO_TIP20 = BigInt(10 ** 12);
   const computedFeeTip20 = computedFeeWei / WEI_TO_TIP20;
-  const feePerPayment = Number(formatUsdAmount(totalFeePaid)) / payments.length;
+  const feePerPayment = Number(formatAlphaUsd(totalFeePaid)) / payments.length;
 
   emitLog({
     action: ACTION,
@@ -309,8 +309,8 @@ export async function batchAction(params: {
       },
       "2_formula": `total_fee = total_gasUsed × effectiveGasPrice`,
       "3_calculation": `${totalGasUsed} gas × ${formatGwei(effectiveGasPrice)} Gwei = ${formatGwei(computedFeeWei)} Gwei`,
-      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatUsdAmount(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
-      "5_actual_fee": `$${formatUsdAmount(totalFeePaid)} total (from balance: $${formatUsdAmount(senderTotalDeducted)} deducted − $${formatUsdAmount(totalAmount)} transferred)`,
+      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatAlphaUsd(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
+      "5_actual_fee": `$${formatAlphaUsd(totalFeePaid)} total (from balance: $${formatAlphaUsd(senderTotalDeducted)} deducted − $${formatAlphaUsd(totalAmount)} transferred)`,
       "6_efficiency": `$${feePerPayment.toFixed(6)} average cost per payment (${payments.length} transactions)`,
     },
     indent: 1,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Account, ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, formatBalance, ANIMAL_EMOJI, ANIMAL_NAME, productEmoji } from "../../utils/formatting";
+import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji } from "../../utils/formatting";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
@@ -9,7 +9,7 @@ interface MerchantPanelProps {
 
 interface AnimState {
   guestEmoji: string;
-  guestName: string;
+  guestAddr: string;
   productEm: string;
   amount: string;
   txHash: string;
@@ -17,24 +17,24 @@ interface AnimState {
 
 interface ActivityEntry {
   guestEmoji: string;
-  guestName: string;
+  guestAddr: string;
   productEm: string;
   productName: string;
   amount: string;
   txHash: string;
 }
 
-function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestEmoji: string, guestName: string): { text: string; delay: number }[] {
+function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestLabel: string): { text: string; delay: number }[] {
   const prodEm = productEmoji(receipt.product_name);
   return [
-    { text: `${guestEmoji} ${guestName} evaluating purchase decision...`, delay: 0 },
+    { text: `${guestLabel} evaluating purchase decision...`, delay: 0 },
     { text: `Discovering merchants via /api/zoo/registry`, delay: 600 },
     { text: `Browsing merchant catalog...`, delay: 1200 },
-    { text: `Found ${prodEm} ${receipt.product_name} — $${receipt.amount}`, delay: 1800 },
+    { text: `Found ${prodEm} ${receipt.product_name} — $${receipt.amount} AUSD`, delay: 1800 },
     { text: `Creating checkout session...`, delay: 2400 },
-    { text: `🪙 Executing payment on-chain...`, delay: 3000 },
-    { text: `Verifying tx via checkout/complete...`, delay: 3600 },
-    { text: `✅ ACP purchase confirmed!`, delay: 4200 },
+    { text: `🔐 Signing transferWithMemo tx...`, delay: 3000 },
+    { text: `📡 Broadcasting to Tempo Moderato...`, delay: 3600 },
+    { text: `✅ AlphaUSD transfer confirmed on-chain!`, delay: 4200 },
   ];
 }
 
@@ -55,12 +55,13 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
     lastTxRef.current = latestReceipt.tx_hash;
 
     const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🦊";
-    const guestName = ANIMAL_NAME[latestReceipt.agent_id] ?? latestReceipt.agent_id;
+    const guestAddr = latestReceipt.agent_address ? shortAddr(latestReceipt.agent_address) : latestReceipt.agent_id;
+    const guestLabel = formatGuestLabel(latestReceipt.agent_id, latestReceipt.agent_address);
     const productEm = productEmoji(latestReceipt.product_name);
 
     setAnim({
       guestEmoji,
-      guestName,
+      guestAddr,
       productEm,
       amount: latestReceipt.amount,
       txHash: latestReceipt.tx_hash,
@@ -70,7 +71,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
     setActivity((prev) => [
       {
         guestEmoji,
-        guestName,
+        guestAddr,
         productEm,
         productName: latestReceipt.product_name,
         amount: latestReceipt.amount,
@@ -83,7 +84,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
     stepTimersRef.current.forEach(clearTimeout);
     stepTimersRef.current = [];
 
-    const steps = buildProtocolSteps(latestReceipt, guestEmoji, guestName);
+    const steps = buildProtocolSteps(latestReceipt, guestLabel);
     for (const step of steps) {
       const id = setTimeout(() => setProtocolStep(step.text), step.delay);
       stepTimersRef.current.push(id);
@@ -105,7 +106,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
   if (!merchant) return null;
 
   const rawBalance = merchant.balances[ALPHA_USD] ?? "0";
-  const balance = formatBalance(rawBalance);
+  const balance = formatAlphaUsdBalance(rawBalance);
 
   return (
     <div className="px-5 pt-4 shrink-0">
@@ -132,7 +133,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
               <span className="text-3xl">{anim ? anim.guestEmoji : "🦁"}</span>
               {anim && (
                 <span className="font-pixel text-[8px] text-[var(--zt-tan)] whitespace-nowrap mt-0.5">
-                  {(anim.guestName ?? "Guest").split(" ")[0]}
+                  {anim.guestAddr}
                 </span>
               )}
             </div>
@@ -185,7 +186,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
                     className="font-pixel text-[10px] text-[var(--zt-tan)] flex items-center gap-1.5"
                   >
                     <span>{entry.guestEmoji}</span>
-                    <span className="text-[var(--zt-tan)]">{(entry.guestName ?? "Guest").split(" ")[0]}</span>
+                    <span className="text-[var(--zt-tan)]">{entry.guestAddr}</span>
                     <span className="text-gray-500">bought</span>
                     <span>{entry.productEm} {entry.productName}</span>
                     <span className="text-[var(--zt-gold)] ml-auto">${entry.amount}</span>

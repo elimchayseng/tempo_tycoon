@@ -11,6 +11,7 @@ import type {
   AgentEvent,
   AgentEventType
 } from './types.js';
+import type { TxFlowStage } from '../shared/types.js';
 
 const log = createLogger('BuyerAgent');
 
@@ -139,7 +140,7 @@ export class BuyerAgent {
       });
 
       // Step 2: Get current balance from blockchain
-      const currentBalance = await this.balanceSync.getBlockchainBalance(this.config.agent_id);
+      const currentBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
 
       // Log balance comparison for debugging
       await this.balanceSync.logBalanceComparison(this.config.agent_id, this.state.balance);
@@ -196,6 +197,7 @@ export class BuyerAgent {
       });
 
       // Step 1: Initiate ACP purchase flow
+      this.emitTxFlow('checkout_created', { preferred_category: preferredCategory });
       const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory);
 
       if (!purchaseFlow) {
@@ -211,16 +213,19 @@ export class BuyerAgent {
 
       // Step 3: Execute payment
       log.info(`[${this.config.agent_id}] Making payment for ${product.name}...`);
+      this.emitTxFlow('signing', { product: product.name, amount: session.amount });
 
-      const paymentResult = await this.paymentManager.makePaymentWithRetry(session, product);
+      const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, product);
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || 'Payment failed');
       }
 
       log.info(`[${this.config.agent_id}] Payment successful: ${paymentResult.tx_hash}`);
+      this.emitTxFlow('block_inclusion', { tx_hash: paymentResult.tx_hash, block_number: paymentResult.block_number });
 
       // Step 4: Complete checkout with merchant
+      this.emitTxFlow('merchant_verified', { session_id: session.session_id });
       const checkoutResult = await this.acpClient.completeCheckout(
         merchantCategory,
         session.session_id,
@@ -256,7 +261,7 @@ export class BuyerAgent {
       // Step 8: Re-read authoritative balance from chain instead of
       // speculatively subtracting (avoids floating-point vs fixed-point
       // rounding mismatch that caused persistent $0.01 drift).
-      const postPurchaseBalance = await this.balanceSync.getBlockchainBalance(this.config.agent_id);
+      const postPurchaseBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
       this.state.balance = postPurchaseBalance.toFixed(2);
       this.state.status = 'online';
 
@@ -404,6 +409,17 @@ export class BuyerAgent {
         }
       });
     }
+  }
+
+  /**
+   * Emit a transaction flow event for real-time visualization
+   */
+  private emitTxFlow(stage: TxFlowStage, data: Record<string, unknown> = {}): void {
+    this.emitEvent('tx_flow' as AgentEventType, {
+      stage,
+      timestamp: Date.now(),
+      data,
+    });
   }
 
   /**

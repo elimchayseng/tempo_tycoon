@@ -5,12 +5,17 @@
  * @param balance - Raw balance as string (e.g., "1000000" for $1.00)
  * @returns Formatted balance (e.g., "$1.00")
  */
-export function formatBalance(balance: string): string {
+/**
+ * Format a raw AlphaUSD balance (TIP-20, 6 decimals) for display.
+ * @param balance - Raw balance as string (e.g., "1000000" for $1.00)
+ * @returns Formatted balance (e.g., "$1.00 AUSD")
+ */
+export function formatAlphaUsdBalance(balance: string): string {
   const raw = BigInt(balance || "0");
   const whole = raw / 1_000_000n; // 6 decimals for TIP-20
   const frac = raw % 1_000_000n;
   const fracStr = frac.toString().padStart(6, "0").slice(0, 2);
-  return `$${whole.toLocaleString()}.${fracStr}`;
+  return `$${whole.toLocaleString()}.${fracStr} AUSD`;
 }
 
 /**
@@ -61,11 +66,18 @@ export const ANIMAL_EMOJI: Record<string, string> = {
   attendee_3: "🐧",
 };
 
-export const ANIMAL_NAME: Record<string, string> = {
-  attendee_1: "Leo the Lion",
-  attendee_2: "Ellie the Elephant",
-  attendee_3: "Penny the Penguin",
-};
+/**
+ * Build the standardized guest label: `Guest: 0xABCD...1234 🦁`
+ * @param agentId - e.g. "attendee_1"
+ * @param address - optional wallet address
+ */
+export function formatGuestLabel(agentId: string, address?: string): string {
+  const emoji = ANIMAL_EMOJI[agentId] ?? "🦊";
+  if (address) {
+    return `Guest: ${shortAddr(address)} ${emoji}`;
+  }
+  return `Guest: ${agentId} ${emoji}`;
+}
 
 /**
  * Get the emoji for a product name
