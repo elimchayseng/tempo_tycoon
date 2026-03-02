@@ -31,6 +31,7 @@ export type AccountsState = Account[];
 // Zoo Dashboard types
 export interface ZooAgentState {
   agent_id: string;
+  address: string;
   status: string;
   needs: { food_need: number; fun_need: number };
   balance: string;

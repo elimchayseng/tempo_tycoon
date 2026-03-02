@@ -20,28 +20,25 @@ export default function ZooHeader({
   onRestart,
 }: ZooHeaderProps) {
   return (
-    <header className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gray-900/80 backdrop-blur-sm shrink-0">
+    <header className="zt-statusbar flex items-center justify-between px-5 py-2.5 shrink-0">
       <div className="flex items-center gap-3">
-        <h1 className="text-base font-bold tracking-tight">
-          <span className="text-[var(--zoo-green)]">Zoo</span>{" "}
-          <span className="text-gray-100">Tycoon</span>
+        <h1 className="font-pixel text-sm text-white" style={{ textShadow: "2px 2px 0 rgba(0,0,0,0.5)" }}>
+          <span className="text-[var(--zt-gold)]">Tempo</span>{" "}
+          <span>Tycoon</span>
         </h1>
-        <span className="text-[10px] text-gray-600 font-mono bg-gray-800/50 px-1.5 py-0.5 rounded">
-          Moderato Testnet
+        <span className="font-pixel text-[7px] text-[var(--zt-tan)] opacity-70">
+          Moderato
         </span>
       </div>
 
       <div className="flex items-center gap-3">
         {error && (
-          <span className="text-xs text-red-400 max-w-60 truncate">{error}</span>
+          <span className="font-pixel text-[7px] text-red-400 max-w-60 truncate">{error}</span>
         )}
 
         {/* Phase-aware controls */}
         {phase === "idle" && (
-          <button
-            onClick={onStartPreflight}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-[var(--zoo-green)] hover:bg-[var(--zoo-green-light)] text-white transition-colors"
-          >
+          <button onClick={onStartPreflight} className="zt-btn">
             Start Zoo
           </button>
         )}
@@ -49,52 +46,46 @@ export default function ZooHeader({
         {(phase === "preflight" || phase === "ready") && (
           <div className="flex items-center gap-2">
             {phase === "ready" && (
-              <button
-                onClick={onOpenGates}
-                className="px-3 py-1.5 text-xs font-medium rounded bg-[var(--zoo-brown)] hover:brightness-110 text-white transition-colors"
-              >
+              <button onClick={onOpenGates} className="zt-btn-brown">
                 Open Gates
               </button>
             )}
-            <button
-              onClick={onRestart}
-              className="px-3 py-1.5 text-xs font-medium rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
-            >
+            <button onClick={onRestart} className="zt-btn">
               Cancel
             </button>
           </div>
         )}
 
         {phase === "starting" && (
-          <span className="text-xs text-yellow-400/80 animate-pulse font-mono">
+          <span className="font-pixel text-[8px] text-[var(--zt-gold)] animate-pulse">
             Starting agents...
           </span>
         )}
 
         {phase === "running" && (
-          <button
-            onClick={onStopZoo}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-red-700 hover:bg-red-600 text-white transition-colors"
-          >
+          <button onClick={onStopZoo} className="zt-btn" style={{
+            background: "linear-gradient(180deg, #c0392b 0%, #8b1a1a 100%)",
+            borderColor: "#e06050 #4a0e0e #4a0e0e #e06050",
+          }}>
             Stop Zoo
           </button>
         )}
 
         {phase === "stopping" && (
-          <span className="text-xs text-yellow-400/80 animate-pulse font-mono">
+          <span className="font-pixel text-[8px] text-[var(--zt-gold)] animate-pulse">
             Stopping...
           </span>
         )}
 
         {/* Connection indicator */}
-        <div className="flex items-center gap-1.5">
+        <div className="zt-inset px-2 py-1 flex items-center gap-1.5" style={{ background: "rgba(0,0,0,0.3)" }}>
           <span
-            className={`inline-block w-1.5 h-1.5 rounded-full ${
+            className={`inline-block w-2 h-2 ${
               connected ? "bg-emerald-400" : "bg-red-500"
             }`}
           />
-          <span className="text-[10px] text-gray-500">
-            {connected ? "connected" : "disconnected"}
+          <span className="font-pixel text-[7px] text-gray-300">
+            {connected ? "ON" : "OFF"}
           </span>
         </div>
       </div>

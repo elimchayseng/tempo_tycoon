@@ -5,6 +5,8 @@ interface AgentCardRowProps {
   agents: ZooAgentState[];
 }
 
+const ANIMAL_EMOJI = ["🦁", "🐘", "🐧"];
+
 export default function AgentCardRow({ agents }: AgentCardRowProps) {
   if (agents.length === 0) {
     return (
@@ -12,9 +14,14 @@ export default function AgentCardRow({ agents }: AgentCardRowProps) {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-gray-900/40 border border-gray-800/50 rounded-lg p-4 h-36 flex items-center justify-center"
+            className="zt-bevel overflow-hidden"
           >
-            <span className="text-xs text-gray-600">Agent {i} offline</span>
+            <div className="zt-titlebar">
+              {ANIMAL_EMOJI[i - 1]} Guest {i}
+            </div>
+            <div className="bg-[var(--zt-green-dark)] px-3 py-6 flex items-center justify-center">
+              <span className="font-pixel text-[8px] text-gray-600">offline</span>
+            </div>
           </div>
         ))}
       </div>

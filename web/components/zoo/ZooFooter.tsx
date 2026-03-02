@@ -13,12 +13,14 @@ export default function ZooFooter({ zooMaster }: ZooFooterProps) {
   const balance = formatBalance(rawBalance);
 
   return (
-    <div className="shrink-0 border-t border-gray-800/60 bg-gray-950 px-4 py-2 flex items-center justify-between text-xs text-gray-500">
+    <footer className="zt-statusbar shrink-0 px-4 py-2 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-gray-400 font-medium">Zoo Master Fund</span>
-        <span className="font-mono">{shortAddr(zooMaster.address)}</span>
+        <span className="font-pixel text-[7px] text-[var(--zt-tan)]">Zoo Master</span>
+        <span className="font-pixel text-[7px] text-gray-400">{shortAddr(zooMaster.address)}</span>
       </div>
-      <span className="font-mono text-[var(--zoo-tan)]">{balance}</span>
-    </div>
+      <span className="font-pixel text-[9px] text-[var(--zt-gold)]">
+        💰 {balance}
+      </span>
+    </footer>
   );
 }

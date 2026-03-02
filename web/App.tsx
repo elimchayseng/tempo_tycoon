@@ -23,7 +23,7 @@ export default function App() {
   const zooMaster = accounts.find(a => a.label === "Zoo Master");
 
   return (
-    <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
+    <div className="h-screen flex flex-col bg-[var(--zt-green-dark)] text-gray-100">
       <ZooHeader
         phase={phase}
         connected={connected}
@@ -36,22 +36,24 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* Idle state */}
+        {/* Idle state — dialog popup */}
         {phase === "idle" && (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-300 mb-2">
-                <span className="text-[var(--zoo-green-light)]">Zoo Tycoon</span> Dashboard
-              </h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Autonomous agent commerce on Tempo Moderato Testnet
-              </p>
-              <button
-                onClick={startPreflight}
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[var(--zoo-green)] hover:bg-[var(--zoo-green-light)] text-white transition-colors"
-              >
-                Start Zoo
-              </button>
+            <div className="w-full max-w-sm zt-bevel overflow-hidden">
+              {/* Title bar */}
+              <div className="zt-titlebar text-center">
+                🦁 TEMPO TYCOON
+              </div>
+              {/* Parchment body */}
+              <div className="zt-parchment px-6 py-6 text-center">
+                <p className="font-pixel text-[8px] text-[var(--zt-text-mid)] mb-5 leading-relaxed">
+                  Autonomous agent commerce<br />
+                  on Tempo Moderato Testnet
+                </p>
+                <button onClick={startPreflight} className="zt-btn-brown">
+                  Start Zoo
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -70,7 +72,7 @@ export default function App() {
         {/* Running dashboard */}
         {showDashboard && (
           <>
-            <div className="border-b border-gray-800/60 shrink-0">
+            <div className="border-b border-[var(--zt-green-mid)] shrink-0">
               <AgentCardRow agents={zooAgents} />
             </div>
             <ReceiptFeed receipts={receipts} />

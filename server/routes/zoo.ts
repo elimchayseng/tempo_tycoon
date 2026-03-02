@@ -97,6 +97,7 @@ function broadcastAgentStates() {
     const status = agentRunner.getStatus();
     const agents: ZooAgentState[] = status.agents.map((a: any) => ({
       agent_id: a.agent_id,
+      address: a.address ?? '',
       status: a.status,
       needs: a.needs ?? { food_need: 100, fun_need: 100 },
       balance: String(a.balance ?? '0'),

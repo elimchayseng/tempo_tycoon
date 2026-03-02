@@ -21,8 +21,10 @@ export default function ReceiptFeed({ receipts }: ReceiptFeedProps) {
   if (receipts.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-gray-600">
-          No purchase receipts yet. Agents will appear here once they start buying.
+        <p className="font-pixel text-[10px] text-[var(--zt-tan)] leading-relaxed text-center">
+          No purchase receipts yet.<br />
+          Guests will buy food once<br />
+          the zoo is open!
         </p>
       </div>
     );
@@ -31,11 +33,13 @@ export default function ReceiptFeed({ receipts }: ReceiptFeedProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto px-5 py-4 space-y-3"
+      className="flex-1 overflow-y-auto px-5 py-4"
     >
-      {receipts.map((receipt, i) => (
-        <ReceiptCard key={`${receipt.tx_hash}-${i}`} receipt={receipt} />
-      ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {receipts.map((receipt, i) => (
+          <ReceiptCard key={`${receipt.tx_hash}-${i}`} receipt={receipt} />
+        ))}
+      </div>
     </div>
   );
 }
