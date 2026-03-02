@@ -1,4 +1,4 @@
-import type { SendRequest, BatchRequest, HistoryRequest } from '../lib/types.js';
+import type { SendRequest, BatchRequest, HistoryRequest, PreflightResult } from '../lib/types.js';
 
 // Configuration for API calls
 const API_BASE_URL = '/api';
@@ -118,6 +118,26 @@ export class ApiService {
     await apiRequest('/history', {
       body: JSON.stringify(request),
     });
+  }
+
+  static async zooPreflight(): Promise<PreflightResult> {
+    return apiRequest<PreflightResult>('/zoo/preflight');
+  }
+
+  static async zooStartAgents(): Promise<{ success: boolean }> {
+    return apiRequest('/zoo/agents/start');
+  }
+
+  static async zooStopAgents(): Promise<{ success: boolean }> {
+    return apiRequest('/zoo/agents/stop');
+  }
+
+  static async zooGetStatus(): Promise<unknown> {
+    return apiRequest('/zoo/status', { method: 'GET' });
+  }
+
+  static async zooFundAgents(): Promise<{ success: boolean }> {
+    return apiRequest('/zoo/agents/fund');
   }
 }
 

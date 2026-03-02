@@ -69,7 +69,7 @@ function safeStringify(obj: unknown): string {
   );
 }
 
-function broadcast(message: Record<string, unknown>): void {
+export function broadcast(message: Record<string, unknown>): void {
   if (clients.size === 0) return;
 
   const json = safeStringify(message);

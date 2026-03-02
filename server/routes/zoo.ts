@@ -6,7 +6,9 @@ import { getZooAccountByRole, getAllZooAccounts } from "../zoo-accounts.js";
 import { config } from "../config.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
 import { AgentRunner } from "../../agents/agent-runner.js";
-import { emitLog } from "../instrumented-client.js";
+import { emitLog, broadcast } from "../instrumented-client.js";
+import { publicClient } from "../tempo-client.js";
+import type { PreflightCheck, PreflightResult, ZooAgentState, ZooPurchaseReceipt } from "../../shared/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,6 +45,25 @@ if (config.zoo.enabled) {
         new_needs: event.data.new_needs
       }
     });
+
+    // Broadcast typed purchase receipt for dashboard
+    const rec = event.data.purchase_record;
+    const receipt: ZooPurchaseReceipt = {
+      agent_id: event.agent_id,
+      product_name: rec.name ?? rec.product_name ?? '',
+      sku: rec.sku ?? '',
+      amount: String(rec.amount),
+      tx_hash: rec.tx_hash ?? '',
+      block_number: String(rec.block_number ?? ''),
+      gas_used: String(rec.gas_used ?? ''),
+      need_before: event.data.need_before ?? 0,
+      need_after: event.data.new_needs?.food_need ?? 0,
+      timestamp: Date.now(),
+    };
+    broadcast({ type: 'zoo_purchase', receipt });
+
+    // Also broadcast updated agent states
+    broadcastAgentStates();
   });
 
   agentRunner.on('needs_updated', (event) => {
@@ -57,9 +78,30 @@ if (config.zoo.enabled) {
         cycle: event.data.cycle_count
       }
     });
+
+    // Broadcast updated agent states
+    broadcastAgentStates();
   });
 
   console.log('[zoo-routes] 🤖 AgentRunner initialized and ready');
+}
+
+function broadcastAgentStates() {
+  if (!agentRunner) return;
+  try {
+    const status = agentRunner.getStatus();
+    const agents: ZooAgentState[] = status.agents.map((a: any) => ({
+      agent_id: a.agent_id,
+      status: a.status,
+      needs: a.needs ?? { food_need: 100, fun_need: 100 },
+      balance: String(a.balance ?? '0'),
+      purchase_count: a.purchase_count ?? 0,
+      total_spent: String(a.total_spent ?? '0'),
+    }));
+    broadcast({ type: 'zoo_agents', agents });
+  } catch {
+    // Silently ignore if agent runner state is unavailable
+  }
 }
 
 // Helper to load and process zoo registry
@@ -92,6 +134,92 @@ function loadZooRegistry() {
     throw new Error('Failed to load zoo registry');
   }
 }
+
+// POST /api/zoo/preflight - Run pre-flight checks before starting zoo
+zooRoutes.post("/preflight", async (c) => {
+  const checks: PreflightCheck[] = [
+    { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
+    { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
+    { id: "balances", label: "Wallet balances", status: "pending" },
+    { id: "merchants", label: "Merchant registry", status: "pending" },
+    { id: "runner", label: "Agent runner", status: "pending" },
+  ];
+
+  // 1. Blockchain connectivity
+  try {
+    const blockNumber = await publicClient.getBlockNumber();
+    checks[0].status = "pass";
+    checks[0].detail = `Block #${blockNumber}`;
+  } catch (e) {
+    checks[0].status = "fail";
+    checks[0].detail = e instanceof Error ? e.message : "Cannot reach chain";
+  }
+
+  // 2. Zoo accounts initialized
+  try {
+    const accounts = getAllZooAccounts();
+    if (accounts.length >= 5) {
+      checks[1].status = "pass";
+      checks[1].detail = `${accounts.length} accounts found`;
+    } else {
+      checks[1].status = "fail";
+      checks[1].detail = `Only ${accounts.length}/5 accounts found`;
+    }
+  } catch (e) {
+    checks[1].status = "fail";
+    checks[1].detail = e instanceof Error ? e.message : "Account check failed";
+  }
+
+  // 3. Wallet balances
+  try {
+    const master = getZooAccountByRole("zooMaster");
+    const attendees = [
+      getZooAccountByRole("attendee1"),
+      getZooAccountByRole("attendee2"),
+      getZooAccountByRole("attendee3"),
+    ];
+    const allFunded = master && attendees.every((a) => a !== undefined);
+    if (allFunded) {
+      checks[2].status = "pass";
+      checks[2].detail = "Master + 3 attendees available";
+    } else {
+      checks[2].status = "fail";
+      checks[2].detail = "Some wallets missing";
+    }
+  } catch (e) {
+    checks[2].status = "fail";
+    checks[2].detail = e instanceof Error ? e.message : "Balance check failed";
+  }
+
+  // 4. Merchant registry
+  try {
+    const registry = loadZooRegistry();
+    const merchantCount = registry.merchants?.length ?? 0;
+    if (merchantCount > 0) {
+      checks[3].status = "pass";
+      checks[3].detail = `${merchantCount} merchant(s) loaded`;
+    } else {
+      checks[3].status = "fail";
+      checks[3].detail = "No merchants in registry";
+    }
+  } catch (e) {
+    checks[3].status = "fail";
+    checks[3].detail = e instanceof Error ? e.message : "Registry load failed";
+  }
+
+  // 5. Agent runner
+  if (agentRunner) {
+    checks[4].status = "pass";
+    checks[4].detail = "Agent runner ready";
+  } else {
+    checks[4].status = "fail";
+    checks[4].detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";
+  }
+
+  const success = checks.every((ch) => ch.status === "pass");
+  const result: PreflightResult = { success, checks };
+  return c.json(result);
+});
 
 // GET /api/zoo/registry - Returns the complete merchant registry for agent discovery
 zooRoutes.get("/registry", async (c) => {

@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+:root {
+  --zoo-green: #2d5a1e;
+  --zoo-green-light: #3a7528;
+  --zoo-brown: #8b6914;
+  --zoo-tan: #d4b87a;
+}
