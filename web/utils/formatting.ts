@@ -5,12 +5,17 @@
  * @param balance - Raw balance as string (e.g., "1000000" for $1.00)
  * @returns Formatted balance (e.g., "$1.00")
  */
-export function formatBalance(balance: string): string {
+/**
+ * Format a raw AlphaUSD balance (TIP-20, 6 decimals) for display.
+ * @param balance - Raw balance as string (e.g., "1000000" for $1.00)
+ * @returns Formatted balance (e.g., "$1.00 AUSD")
+ */
+export function formatAlphaUsdBalance(balance: string): string {
   const raw = BigInt(balance || "0");
   const whole = raw / 1_000_000n; // 6 decimals for TIP-20
   const frac = raw % 1_000_000n;
   const fracStr = frac.toString().padStart(6, "0").slice(0, 2);
-  return `$${whole.toLocaleString()}.${fracStr}`;
+  return `$${whole.toLocaleString()}.${fracStr} AUSD`;
 }
 
 /**

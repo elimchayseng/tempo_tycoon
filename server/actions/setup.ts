@@ -5,7 +5,7 @@ import {
   ALPHA_USD,
   CHAIN_CONFIG,
   TIP20_DECIMALS,
-  formatUsdAmount,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import {
@@ -153,12 +153,12 @@ export async function setupAction() {
       emitLog({
         action: ACTION,
         type: "rpc_result",
-        label: `${acct.label}: ${raw.toLocaleString()} raw = $${formatUsdAmount(raw)}`,
+        label: `${acct.label}: ${raw.toLocaleString()} raw = $${formatAlphaUsd(raw)}`,
         data: {
           account: acct.label,
           address: shortAddress(acct.address),
           raw_balance: raw.toString(),
-          formatted: `$${formatUsdAmount(raw)}`,
+          formatted: `$${formatAlphaUsd(raw)}`,
           decimals: TIP20_DECIMALS,
         },
         indent: 1,

@@ -6,7 +6,9 @@ import { emitLog, broadcast } from "../instrumented-client.js";
 import { getZooAccountByRole } from "../zoo-accounts.js";
 import { accountStore } from "../accounts.js";
 import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } from "./zoo-shared.js";
-import type { ZooAgentState, ZooPurchaseReceipt } from "../../shared/types.js";
+import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
+import { balanceHistoryTracker } from "../balance-history.js";
+import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate } from "../../shared/types.js";
 
 const log = createLogger('zoo-agents');
 
@@ -53,6 +55,49 @@ if (config.zoo.enabled) {
     });
   });
 
+  // Broadcast network stats every 5 seconds while simulation is active
+  let networkStatsInterval: ReturnType<typeof setInterval> | null = null;
+
+  runner.on('simulation_started', () => {
+    networkStatsInterval = setInterval(async () => {
+      try {
+        const stats = await fetchNetworkStats();
+        broadcast({ type: 'zoo_network_stats', stats });
+      } catch (err) {
+        log.debug('Failed to broadcast network stats', err);
+      }
+    }, 5000);
+  });
+
+  runner.on('simulation_stopped', () => {
+    if (networkStatsInterval) {
+      clearInterval(networkStatsInterval);
+      networkStatsInterval = null;
+    }
+  });
+
+  // Emit tx flow events at purchase stages
+  runner.on('purchase_initiated', (event) => {
+    const flowEvent: TransactionFlowEvent = {
+      agent_id: event.agent_id,
+      stage: 'decision',
+      timestamp: Date.now(),
+      data: { max_budget: event.data.max_budget, needs: event.data.current_needs },
+    };
+    broadcast({ type: 'zoo_tx_flow', event: flowEvent });
+  });
+
+  // Forward tx_flow events from buyer agents
+  runner.on('tx_flow' as any, (event: any) => {
+    const flowEvent: TransactionFlowEvent = {
+      agent_id: event.agent_id,
+      stage: event.data.stage,
+      timestamp: event.data.timestamp,
+      data: event.data.data ?? {},
+    };
+    broadcast({ type: 'zoo_tx_flow', event: flowEvent });
+  });
+
   runner.on('purchase_completed', (event) => {
     emitLog({
       action: 'zoo_purchase',
@@ -66,6 +111,9 @@ if (config.zoo.enabled) {
         new_needs: event.data.new_needs
       }
     });
+
+    // Increment zoo tx counter
+    incrementZooTxCount();
 
     const rec = event.data.purchase_record;
     const registry = loadZooRegistry();
@@ -87,6 +135,33 @@ if (config.zoo.enabled) {
     };
     broadcast({ type: 'zoo_purchase', receipt });
 
+    // Emit tx flow: confirmed stage
+    const confirmedFlow: TransactionFlowEvent = {
+      agent_id: event.agent_id,
+      stage: 'confirmed',
+      timestamp: Date.now(),
+      data: { tx_hash: rec.tx_hash, block_number: rec.block_number },
+    };
+    broadcast({ type: 'zoo_tx_flow', event: confirmedFlow });
+
+    // Emit balance update
+    const balanceUpdate: BalanceUpdate = {
+      agent_id: event.agent_id,
+      balance: String(event.data.new_balance ?? '0'),
+      previous: '', // We don't track previous here; the frontend can diff
+      event: 'purchase',
+      tx_hash: rec.tx_hash,
+    };
+    broadcast({ type: 'zoo_balance_update', update: balanceUpdate });
+
+    // Record balance history
+    balanceHistoryTracker.record(event.agent_id, {
+      timestamp: Date.now(),
+      balance: String(event.data.new_balance ?? '0'),
+      event: 'purchase',
+      tx_hash: rec.tx_hash,
+    });
+
     broadcastAgentStates();
 
     refreshZooBalances().then(() => {
@@ -94,6 +169,18 @@ if (config.zoo.enabled) {
     }).catch((err) => {
       log.debug('Failed to refresh balances after purchase', err);
     });
+  });
+
+  // Record balance history on funding events
+  runner.on('funding_completed', (event) => {
+    const fundedAgents = event.data?.funded_agents ?? [];
+    for (const agentId of fundedAgents) {
+      balanceHistoryTracker.record(agentId, {
+        timestamp: Date.now(),
+        balance: '', // Will be updated on next balance sync
+        event: 'funding',
+      });
+    }
   });
 
   runner.on('needs_updated', (event) => {

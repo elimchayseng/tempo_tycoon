@@ -21,7 +21,7 @@ export class FundingManager {
     this.refundAmount = config.refundAmount || "30.00";
   }
 
-  async fundAllAttendees(attendeeConfigs: AgentConfig[]): Promise<BatchFundingResult> {
+  async fundAllAgentWallets(attendeeConfigs: AgentConfig[]): Promise<BatchFundingResult> {
     log.info(`Initiating initial funding for ${attendeeConfigs.length} attendees...`);
 
     const recipients = attendeeConfigs.map(config => ({
@@ -38,10 +38,10 @@ export class FundingManager {
     return this.executeBatchFunding(request);
   }
 
-  async checkAndRefundAttendees(
+  async checkAndTopUpAgentWallets(
     attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): Promise<BatchFundingResult | null> {
-    const lowBalanceAttendees = this.findLowBalanceAttendees(attendeeAccounts);
+    const lowBalanceAttendees = this.findLowAlphaUsdWallets(attendeeAccounts);
 
     if (lowBalanceAttendees.length === 0) {
       log.debug(`All attendees have sufficient balance (>${this.refundThreshold} AlphaUSD)`);
@@ -64,7 +64,7 @@ export class FundingManager {
     return this.executeBatchFunding(request);
   }
 
-  private findLowBalanceAttendees(
+  private findLowAlphaUsdWallets(
     attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): { label: string; address: string; balance: number }[] {
     const lowBalanceAttendees = [];

@@ -9,7 +9,7 @@ const log = createLogger('BalanceSync');
  */
 export class BalanceSync {
 
-  async getBlockchainBalance(agentId: string): Promise<number> {
+  async getAlphaUsdOnChainBalance(agentId: string): Promise<number> {
     try {
       const account = accountStore.get(agentId);
       if (!account) {
@@ -31,12 +31,12 @@ export class BalanceSync {
   }
 
   async getFormattedBalance(agentId: string): Promise<string> {
-    const balance = await this.getBlockchainBalance(agentId);
+    const balance = await this.getAlphaUsdOnChainBalance(agentId);
     return balance.toFixed(2);
   }
 
-  async hasSufficientBalance(agentId: string, requiredAmount: number): Promise<boolean> {
-    const currentBalance = await this.getBlockchainBalance(agentId);
+  async hasMinimumAlphaUsd(agentId: string, requiredAmount: number): Promise<boolean> {
+    const currentBalance = await this.getAlphaUsdOnChainBalance(agentId);
     const hasEnough = currentBalance >= requiredAmount;
 
     if (!hasEnough) {
@@ -47,7 +47,7 @@ export class BalanceSync {
   }
 
   async logBalanceComparison(agentId: string, localBalance: string): Promise<void> {
-    const blockchainBalance = await this.getBlockchainBalance(agentId);
+    const blockchainBalance = await this.getAlphaUsdOnChainBalance(agentId);
     const blockchainBalanceStr = blockchainBalance.toFixed(2);
 
     if (localBalance !== blockchainBalanceStr) {

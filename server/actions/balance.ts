@@ -4,7 +4,7 @@ import {
   publicClient,
   ALPHA_USD,
   TIP20_DECIMALS,
-  formatUsdAmount,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import { emitLog, emitAccounts } from "../instrumented-client.js";
@@ -56,12 +56,12 @@ export async function balanceAction() {
       emitLog({
         action: ACTION,
         type: "rpc_result",
-        label: `${acct.label}: ${raw.toLocaleString()} raw = $${formatUsdAmount(raw)}`,
+        label: `${acct.label}: ${raw.toLocaleString()} raw = $${formatAlphaUsd(raw)}`,
         data: {
           account: acct.label,
           address: shortAddress(acct.address),
           raw_balance: raw.toString(),
-          formatted: `$${formatUsdAmount(raw)}`,
+          formatted: `$${formatAlphaUsd(raw)}`,
           decimals: TIP20_DECIMALS,
         },
         indent: 1,

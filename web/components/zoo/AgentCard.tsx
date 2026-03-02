@@ -79,7 +79,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
         {/* Stats row */}
         <div className="flex items-center justify-between pt-1 border-t border-[var(--zt-green-mid)]">
           <span className="font-pixel text-[10px] text-[var(--zt-gold)]">
-            🪙 ${agent.balance}
+            🪙 ${agent.balance} AUSD
           </span>
           <span className="font-pixel text-[10px] text-gray-500">
             {agent.purchase_count} buy{agent.purchase_count !== 1 ? "s" : ""}

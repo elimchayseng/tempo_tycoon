@@ -24,7 +24,7 @@ import {
 } from "../shared/validation.js";
 import { setupAction } from "./actions/setup.js";
 import { balanceAction } from "./actions/balance.js";
-import { sendAction } from "./actions/send.js";
+import { transferAlphaUsdAction } from "./actions/send.js";
 import { sendSponsoredAction } from "./actions/send-sponsored.js";
 import { batchAction } from "./actions/batch.js";
 import { historyAction } from "./actions/history.js";
@@ -163,7 +163,7 @@ app.post("/api/send", async (c) => {
       }, 400);
     }
 
-    await runAction("send", () => sendAction(validation.data!));
+    await runAction("send", () => transferAlphaUsdAction(validation.data!));
     return c.json({ ok: true });
   } catch (err) {
     log.error("api/send error:", err);

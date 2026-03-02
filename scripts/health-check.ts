@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import { publicClient, ALPHA_USD } from "../server/tempo-client.js";
 import { privateKeyToAccount } from "viem/accounts";
-import { formatUsdAmount } from "../server/tempo-client.js";
+import { formatAlphaUsd } from "../server/tempo-client.js";
 
 interface HealthCheck {
   name: string;
@@ -58,7 +58,7 @@ async function checkWalletBalance(privateKey: string, name: string): Promise<Hea
       args: [account.address],
     }) as bigint;
 
-    const balanceUsd = formatUsdAmount(balance);
+    const balanceUsd = formatAlphaUsd(balance);
     const balanceNum = parseFloat(balanceUsd);
 
     let status: "healthy" | "warning" | "error" = "healthy";

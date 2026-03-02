@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { LogEntry, AccountsState, WsMessage, ZooAgentState, ZooPurchaseReceipt } from "../lib/types";
+import type {
+  LogEntry,
+  AccountsState,
+  WsMessage,
+  ZooAgentState,
+  ZooPurchaseReceipt,
+  NetworkStats,
+  TransactionFlowEvent,
+  BalanceUpdate,
+} from "../lib/types";
 
 const RECONNECT_DELAYS = [500, 1000, 2000, 4000];
 
@@ -10,6 +19,9 @@ export function useWebSocket() {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [zooAgents, setZooAgents] = useState<ZooAgentState[]>([]);
   const [receipts, setReceipts] = useState<ZooPurchaseReceipt[]>([]);
+  const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
+  const [txFlowEvents, setTxFlowEvents] = useState<TransactionFlowEvent[]>([]);
+  const [balanceUpdates, setBalanceUpdates] = useState<BalanceUpdate[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
@@ -82,6 +94,15 @@ export function useWebSocket() {
           case "zoo_purchase":
             setReceipts((prev) => [msg.receipt, ...prev].slice(0, 200));
             break;
+          case "zoo_network_stats":
+            setNetworkStats(msg.stats);
+            break;
+          case "zoo_tx_flow":
+            setTxFlowEvents((prev) => [msg.event, ...prev].slice(0, 50));
+            break;
+          case "zoo_balance_update":
+            setBalanceUpdates((prev) => [msg.update, ...prev].slice(0, 100));
+            break;
         }
       };
     }
@@ -97,5 +118,17 @@ export function useWebSocket() {
   const clearLogs = useCallback(() => setLogs([]), []);
   const clearReceipts = useCallback(() => setReceipts([]), []);
 
-  return { logs, accounts, connected, activeAction, clearLogs, zooAgents, receipts, clearReceipts };
+  return {
+    logs,
+    accounts,
+    connected,
+    activeAction,
+    clearLogs,
+    zooAgents,
+    receipts,
+    clearReceipts,
+    networkStats,
+    txFlowEvents,
+    balanceUpdates,
+  };
 }

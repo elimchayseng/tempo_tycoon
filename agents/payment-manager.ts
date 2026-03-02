@@ -1,5 +1,5 @@
 import { createLogger } from '../shared/logger.js';
-import { sendAction } from "../server/actions/send.js";
+import { transferAlphaUsdAction } from "../server/actions/send.js";
 import { accountStore } from "../server/accounts.js";
 import { rpcCircuitBreaker } from './circuit-breaker.js';
 import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
@@ -70,7 +70,7 @@ export class PaymentManager {
   /**
    * Execute payment for a checkout session
    */
-  async makePayment(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
+  async executeAlphaUsdTransfer(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
     log.info(`[${this.agentId}] Processing payment for session ${session.session_id}`);
     log.debug(`[${this.agentId}] Product: ${product.name} ($${session.amount}), Recipient: ${session.recipient_address}`);
 
@@ -91,7 +91,7 @@ export class PaymentManager {
         memo: paymentParams.memo
       });
 
-      const sendResult = await sendAction(paymentParams);
+      const sendResult = await transferAlphaUsdAction(paymentParams);
 
       log.info(`[${this.agentId}] Payment completed successfully!`);
 
@@ -123,14 +123,14 @@ export class PaymentManager {
   /**
    * Execute payment with retry logic and circuit breaker protection.
    */
-  async makePaymentWithRetry(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
+  async executeAlphaUsdTransferWithRetry(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
     const maxRetries = 3;
     const baseDelayMs = 2000;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await rpcCircuitBreaker.execute(() =>
-          txQueue.enqueue(() => this.makePayment(session, product))
+          txQueue.enqueue(() => this.executeAlphaUsdTransfer(session, product))
         );
 
         if (result.success) return result;

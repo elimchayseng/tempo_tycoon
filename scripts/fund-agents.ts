@@ -5,7 +5,7 @@ import { config } from "../server/config.js";
 import { createTempoWalletClient, publicClient, ALPHA_USD } from "../server/tempo-client.js";
 import { Actions } from "viem/tempo";
 import { privateKeyToAccount } from "viem/accounts";
-import { parseUsdAmount, formatUsdAmount } from "../server/tempo-client.js";
+import { parseAlphaUsd, formatAlphaUsd } from "../server/tempo-client.js";
 
 const FUNDING_AMOUNTS = {
   MERCHANT_A: "100.0",
@@ -30,7 +30,7 @@ async function fundWallet(
     const result = await Actions.token.transferSync(walletClient, {
       token: ALPHA_USD,
       to: toAccount.address,
-      amount: parseUsdAmount(amount),
+      amount: parseAlphaUsd(amount),
       memo: `0x${Buffer.from(`Zoo funding: ${walletName}`).toString('hex')}` as `0x${string}`,
       feePayer: fromAccount,
     } as any);
@@ -61,7 +61,7 @@ async function getBalance(address: `0x${string}`): Promise<bigint> {
 async function checkBalance(privateKey: string, walletName: string): Promise<void> {
   const account = privateKeyToAccount(privateKey as `0x${string}`);
   const balance = await getBalance(account.address);
-  console.log(`${walletName}: ${formatUsdAmount(balance)} AlphaUSD`);
+  console.log(`${walletName}: ${formatAlphaUsd(balance)} AlphaUSD`);
 }
 
 async function main() {
@@ -93,11 +93,11 @@ async function main() {
   console.log();
 
   // If zoo master balance is insufficient, request faucet funds
-  const totalNeeded = parseUsdAmount("250.0"); // 100 + 50*3
+  const totalNeeded = parseAlphaUsd("250.0"); // 100 + 50*3
   const initialBalance = await getBalance(zooMasterAccount.address);
 
   if (initialBalance < totalNeeded) {
-    console.log(`Zoo Master balance insufficient ($${formatUsdAmount(initialBalance)}). Requesting faucet funds...`);
+    console.log(`Zoo Master balance insufficient ($${formatAlphaUsd(initialBalance)}). Requesting faucet funds...`);
 
     try {
       const hashes = await Actions.faucet.fund(publicClient, {
@@ -130,7 +130,7 @@ async function main() {
 
     // Re-check balance
     const newBalance = await getBalance(zooMasterAccount.address);
-    console.log(`Zoo Master balance after faucet: ${formatUsdAmount(newBalance)} AlphaUSD\n`);
+    console.log(`Zoo Master balance after faucet: ${formatAlphaUsd(newBalance)} AlphaUSD\n`);
   }
 
   // Fund all wallets

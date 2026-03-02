@@ -5,7 +5,7 @@ import {
   publicClient,
   ALPHA_USD,
   CHAIN_CONFIG,
-  formatUsdAmount,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import { emitLog } from "../instrumented-client.js";
@@ -195,7 +195,7 @@ export async function historyAction(params: { account: string }) {
       index: index + 1,
       direction,
       sign,
-      amount: formatUsdAmount(value), // This should return a string
+      amount: formatAlphaUsd(value), // This should return a string
       arrow,
       otherParty: String(otherLabel),
       memo: String(decodedMemo),

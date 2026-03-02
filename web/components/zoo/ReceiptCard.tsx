@@ -30,7 +30,7 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
         <span>
           {emoji} {receipt.product_name}
         </span>
-        <span className="text-[var(--zt-gold)]">${receipt.amount}</span>
+        <span className="text-[var(--zt-gold)]">${receipt.amount} AUSD</span>
       </div>
 
       {/* Parchment body */}
@@ -55,6 +55,9 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
             )}
           </Row>
           <Row label="Block">{receipt.block_number || "—"}</Row>
+          {receipt.gas_used && (
+            <Row label="Gas Used">{Number(receipt.gas_used).toLocaleString()}</Row>
+          )}
           <Row label="Time">{time}</Row>
         </div>
       </div>

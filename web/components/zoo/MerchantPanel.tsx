@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Account, ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, formatBalance, ANIMAL_EMOJI, ANIMAL_NAME, productEmoji } from "../../utils/formatting";
+import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, ANIMAL_NAME, productEmoji } from "../../utils/formatting";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
@@ -30,11 +30,11 @@ function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestEmoji: string, gue
     { text: `${guestEmoji} ${guestName} evaluating purchase decision...`, delay: 0 },
     { text: `Discovering merchants via /api/zoo/registry`, delay: 600 },
     { text: `Browsing merchant catalog...`, delay: 1200 },
-    { text: `Found ${prodEm} ${receipt.product_name} — $${receipt.amount}`, delay: 1800 },
+    { text: `Found ${prodEm} ${receipt.product_name} — $${receipt.amount} AUSD`, delay: 1800 },
     { text: `Creating checkout session...`, delay: 2400 },
-    { text: `🪙 Executing payment on-chain...`, delay: 3000 },
-    { text: `Verifying tx via checkout/complete...`, delay: 3600 },
-    { text: `✅ ACP purchase confirmed!`, delay: 4200 },
+    { text: `🔐 Signing transferWithMemo tx...`, delay: 3000 },
+    { text: `📡 Broadcasting to Tempo Moderato...`, delay: 3600 },
+    { text: `✅ AlphaUSD transfer confirmed on-chain!`, delay: 4200 },
   ];
 }
 
@@ -105,7 +105,7 @@ export default function MerchantPanel({ merchant, latestReceipt }: MerchantPanel
   if (!merchant) return null;
 
   const rawBalance = merchant.balances[ALPHA_USD] ?? "0";
-  const balance = formatBalance(rawBalance);
+  const balance = formatAlphaUsdBalance(rawBalance);
 
   return (
     <div className="px-5 pt-4 shrink-0">

@@ -8,8 +8,8 @@ import {
   PATH_USD,
   CHAIN_CONFIG,
   TIP20_DECIMALS,
-  parseUsdAmount,
-  formatUsdAmount,
+  parseAlphaUsd,
+  formatAlphaUsd,
   shortAddress,
 } from "../tempo-client.js";
 import { emitLog } from "../instrumented-client.js";
@@ -38,7 +38,7 @@ export async function sendSponsoredAction(params: {
     throw new Error("Cannot send to yourself");
   }
 
-  const rawAmount = parseUsdAmount(amount);
+  const rawAmount = parseAlphaUsd(amount);
 
   emitLog({
     action: ACTION,
@@ -127,10 +127,10 @@ export async function sendSponsoredAction(params: {
     type: "rpc_result",
     label: `Balances before`,
     data: {
-      [`${senderAcct.label} (AlphaUSD)`]: `$${formatUsdAmount(senderBalanceBefore)}`,
-      [`${recipientAcct.label} (AlphaUSD)`]: `$${formatUsdAmount(recipientBalanceBefore)}`,
-      ["Sponsor (AlphaUSD)"]: `$${formatUsdAmount(sponsorAlphaBefore)}`,
-      ["Sponsor (pathUSD)"]: `$${formatUsdAmount(sponsorPathBefore)}`,
+      [`${senderAcct.label} (AlphaUSD)`]: `$${formatAlphaUsd(senderBalanceBefore)}`,
+      [`${recipientAcct.label} (AlphaUSD)`]: `$${formatAlphaUsd(recipientBalanceBefore)}`,
+      ["Sponsor (AlphaUSD)"]: `$${formatAlphaUsd(sponsorAlphaBefore)}`,
+      ["Sponsor (pathUSD)"]: `$${formatAlphaUsd(sponsorPathBefore)}`,
     },
     indent: 1,
   });
@@ -213,7 +213,7 @@ export async function sendSponsoredAction(params: {
       transfer_event: {
         from: shortAddress(result.from),
         to: shortAddress(result.to),
-        amount: `${result.amount.toString()} (= $${formatUsdAmount(result.amount)})`,
+        amount: `${result.amount.toString()} (= $${formatAlphaUsd(result.amount)})`,
         memo: memoHex,
       },
       explorer: `${CHAIN_CONFIG.explorerUrl}/tx/${receipt.transactionHash}`,
@@ -283,23 +283,23 @@ export async function sendSponsoredAction(params: {
     label: `Balance changes — notice who paid the fee!`,
     data: {
       [senderAcct.label + " (AlphaUSD)"]: {
-        before: `$${formatUsdAmount(senderBalanceBefore)}`,
-        after: `$${formatUsdAmount(senderBalanceAfter)}`,
-        change: `−$${formatUsdAmount(senderDiff)}`,
+        before: `$${formatAlphaUsd(senderBalanceBefore)}`,
+        after: `$${formatAlphaUsd(senderBalanceAfter)}`,
+        change: `−$${formatAlphaUsd(senderDiff)}`,
         note: senderDiff === rawAmount
           ? `✓ Sender lost exactly $${amount} — no fee deducted!`
-          : `Sender lost $${formatUsdAmount(senderDiff)}`,
+          : `Sender lost $${formatAlphaUsd(senderDiff)}`,
       },
       [recipientAcct.label + " (AlphaUSD)"]: {
-        before: `$${formatUsdAmount(recipientBalanceBefore)}`,
-        after: `$${formatUsdAmount(recipientBalanceAfter)}`,
-        change: `+$${formatUsdAmount(recipientDiff)}`,
+        before: `$${formatAlphaUsd(recipientBalanceBefore)}`,
+        after: `$${formatAlphaUsd(recipientBalanceAfter)}`,
+        change: `+$${formatAlphaUsd(recipientDiff)}`,
       },
       ["Sponsor (pathUSD — fee token)"]: {
-        before: `$${formatUsdAmount(sponsorPathBefore)}`,
-        after: `$${formatUsdAmount(sponsorPathAfter)}`,
-        change: `−$${formatUsdAmount(sponsorPathDiff)}`,
-        note: `Sponsor paid $${formatUsdAmount(sponsorPathDiff)} fee in pathUSD`,
+        before: `$${formatAlphaUsd(sponsorPathBefore)}`,
+        after: `$${formatAlphaUsd(sponsorPathAfter)}`,
+        change: `−$${formatAlphaUsd(sponsorPathDiff)}`,
+        note: `Sponsor paid $${formatAlphaUsd(sponsorPathDiff)} fee in pathUSD`,
       },
     },
   });
@@ -325,8 +325,8 @@ export async function sendSponsoredAction(params: {
       },
       "2_formula": `fee = gasUsed × effectiveGasPrice`,
       "3_calculation": `${gasUsed} gas × ${formatGwei(effectiveGasPrice)} Gwei = ${formatGwei(computedFeeWei)} Gwei`,
-      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatUsdAmount(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
-      "5_actual_fee": `$${formatUsdAmount(sponsorPathDiff)} (Sponsor's pathUSD balance dropped by this amount)`,
+      "4_to_dollars": `${formatGwei(computedFeeWei)} Gwei ÷ 10³ ≈ $${formatAlphaUsd(computedFeeTip20)} (TIP-20 uses 6 decimals, Gwei uses 9)`,
+      "5_actual_fee": `$${formatAlphaUsd(sponsorPathDiff)} (Sponsor's pathUSD balance dropped by this amount)`,
     },
     indent: 1,
   });
@@ -337,8 +337,8 @@ export async function sendSponsoredAction(params: {
     label: "KEY CONCEPT",
     data: {},
     annotations: [
-      `PROOF: ${senderAcct.label} lost exactly $${amount} (the transfer amount). The fee of $${formatUsdAmount(sponsorPathDiff)} was paid by Sponsor in pathUSD.`,
-      `FEE MATH: ${gasUsed} gas × ${formatGwei(effectiveGasPrice)} Gwei/gas = ${formatGwei(computedFeeWei)} Gwei ≈ $${formatUsdAmount(computedFeeTip20)} in pathUSD`,
+      `PROOF: ${senderAcct.label} lost exactly $${amount} (the transfer amount). The fee of $${formatAlphaUsd(sponsorPathDiff)} was paid by Sponsor in pathUSD.`,
+      `FEE MATH: ${gasUsed} gas × ${formatGwei(effectiveGasPrice)} Gwei/gas = ${formatGwei(computedFeeWei)} Gwei ≈ $${formatAlphaUsd(computedFeeTip20)} in pathUSD`,
       "The fee was paid in pathUSD — the network's base fee token. The Fee AMM allows fees to be paid in any stablecoin, and the sponsor can choose which one.",
       "On Ethereum, this requires ERC-4337 (Account Abstraction) with a bundler and paymaster contract. On Tempo, it's just a field on the transaction.",
     ],
