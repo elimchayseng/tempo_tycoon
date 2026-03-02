@@ -7,7 +7,9 @@ import { config } from "../config.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
 import { AgentRunner } from "../../agents/agent-runner.js";
 import { emitLog, broadcast } from "../instrumented-client.js";
-import { publicClient } from "../tempo-client.js";
+import { publicClient, ALPHA_USD } from "../tempo-client.js";
+import { accountStore } from "../accounts.js";
+import { Abis } from "viem/tempo";
 import type { PreflightCheck, PreflightResult, ZooAgentState, ZooPurchaseReceipt } from "../../shared/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,9 +20,35 @@ export const zooRoutes = new Hono();
 // Global AgentRunner instance
 let agentRunner: AgentRunner | null = null;
 
+// Refresh on-chain balances for all zoo accounts into the account store
+async function refreshZooBalances() {
+  const zooAccounts = getAllZooAccounts();
+  for (const acct of zooAccounts) {
+    try {
+      const raw = await publicClient.readContract({
+        address: ALPHA_USD,
+        abi: Abis.tip20,
+        functionName: "balanceOf",
+        args: [acct.address],
+      }) as bigint;
+      accountStore.updateBalance(acct.label, ALPHA_USD, raw);
+    } catch (err) {
+      console.warn(`[zoo-routes] Failed to fetch balance for ${acct.label}:`, err);
+    }
+  }
+}
+
 // Initialize AgentRunner if zoo simulation is enabled
 if (config.zoo.enabled) {
   agentRunner = new AgentRunner();
+
+  // Fetch on-chain balances for zoo accounts on startup
+  refreshZooBalances().then(() => {
+    console.log('[zoo-routes] 💰 Zoo account balances refreshed from chain');
+    broadcast({ type: "accounts", accounts: accountStore.toPublic() });
+  }).catch((err) => {
+    console.warn('[zoo-routes] ⚠️ Failed to refresh zoo balances:', err);
+  });
 
   // Subscribe to agent events and broadcast via WebSocket
   agentRunner.on('simulation_started', (event) => {
@@ -69,6 +97,11 @@ if (config.zoo.enabled) {
 
     // Also broadcast updated agent states
     broadcastAgentStates();
+
+    // Refresh on-chain balances and broadcast updated accounts to dashboard
+    refreshZooBalances().then(() => {
+      broadcast({ type: "accounts", accounts: accountStore.toPublic() });
+    }).catch(() => {});
   });
 
   agentRunner.on('needs_updated', (event) => {
@@ -315,7 +348,7 @@ zooRoutes.get("/status", async (c) => {
 // GET /api/zoo/health - Simple health check for zoo-specific functionality
 zooRoutes.get("/health", async (c) => {
   try {
-    const health = {
+    const health: Record<string, any> = {
       status: "ok",
       zoo_enabled: config.zoo.enabled,
       timestamp: new Date().toISOString(),
