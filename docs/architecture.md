@@ -82,3 +82,33 @@
 - **Non-recoverable detection:** Skips retry for "insufficient funds" and "unknown account" errors
 - **Balance caching:** 60s TTL on registry and catalog responses
 - **Auto-refunding:** 30s interval funding monitor refunds agents below $10 threshold
+
+## Tempo Blockchain Data Layer
+
+The Tempo Moderato testnet (chain 42431) is the authoritative source for all balance and transaction data.
+
+### What we read from the blockchain
+
+| Data | Method | Contract / RPC |
+|------|--------|----------------|
+| AlphaUSD balances | `balanceOf(address)` via `readContract` | TIP-20 token contract |
+| Transaction receipts | `getTransactionReceipt(hash)` | RPC |
+| Transaction details | `getTransaction(hash)` | RPC (memo decoding, explorer) |
+| Transfer events | `getLogs` for `TransferWithMemo` | TIP-20 token contract |
+| Network metadata | `getChainId()`, `getBlockNumber()`, `getGasPrice()` | RPC (stats dashboard) |
+
+### How we fetch it
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `publicClient` | `server/tempo-client.ts` | viem client configured for Tempo Moderato |
+| `refreshZooBalances()` | `server/routes/zoo-shared.ts` | Batch refresh of all zoo account balances from chain |
+| `BalanceSync.getAlphaUsdOnChainBalance()` | `agents/balance-sync.ts` | Per-agent on-chain balance read via `readContract` |
+| `SessionVerifier` | `server/middleware/session-verifier.ts` | Verifies payment transactions on-chain |
+
+### Source-of-truth principle
+
+- The blockchain is the authoritative source for all balance and transaction data
+- The in-memory `accountStore` is a cache updated after on-chain reads
+- API endpoints and agents always refresh from chain before reading balances
+- `balanceHistoryTracker` and `StateManager` are supplementary tracking, not authoritative

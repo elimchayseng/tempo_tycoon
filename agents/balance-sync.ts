@@ -1,11 +1,13 @@
 import { createLogger } from '../shared/logger.js';
 import { accountStore } from "../server/accounts.js";
-import { ALPHA_USD } from "../server/tempo-client.js";
+import { publicClient, ALPHA_USD } from "../server/tempo-client.js";
+import { Abis } from "viem/tempo";
 
 const log = createLogger('BalanceSync');
 
 /**
- * Utility to sync agent balances between blockchain and local state
+ * Utility to sync agent balances between blockchain and local state.
+ * Reads balances directly from the Tempo blockchain via readContract.
  */
 export class BalanceSync {
 
@@ -17,10 +19,20 @@ export class BalanceSync {
         return 0;
       }
 
-      const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
+      // Read balance directly from the blockchain
+      const balanceBigInt = await publicClient.readContract({
+        address: ALPHA_USD,
+        abi: Abis.tip20,
+        functionName: "balanceOf",
+        args: [account.address],
+      }) as bigint;
+
       const balanceUsd = Number(balanceBigInt) / 1_000_000;
 
-      log.debug(`${agentId} (${account.address}) balance: $${balanceUsd.toFixed(2)}`);
+      // Update the in-memory cache so other consumers stay fresh
+      accountStore.updateBalance(account.label, ALPHA_USD, balanceBigInt);
+
+      log.debug(`${agentId} (${account.address}) on-chain balance: $${balanceUsd.toFixed(2)}`);
 
       return balanceUsd;
 
@@ -46,34 +58,8 @@ export class BalanceSync {
     return hasEnough;
   }
 
-  async logBalanceComparison(agentId: string, localBalance: string): Promise<void> {
-    const blockchainBalance = await this.getAlphaUsdOnChainBalance(agentId);
-    const blockchainBalanceStr = blockchainBalance.toFixed(2);
-
-    if (localBalance !== blockchainBalanceStr) {
-      log.warn(`Balance mismatch for ${agentId}: local=$${localBalance}, chain=$${blockchainBalanceStr}, diff=$${(blockchainBalance - parseFloat(localBalance)).toFixed(2)}`);
-    } else {
-      log.debug(`${agentId} balances in sync: $${blockchainBalanceStr}`);
-    }
-  }
-
   getWalletAddress(agentId: string): string | null {
     const account = accountStore.get(agentId);
     return account ? account.address : null;
-  }
-
-  getAccountInfo(agentId: string): { address: string; balance: string } | null {
-    const account = accountStore.get(agentId);
-    if (!account) {
-      return null;
-    }
-
-    const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
-    const balanceUsd = Number(balanceBigInt) / 1_000_000;
-
-    return {
-      address: account.address,
-      balance: balanceUsd.toFixed(2)
-    };
   }
 }

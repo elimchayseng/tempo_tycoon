@@ -168,6 +168,92 @@ Force a specific agent to make an immediate purchase (for testing).
 { "max_budget": 10.0 }
 ```
 
+## Blockchain Explorer
+
+### `GET /api/zoo/network/stats`
+Live network statistics from the Tempo RPC.
+
+**Response:**
+```json
+{
+  "chain_id": 42431,
+  "chain_name": "Tempo Moderato Testnet",
+  "latest_block": 12345678,
+  "gas_price_gwei": "1.0",
+  "rpc_latency_ms": 45,
+  "zoo_tx_count": 27,
+  "zoo_tx_throughput_per_min": 3.5
+}
+```
+
+### `GET /api/zoo/network/token-info`
+Static metadata about the AlphaUSD TIP-20 token.
+
+**Response:**
+```json
+{
+  "name": "AlphaUSD",
+  "symbol": "AUSD",
+  "address": "0x...",
+  "standard": "TIP-20",
+  "decimals": 6,
+  "transfer_with_memo_signature": "transferWithMemo(address,uint256,bytes32)"
+}
+```
+
+### `GET /api/zoo/network/wallets`
+All zoo wallet addresses with live on-chain balances (refreshed on each request).
+
+**Response:**
+```json
+{
+  "wallets": [
+    {
+      "role": "facilitator",
+      "label": "Zoo Master",
+      "address": "0x...",
+      "balance": "1000.00",
+      "balance_raw": "1000000000",
+      "nonce": 42,
+      "explorer_link": "https://explorer.tempo.xyz/address/0x..."
+    }
+  ]
+}
+```
+
+### `GET /api/zoo/network/balance-history/:agentId`
+Balance history for a specific agent over time.
+
+**Response:**
+```json
+{
+  "agent_id": "attendee_1",
+  "history": [
+    { "timestamp": 1700000000000, "balance": "50.00", "event": "funding" },
+    { "timestamp": 1700000030000, "balance": "46.50", "event": "purchase", "tx_hash": "0x..." }
+  ]
+}
+```
+
+### `GET /api/zoo/network/tx/:txHash`
+Detailed transaction information decoded from the blockchain.
+
+**Response:**
+```json
+{
+  "tx_hash": "0x...",
+  "block_number": 12345678,
+  "gas_used": "21000",
+  "fee_ausd": "0.000021",
+  "decoded_memo": "Zoo Purchase: Classic Hotdog",
+  "confirmations": 5,
+  "from": "0x...",
+  "to": "0x...",
+  "amount": "",
+  "explorer_link": "https://explorer.tempo.xyz/tx/0x..."
+}
+```
+
 ## WebSocket
 
 Connect to `ws://localhost:4000/ws`.

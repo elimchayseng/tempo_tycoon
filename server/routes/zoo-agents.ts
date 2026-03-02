@@ -176,12 +176,19 @@ if (config.zoo.enabled) {
   });
 
   // Record balance history on funding events
-  runner.on('funding_completed', (event) => {
+  runner.on('funding_completed', async (event) => {
+    await refreshZooBalances();
     const fundedAgents = event.data?.funded_agents ?? [];
     for (const agentId of fundedAgents) {
+      // Map agent_id (attendee_1) → role key (attendee1) for account lookup
+      const roleKey = agentId.replace('_', '') as any;
+      const account = getZooAccountByRole(roleKey);
+      const balanceRaw = account?.balances[config.contracts.alphaUsd] ?? BigInt(0);
+      const balanceUsd = (Number(balanceRaw) / 1_000_000).toFixed(2);
+
       balanceHistoryTracker.record(agentId, {
         timestamp: Date.now(),
-        balance: '', // Will be updated on next balance sync
+        balance: balanceUsd,
         event: 'funding',
       });
     }
