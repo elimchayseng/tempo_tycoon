@@ -42,7 +42,7 @@ export class BuyerAgent {
       needRecovery: config.need_recovery,
       minBalanceThreshold: parseFloat(config.refund_threshold),
     });
-    this.acpClient = new ACPClient(); // Uses default localhost:4002
+    this.acpClient = new ACPClient(`http://localhost:${process.env.PORT || 4000}`);
     this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
     this.balanceSync = new BalanceSync();
 
