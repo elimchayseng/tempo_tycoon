@@ -1,6 +1,9 @@
+import { createLogger } from '../shared/logger.js';
 import { batchAction } from "../server/actions/batch.js";
 import { ALPHA_USD } from "../server/tempo-client.js";
 import type { BatchFundingRequest, BatchFundingResult, AgentConfig } from "./types.js";
+
+const log = createLogger('FundingManager');
 
 export class FundingManager {
   private readonly zooMasterLabel = 'zoo_master';
@@ -18,11 +21,8 @@ export class FundingManager {
     this.refundAmount = config.refundAmount || "30.00";
   }
 
-  /**
-   * Fund all attendees with initial funding amount
-   */
   async fundAllAttendees(attendeeConfigs: AgentConfig[]): Promise<BatchFundingResult> {
-    console.log(`[FundingManager] 💰 Initiating initial funding for ${attendeeConfigs.length} attendees...`);
+    log.info(`Initiating initial funding for ${attendeeConfigs.length} attendees...`);
 
     const recipients = attendeeConfigs.map(config => ({
       address: config.address,
@@ -38,25 +38,22 @@ export class FundingManager {
     return this.executeBatchFunding(request);
   }
 
-  /**
-   * Check attendee balances and fund those below threshold
-   */
   async checkAndRefundAttendees(
     attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): Promise<BatchFundingResult | null> {
     const lowBalanceAttendees = this.findLowBalanceAttendees(attendeeAccounts);
 
     if (lowBalanceAttendees.length === 0) {
-      console.log(`[FundingManager] ✓ All attendees have sufficient balance (>${this.refundThreshold} AlphaUSD)`);
+      log.debug(`All attendees have sufficient balance (>${this.refundThreshold} AlphaUSD)`);
       return null;
     }
 
-    console.log(`[FundingManager] 🔄 ${lowBalanceAttendees.length} attendees need refunding...`);
+    log.info(`${lowBalanceAttendees.length} attendees need refunding...`);
 
     const recipients = lowBalanceAttendees.map(attendee => ({
       address: attendee.address,
       amount: this.refundAmount,
-      agent_id: attendee.label.replace(' ', '_').toLowerCase() // Convert "Attendee 1" to "attendee_1"
+      agent_id: attendee.label.replace(' ', '_').toLowerCase()
     }));
 
     const request: BatchFundingRequest = {
@@ -67,21 +64,16 @@ export class FundingManager {
     return this.executeBatchFunding(request);
   }
 
-  /**
-   * Find attendees with balance below threshold
-   */
   private findLowBalanceAttendees(
     attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): { label: string; address: string; balance: number }[] {
     const lowBalanceAttendees = [];
-    // Use imported ALPHA_USD constant for consistency
 
     for (const account of attendeeAccounts) {
       const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
-      // Convert from 6-decimal TIP20 format to USD
       const balanceUsd = Number(balanceBigInt) / 1_000_000;
 
-      console.log(`[FundingManager] ${account.label}: $${balanceUsd.toFixed(2)} AlphaUSD`);
+      log.debug(`${account.label}: $${balanceUsd.toFixed(2)} AlphaUSD`);
 
       if (balanceUsd < this.refundThreshold) {
         lowBalanceAttendees.push({
@@ -89,63 +81,51 @@ export class FundingManager {
           address: account.address,
           balance: balanceUsd
         });
-        console.log(`[FundingManager] ⚠️  ${account.label} below threshold ($${balanceUsd.toFixed(2)} < $${this.refundThreshold})`);
+        log.info(`${account.label} below threshold ($${balanceUsd.toFixed(2)} < $${this.refundThreshold})`);
       }
     }
 
     return lowBalanceAttendees;
   }
 
-  /**
-   * Execute batch funding using the existing batch payment system
-   */
   private async executeBatchFunding(request: BatchFundingRequest): Promise<BatchFundingResult> {
     try {
       const totalAmount = request.recipients.reduce((sum, r) => sum + parseFloat(r.amount), 0);
       const reasonText = request.reason === 'initial_funding' ? 'Initial Zoo Funding' : 'Zoo Refunding';
 
-      console.log(`[FundingManager] 🚀 Executing batch ${request.reason} for ${request.recipients.length} attendees (Total: $${totalAmount.toFixed(2)})`);
+      log.info(`Executing batch ${request.reason} for ${request.recipients.length} attendees (Total: $${totalAmount.toFixed(2)})`);
 
-      // Log wallet addresses for each agent being funded
-      console.log(`[FundingManager] 💳 Wallet Address Mapping:`);
-      request.recipients.forEach((recipient, index) => {
-        console.log(`[FundingManager]   ${recipient.agent_id} → 💰 ${recipient.address} (funding $${recipient.amount})`);
+      log.debug('Wallet Address Mapping:');
+      request.recipients.forEach((recipient) => {
+        log.debug(`  ${recipient.agent_id} -> ${recipient.address} (funding $${recipient.amount})`);
       });
 
-      // Prepare batch payment request in the format expected by batchAction
       const batchParams = {
         from: this.zooMasterLabel,
         payments: request.recipients.map((recipient, index) => ({
-          to: recipient.agent_id, // Use agent_id as the account label for the batch action
+          to: recipient.agent_id,
           amount: recipient.amount,
           memo: `${reasonText} #${index + 1}`
         }))
       };
 
-      console.log(`[FundingManager] 📤 Batch payment structure:`, {
+      log.debug('Batch payment structure:', {
         from: batchParams.from,
         payment_count: batchParams.payments.length,
         total_amount: `$${totalAmount.toFixed(2)}`,
-        payments: batchParams.payments.map(p => `${p.amount} → ${p.to} (${p.memo})`)
       });
 
-      // Execute the batch payment using the existing batch system
       const batchResult = await batchAction(batchParams);
 
-      // Extract transaction hashes from batch result if available
       const txHashes = batchResult?.txHashes || [];
 
-      console.log(`[FundingManager] 🔗 Transaction Details:`);
-      if (txHashes && txHashes.length > 0) {
+      if (txHashes.length > 0) {
         txHashes.forEach((txHash, index) => {
           const recipient = request.recipients[index];
           if (recipient) {
-            console.log(`[FundingManager]   ${recipient.agent_id} (${recipient.address}) funded $${recipient.amount} - TX: ${txHash}`);
-            console.log(`[FundingManager]   🔍 Verify: https://testnet.tempoexplorer.com/tx/${txHash}`);
+            log.debug(`${recipient.agent_id} funded $${recipient.amount} - TX: ${txHash}`);
           }
         });
-      } else {
-        console.log(`[FundingManager]   ℹ️  Transaction hashes not available from batch operation`);
       }
 
       const result: BatchFundingResult = {
@@ -159,19 +139,12 @@ export class FundingManager {
         }, {} as Record<string, string>)
       };
 
-      console.log(`[FundingManager] ✅ Batch funding completed successfully!`);
-      console.log(`[FundingManager] 📊 Funding Summary:`, {
-        funded_agents: result.funded_agents,
-        total_amount: `$${result.total_amount}`,
-        reason: request.reason,
-        transaction_count: txHashes.length,
-        wallet_mapping: result.wallet_addresses
-      });
+      log.info(`Batch funding completed: $${result.total_amount} to ${result.funded_agents.length} agents`);
 
       return result;
 
     } catch (error) {
-      console.error(`[FundingManager] ❌ Batch funding failed:`, error);
+      log.error('Batch funding failed:', error);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -184,9 +157,6 @@ export class FundingManager {
     }
   }
 
-  /**
-   * Get funding status and configuration info
-   */
   getStatus() {
     return {
       zoo_master_label: this.zooMasterLabel,
@@ -197,9 +167,6 @@ export class FundingManager {
     };
   }
 
-  /**
-   * Update funding configuration
-   */
   updateConfig(config: {
     refundThreshold?: number;
     initialFundingAmount?: string;
@@ -215,6 +182,6 @@ export class FundingManager {
       this.refundAmount = config.refundAmount;
     }
 
-    console.log(`[FundingManager] ⚙️  Configuration updated:`, this.getStatus());
+    log.info('Configuration updated:', this.getStatus());
   }
 }

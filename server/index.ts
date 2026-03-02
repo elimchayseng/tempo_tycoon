@@ -15,6 +15,7 @@ import {
 import { publicClient, CHAIN_CONFIG } from "./tempo-client.js";
 import { accountStore } from "./accounts.js";
 import { config, validateConfig } from "./config.js";
+import { createLogger } from "../shared/logger.js";
 import { initializeZooAccounts, areZooAccountsInitialized, getAllZooAccounts } from "./zoo-accounts.js";
 import {
   validateSendRequest,
@@ -28,6 +29,8 @@ import { sendSponsoredAction } from "./actions/send-sponsored.js";
 import { batchAction } from "./actions/batch.js";
 import { historyAction } from "./actions/history.js";
 import { zooRoutes } from "./routes/zoo.js";
+
+const log = createLogger('server');
 
 // Validate configuration on startup
 validateConfig();
@@ -46,10 +49,10 @@ app.use("/*", cors());
 if (config.logging.enableRequestLogging) {
   app.use("*", async (c, next) => {
     const start = Date.now();
-    console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`);
+    log.debug(`${c.req.method} ${c.req.url}`);
     await next();
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url} - ${c.res.status} (${duration}ms)`);
+    log.debug(`${c.req.method} ${c.req.url} - ${c.res.status} (${duration}ms)`);
   });
 }
 
@@ -80,7 +83,7 @@ app.get(
       removeClient(ws);
     },
     onError(event, ws) {
-      console.error("[ws] WebSocket error:", event);
+      log.error("WebSocket error:", event);
       removeClient(ws);
     },
   }))
@@ -163,7 +166,7 @@ app.post("/api/send", async (c) => {
     await runAction("send", () => sendAction(validation.data!));
     return c.json({ ok: true });
   } catch (err) {
-    console.error("[api/send] Error:", err);
+    log.error("api/send error:", err);
     return c.json({ error: String(err) }, 500);
   }
 });
@@ -183,7 +186,7 @@ app.post("/api/send-sponsored", async (c) => {
     await runAction("send-sponsored", () => sendSponsoredAction(validation.data!));
     return c.json({ ok: true });
   } catch (err) {
-    console.error("[api/send-sponsored] Error:", err);
+    log.error("api/send-sponsored error:", err);
     return c.json({ error: String(err) }, 500);
   }
 });
@@ -203,7 +206,7 @@ app.post("/api/batch", async (c) => {
     await runAction("batch", () => batchAction(validation.data!));
     return c.json({ ok: true });
   } catch (err) {
-    console.error("[api/batch] Error:", err);
+    log.error("api/batch error:", err);
     return c.json({ error: String(err) }, 500);
   }
 });
@@ -223,7 +226,7 @@ app.post("/api/history", async (c) => {
     await runAction("history", () => historyAction(validation.data!));
     return c.json({ ok: true });
   } catch (err) {
-    console.error("[api/history] Error:", err);
+    log.error("api/history error:", err);
     return c.json({ error: String(err) }, 500);
   }
 });
@@ -246,24 +249,24 @@ const server = serve({
 });
 injectWebSocket(server);
 
-console.log(`[tempo-explorer] Server running on port ${config.server.port}`);
-console.log(`[tempo-explorer] WebSocket available on /ws`);
-console.log(`[tempo-explorer] Environment: ${config.server.environment}`);
-console.log(`[tempo-explorer] Targeting ${CHAIN_CONFIG.chainName} (chain ${CHAIN_CONFIG.chainId})`);
-console.log(`[tempo-explorer] Max WebSocket connections: ${config.limits.maxWebSocketConnections}`);
-console.log(`[tempo-explorer] Request logging: ${config.logging.enableRequestLogging ? 'enabled' : 'disabled'}`);
+log.info(`Server running on port ${config.server.port}`);
+log.info(`WebSocket available on /ws`);
+log.info(`Environment: ${config.server.environment}`);
+log.info(`Targeting ${CHAIN_CONFIG.chainName} (chain ${CHAIN_CONFIG.chainId})`);
+log.debug(`Max WebSocket connections: ${config.limits.maxWebSocketConnections}`);
+log.debug(`Request logging: ${config.logging.enableRequestLogging ? 'enabled' : 'disabled'}`);
 
 // Zoo simulation status
 if (config.zoo.enabled) {
   const zooAccountsInitialized = areZooAccountsInitialized();
-  console.log(`[zoo-simulation] Zoo simulation: enabled`);
-  console.log(`[zoo-simulation] Zoo accounts initialized: ${zooAccountsInitialized}`);
+  log.info('Zoo simulation: enabled');
+  log.info(`Zoo accounts initialized: ${zooAccountsInitialized}`);
   if (zooAccountsInitialized) {
     const zooAccounts = getAllZooAccounts();
-    console.log(`[zoo-simulation] Total zoo accounts: ${zooAccounts.length}`);
-    console.log(`[zoo-simulation] Registry available at: /api/zoo/registry`);
-    console.log(`[zoo-simulation] Merchant catalog at: /api/merchant/food/catalog`);
+    log.info(`Total zoo accounts: ${zooAccounts.length}`);
+    log.debug('Registry available at: /api/zoo/registry');
+    log.debug('Merchant catalog at: /api/merchant/food/catalog');
   }
 } else {
-  console.log(`[zoo-simulation] Zoo simulation: disabled`);
+  log.info('Zoo simulation: disabled');
 }

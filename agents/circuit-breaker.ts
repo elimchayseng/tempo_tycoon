@@ -1,3 +1,7 @@
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('CircuitBreaker');
+
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerOptions {
@@ -33,7 +37,7 @@ export class CircuitBreaker {
     this.resetTimeoutMs = options.resetTimeoutMs ?? 30000;
     this.halfOpenMaxAttempts = options.halfOpenMaxAttempts ?? 2;
 
-    console.log(`[CircuitBreaker:${this.name}] Initialized (threshold=${this.failureThreshold}, reset=${this.resetTimeoutMs}ms)`);
+    log.info(`[${this.name}] Initialized (threshold=${this.failureThreshold}, reset=${this.resetTimeoutMs}ms)`);
   }
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {
@@ -59,7 +63,7 @@ export class CircuitBreaker {
   private onSuccess(): void {
     if (this.state === 'HALF_OPEN') {
       this.halfOpenSuccesses++;
-      console.log(`[CircuitBreaker:${this.name}] HALF_OPEN success ${this.halfOpenSuccesses}/${this.halfOpenMaxAttempts}`);
+      log.debug(`[${this.name}] HALF_OPEN success ${this.halfOpenSuccesses}/${this.halfOpenMaxAttempts}`);
       if (this.halfOpenSuccesses >= this.halfOpenMaxAttempts) {
         this.transitionTo('CLOSED');
       }
@@ -73,10 +77,10 @@ export class CircuitBreaker {
     this.lastFailureTime = Date.now();
 
     if (this.state === 'HALF_OPEN') {
-      console.log(`[CircuitBreaker:${this.name}] HALF_OPEN failure — reopening`);
+      log.warn(`[${this.name}] HALF_OPEN failure — reopening`);
       this.transitionTo('OPEN');
     } else if (this.failures >= this.failureThreshold) {
-      console.log(`[CircuitBreaker:${this.name}] Failure threshold reached (${this.failures}/${this.failureThreshold}) — opening`);
+      log.warn(`[${this.name}] Failure threshold reached (${this.failures}/${this.failureThreshold}) — opening`);
       this.transitionTo('OPEN');
     }
   }
@@ -97,7 +101,7 @@ export class CircuitBreaker {
       this.halfOpenSuccesses = 0;
     }
 
-    console.log(`[CircuitBreaker:${this.name}] ${prev} -> ${newState}`);
+    log.info(`[${this.name}] ${prev} -> ${newState}`);
   }
 
   getStatus(): CircuitBreakerStatus {
@@ -114,7 +118,7 @@ export class CircuitBreaker {
   }
 
   reset(): void {
-    console.log(`[CircuitBreaker:${this.name}] Manual reset`);
+    log.info(`[${this.name}] Manual reset`);
     this.state = 'CLOSED';
     this.failures = 0;
     this.halfOpenSuccesses = 0;

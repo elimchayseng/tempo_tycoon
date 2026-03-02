@@ -59,7 +59,7 @@ export function parseUsdAmount(amount: string): bigint {
 }
 
 /** Convert raw TIP-20 units to a human-readable USD string */
-export function formatUsdAmount(raw: bigint | any): string {
+export function formatUsdAmount(raw: bigint | number | string): string {
   // If raw is undefined or null, force it to 0n
   const bigRaw = (raw === undefined || raw === null) ? 0n : BigInt(raw);
   

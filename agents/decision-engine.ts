@@ -1,4 +1,19 @@
+import { createLogger } from '../shared/logger.js';
+import { config } from '../server/config.js';
 import type { AgentNeeds, AgentConfig, MerchantProduct } from './types.js';
+
+const log = createLogger('DecisionEngine');
+
+/** Default simulation parameters — overridden by env-var config or constructor args */
+export const SIMULATION_DEFAULTS = {
+  pollingIntervalMs: 3000,
+  needDecayRate: { food_need: 5, fun_need: 4 },
+  purchaseThreshold: { food_need: 40, fun_need: 30 },
+  needRecovery: { main: 70, snack: 50, beverage: 30, dessert: 60 },
+  minBalanceThreshold: 5.0,
+  maxPurchaseFrequencyMs: 2000,
+  randomFactor: 0.2,
+} as const;
 
 interface DecisionEngineConfig {
   pollingIntervalMs: number;
@@ -31,6 +46,25 @@ export interface PurchaseDecision {
   estimatedNeedsAfter?: AgentNeeds;
 }
 
+/** Build defaults from env-var config (server/config.ts) falling back to SIMULATION_DEFAULTS */
+function buildConfigDefaults(): DecisionEngineConfig {
+  return {
+    pollingIntervalMs: config.zoo.agentPollingInterval || SIMULATION_DEFAULTS.pollingIntervalMs,
+    needDecayRate: {
+      food_need: config.zoo.needDecayRate || SIMULATION_DEFAULTS.needDecayRate.food_need,
+      fun_need: SIMULATION_DEFAULTS.needDecayRate.fun_need,
+    },
+    purchaseThreshold: {
+      food_need: config.zoo.purchaseThreshold || SIMULATION_DEFAULTS.purchaseThreshold.food_need,
+      fun_need: SIMULATION_DEFAULTS.purchaseThreshold.fun_need,
+    },
+    needRecovery: { ...SIMULATION_DEFAULTS.needRecovery },
+    minBalanceThreshold: config.zoo.minBalanceThreshold || SIMULATION_DEFAULTS.minBalanceThreshold,
+    maxPurchaseFrequencyMs: SIMULATION_DEFAULTS.maxPurchaseFrequencyMs,
+    randomFactor: SIMULATION_DEFAULTS.randomFactor,
+  };
+}
+
 export class DecisionEngine {
   private readonly config: DecisionEngineConfig;
   private readonly agentId: string;
@@ -38,31 +72,13 @@ export class DecisionEngine {
   constructor(agentId: string, customConfig?: Partial<DecisionEngineConfig>) {
     this.agentId = agentId;
 
-    // Fast testing configuration for 10-20 second purchase cycles
     this.config = {
-      pollingIntervalMs: 3000, // 3 seconds
-      needDecayRate: {
-        food_need: 5, // 5 points per 3-second cycle = slower degradation
-        fun_need: 4   // 4 points per 3-second cycle (future feature)
-      },
-      purchaseThreshold: {
-        food_need: 40,  // Purchase when food need < 40
-        fun_need: 30    // Purchase when fun need < 30 (future)
-      },
-      needRecovery: {
-        main: 70,       // Main dishes recover 70 points
-        snack: 50,      // Snacks recover 50 points
-        beverage: 30,   // Beverages recover 30 points
-        dessert: 60     // Desserts recover 60 points
-      },
-      minBalanceThreshold: 5.0, // Minimum balance to attempt purchase
-      maxPurchaseFrequencyMs: 2000, // Min 2 seconds between purchases
-      randomFactor: 0.2, // 20% randomness factor
-      ...customConfig
+      ...buildConfigDefaults(),
+      ...customConfig,
     };
 
-    console.log(`[DecisionEngine:${this.agentId}] 🧠 Decision engine initialized`);
-    console.log(`[DecisionEngine:${this.agentId}] ⚙️  Configuration:`, {
+    log.info(`[${this.agentId}] Decision engine initialized`);
+    log.debug(`[${this.agentId}] Configuration:`, {
       polling_interval: `${this.config.pollingIntervalMs}ms`,
       food_decay_rate: `${this.config.needDecayRate.food_need} points/cycle`,
       purchase_threshold: this.config.purchaseThreshold.food_need,
@@ -76,30 +92,26 @@ export class DecisionEngine {
   degradeNeeds(currentNeeds: AgentNeeds): AgentNeeds {
     // Apply base degradation
     let newFoodNeed = currentNeeds.food_need - this.config.needDecayRate.food_need;
-    let newFunNeed = currentNeeds.fun_need - this.config.needDecayRate.fun_need;
 
     // Apply randomness factor (-20% to +20% variation)
     const randomFactor = this.config.randomFactor;
     newFoodNeed += (Math.random() - 0.5) * 2 * randomFactor * this.config.needDecayRate.food_need;
-    newFunNeed += (Math.random() - 0.5) * 2 * randomFactor * this.config.needDecayRate.fun_need;
 
     // Clamp to 0-100 range
     newFoodNeed = Math.max(0, Math.min(100, newFoodNeed));
-    newFunNeed = Math.max(0, Math.min(100, newFunNeed));
 
     const degradedNeeds = {
       food_need: Math.round(newFoodNeed),
-      fun_need: Math.round(newFunNeed)
+      fun_need: currentNeeds.fun_need,
     };
 
     // Only log significant changes (every 10 points or when crossing thresholds)
     const foodChange = Math.abs(degradedNeeds.food_need - currentNeeds.food_need);
     const crossedThreshold =
-      (currentNeeds.food_need >= this.config.purchaseThreshold.food_need && degradedNeeds.food_need < this.config.purchaseThreshold.food_need) ||
-      (currentNeeds.fun_need >= this.config.purchaseThreshold.fun_need && degradedNeeds.fun_need < this.config.purchaseThreshold.fun_need);
+      (currentNeeds.food_need >= this.config.purchaseThreshold.food_need && degradedNeeds.food_need < this.config.purchaseThreshold.food_need);
 
     if (foodChange >= 10 || crossedThreshold) {
-      console.log(`[DecisionEngine:${this.agentId}] 📉 Needs degraded: food ${currentNeeds.food_need} → ${degradedNeeds.food_need}${crossedThreshold ? ' [THRESHOLD CROSSED]' : ''}`);
+      log.info(`[${this.agentId}] Needs degraded: food ${currentNeeds.food_need} -> ${degradedNeeds.food_need}${crossedThreshold ? ' [THRESHOLD CROSSED]' : ''}`);
     }
 
     return degradedNeeds;
@@ -113,8 +125,8 @@ export class DecisionEngine {
     currentBalance: number,
     lastPurchaseTime: Date | null
   ): PurchaseDecision {
-    console.log(`[DecisionEngine:${this.agentId}] 🤔 Evaluating purchase decision...`);
-    console.log(`[DecisionEngine:${this.agentId}] 📊 Current state: food=${currentNeeds.food_need}, balance=$${currentBalance.toFixed(2)}`);
+    log.debug(`[${this.agentId}] Evaluating purchase decision...`);
+    log.debug(`[${this.agentId}] Current state: food=${currentNeeds.food_need}, balance=$${currentBalance.toFixed(2)}`);
 
     // Check balance
     if (currentBalance < this.config.minBalanceThreshold) {
@@ -143,16 +155,14 @@ export class DecisionEngine {
 
     // Evaluate need-based purchase decisions
     const foodUrgent = currentNeeds.food_need < this.config.purchaseThreshold.food_need;
-    const funUrgent = currentNeeds.fun_need < this.config.purchaseThreshold.fun_need;
 
-    // For now, only handle food needs (fun needs are future feature)
     if (foodUrgent) {
       const urgency = this.calculateUrgency(currentNeeds.food_need, this.config.purchaseThreshold.food_need);
       const maxBudget = this.calculateMaxBudget(currentBalance, urgency);
       const preferredCategory = this.selectFoodCategory(currentNeeds.food_need);
 
-      console.log(`[DecisionEngine:${this.agentId}] 🚨 Food need urgent! (${currentNeeds.food_need} < ${this.config.purchaseThreshold.food_need})`);
-      console.log(`[DecisionEngine:${this.agentId}] 💰 Budget allocated: $${maxBudget.toFixed(2)} (urgency: ${urgency})`);
+      log.info(`[${this.agentId}] Food need urgent! (${currentNeeds.food_need} < ${this.config.purchaseThreshold.food_need})`);
+      log.debug(`[${this.agentId}] Budget allocated: $${maxBudget.toFixed(2)} (urgency: ${urgency})`);
 
       return {
         shouldPurchase: true,
@@ -166,7 +176,7 @@ export class DecisionEngine {
     }
 
     // No urgent needs
-    console.log(`[DecisionEngine:${this.agentId}] ✓ No urgent needs (food: ${currentNeeds.food_need}/${this.config.purchaseThreshold.food_need})`);
+    log.debug(`[${this.agentId}] No urgent needs (food: ${currentNeeds.food_need}/${this.config.purchaseThreshold.food_need})`);
     return {
       shouldPurchase: false,
       reason: `All needs above threshold (food: ${currentNeeds.food_need}/${this.config.purchaseThreshold.food_need})`,
@@ -191,10 +201,10 @@ export class DecisionEngine {
 
     const newNeeds = {
       food_need: newFoodNeed,
-      fun_need: currentNeeds.fun_need // No fun recovery from food (future feature)
+      fun_need: currentNeeds.fun_need,
     };
 
-    console.log(`[DecisionEngine:${this.agentId}] 🍽️  Need recovery: ${product.name} (${category}) +${actualRecovery} → food: ${currentNeeds.food_need} → ${newNeeds.food_need}`);
+    log.info(`[${this.agentId}] Need recovery: ${product.name} (${category}) +${actualRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
 
     return newNeeds;
   }
@@ -216,16 +226,15 @@ export class DecisionEngine {
    */
   private calculateMaxBudget(currentBalance: number, urgency: 'low' | 'medium' | 'high' | 'critical'): number {
     const urgencyMultipliers = {
-      'low': 0.2,      // 20% of balance
-      'medium': 0.4,   // 40% of balance
-      'high': 0.6,     // 60% of balance
-      'critical': 0.8  // 80% of balance
+      'low': 0.2,
+      'medium': 0.4,
+      'high': 0.6,
+      'critical': 0.8
     };
 
     const multiplier = urgencyMultipliers[urgency];
     const maxBudget = currentBalance * multiplier;
 
-    // Ensure we always keep minimum balance for future purchases
     return Math.max(0, maxBudget - this.config.minBalanceThreshold);
   }
 
@@ -233,18 +242,17 @@ export class DecisionEngine {
    * Select preferred food category based on need level
    */
   private selectFoodCategory(foodNeed: number): string | undefined {
-    // Higher urgency = prefer more substantial food
-    if (foodNeed < 20) return 'main';      // Very hungry - need main dish
-    if (foodNeed < 30) return 'snack';     // Moderately hungry - snack is fine
-    if (foodNeed < 35) return 'beverage';  // Slightly hungry - just a drink
-    return undefined; // No specific preference
+    if (foodNeed < 20) return 'main';
+    if (foodNeed < 30) return 'snack';
+    if (foodNeed < 35) return 'beverage';
+    return undefined;
   }
 
   /**
    * Estimate needs after purchase for decision preview
    */
   private estimateNeedsAfterPurchase(currentNeeds: AgentNeeds, preferredCategory?: string): AgentNeeds {
-    const category = preferredCategory || 'snack'; // Default estimate
+    const category = preferredCategory || 'snack';
     const recoveryAmount = this.config.needRecovery[category as keyof typeof this.config.needRecovery] || 40;
 
     return {
@@ -265,7 +273,7 @@ export class DecisionEngine {
    */
   updateConfig(updates: Partial<DecisionEngineConfig>): void {
     Object.assign(this.config, updates);
-    console.log(`[DecisionEngine:${this.agentId}] ⚙️  Configuration updated:`, updates);
+    log.info(`[${this.agentId}] Configuration updated:`, updates);
   }
 
   /**

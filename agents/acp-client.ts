@@ -1,3 +1,4 @@
+import { createLogger } from '../shared/logger.js';
 import { merchantCircuitBreaker } from './circuit-breaker.js';
 import type {
   ZooRegistry,
@@ -6,6 +7,10 @@ import type {
   CheckoutResult,
   MerchantProduct
 } from './types.js';
+
+const log = createLogger('ACPClient');
+
+const CACHE_TTL_MS = 60_000; // 60s cache TTL
 
 interface CacheEntry<T> {
   data: T;
@@ -16,7 +21,6 @@ export class ACPClient {
   private readonly baseUrl: string;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
-  private readonly cacheTtlMs: number;
 
   private registryCache: CacheEntry<ZooRegistry> | null = null;
   private catalogCache: Map<string, CacheEntry<MerchantCatalog>> = new Map();
@@ -25,21 +29,19 @@ export class ACPClient {
     this.baseUrl = baseUrl;
     this.maxRetries = maxRetries;
     this.retryDelayMs = retryDelayMs;
-    this.cacheTtlMs = 60000; // 60s TTL
 
-    console.log(`[ACPClient] ACP Client initialized: ${this.baseUrl}`);
+    log.info(`ACP Client initialized: ${this.baseUrl}`);
   }
 
   /**
    * Fetch the zoo registry to discover available merchants
    */
   async fetchZooRegistry(): Promise<ZooRegistry> {
-    // Check cache
     if (this.registryCache && Date.now() < this.registryCache.expiresAt) {
-      console.log(`[ACPClient] Cache hit: zoo registry`);
+      log.debug('Cache hit: zoo registry');
       return this.registryCache.data;
     }
-    console.log(`[ACPClient] Cache miss: zoo registry`);
+    log.debug('Cache miss: zoo registry');
 
     const url = `${this.baseUrl}/api/zoo/registry`;
 
@@ -48,12 +50,12 @@ export class ACPClient {
         this.makeRequest<ZooRegistry>('GET', url)
       );
 
-      this.registryCache = { data: registry, expiresAt: Date.now() + this.cacheTtlMs };
-      console.log(`[ACPClient] Registry loaded: ${registry.merchants.length} merchants available`);
+      this.registryCache = { data: registry, expiresAt: Date.now() + CACHE_TTL_MS };
+      log.info(`Registry loaded: ${registry.merchants.length} merchants available`);
       return registry;
 
     } catch (error) {
-      console.error(`[ACPClient] Failed to fetch zoo registry:`, error);
+      log.error('Failed to fetch zoo registry:', error);
       throw new Error(`Failed to fetch zoo registry: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -62,13 +64,12 @@ export class ACPClient {
    * Get merchant catalog for a specific category (e.g., 'food')
    */
   async getMerchantCatalog(category: string): Promise<MerchantCatalog> {
-    // Check cache
     const cached = this.catalogCache.get(category);
     if (cached && Date.now() < cached.expiresAt) {
-      console.log(`[ACPClient] Cache hit: ${category} catalog`);
+      log.debug(`Cache hit: ${category} catalog`);
       return cached.data;
     }
-    console.log(`[ACPClient] Cache miss: ${category} catalog`);
+    log.debug(`Cache miss: ${category} catalog`);
 
     const url = `${this.baseUrl}/api/merchant/${category}/catalog`;
 
@@ -77,13 +78,13 @@ export class ACPClient {
         this.makeRequest<MerchantCatalog>('GET', url)
       );
 
-      this.catalogCache.set(category, { data: catalog, expiresAt: Date.now() + this.cacheTtlMs });
+      this.catalogCache.set(category, { data: catalog, expiresAt: Date.now() + CACHE_TTL_MS });
       const availableProducts = catalog.products.filter(p => p.available);
-      console.log(`[ACPClient] Catalog loaded: ${availableProducts.length}/${catalog.products.length} products available`);
+      log.info(`Catalog loaded: ${availableProducts.length}/${catalog.products.length} products available`);
       return catalog;
 
     } catch (error) {
-      console.error(`[ACPClient] Failed to fetch ${category} catalog:`, error);
+      log.error(`Failed to fetch ${category} catalog:`, error);
       throw new Error(`Failed to fetch merchant catalog: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -105,20 +106,19 @@ export class ACPClient {
       buyer_address: buyerAddress
     };
 
-    console.log(`[ACPClient] 🛍️  Creating checkout session for ${sku} (qty: ${quantity})`);
-    console.log(`[ACPClient] 📤 Request:`, requestBody);
+    log.info(`Creating checkout session for ${sku} (qty: ${quantity})`);
+    log.debug('Request:', requestBody);
 
     try {
       const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody);
 
-      console.log(`[ACPClient] ✓ Checkout session created: ${session.session_id}`);
-      console.log(`[ACPClient] 💰 Payment required: $${session.amount} → ${session.recipient_address}`);
-      console.log(`[ACPClient] ⏰ Session expires at: ${session.expires_at}`);
+      log.info(`Checkout session created: ${session.session_id}`);
+      log.debug(`Payment required: $${session.amount} -> ${session.recipient_address}`);
 
       return session;
 
     } catch (error) {
-      console.error(`[ACPClient] ❌ Failed to create checkout session for ${sku}:`, error);
+      log.error(`Failed to create checkout session for ${sku}:`, error);
       throw new Error(`Failed to create checkout session: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -138,26 +138,23 @@ export class ACPClient {
       tx_hash: txHash
     };
 
-    console.log(`[ACPClient] 🔄 Completing checkout session ${sessionId}`);
-    console.log(`[ACPClient] 🧾 Transaction hash: ${txHash}`);
+    log.info(`Completing checkout session ${sessionId}`);
+    log.debug(`Transaction hash: ${txHash}`);
 
     try {
       const result = await this.makeRequest<CheckoutResult>('POST', url, requestBody);
 
       if (result.success && result.verified) {
-        console.log(`[ACPClient] ✅ Checkout completed successfully!`);
-        console.log(`[ACPClient] 📦 Purchase ID: ${result.purchase_id}`);
-        console.log(`[ACPClient] 💳 Payment verified: $${result.payment?.amount} (block #${result.payment?.block_number})`);
+        log.info(`Checkout completed successfully! Purchase ID: ${result.purchase_id}`);
       } else {
-        console.log(`[ACPClient] ❌ Checkout verification failed:`, result.error || 'Unknown error');
+        log.warn(`Checkout verification failed: ${result.error || 'Unknown error'}`);
       }
 
       return result;
 
     } catch (error) {
-      console.error(`[ACPClient] ❌ Failed to complete checkout:`, error);
+      log.error('Failed to complete checkout:', error);
 
-      // Return a failed result instead of throwing, so agents can handle gracefully
       return {
         success: false,
         verified: false,
@@ -172,60 +169,51 @@ export class ACPClient {
   findRandomProduct(catalog: MerchantCatalog, category?: string): MerchantProduct | null {
     let availableProducts = catalog.products.filter(p => p.available);
 
-    // Filter by category if specified
     if (category) {
       availableProducts = availableProducts.filter(p => p.category === category);
     }
 
     if (availableProducts.length === 0) {
-      console.log(`[ACPClient] ⚠️  No available products found${category ? ` in category '${category}'` : ''}`);
+      log.warn(`No available products found${category ? ` in category '${category}'` : ''}`);
       return null;
     }
 
-    // Select random product
     const randomIndex = Math.floor(Math.random() * availableProducts.length);
     const selectedProduct = availableProducts[randomIndex];
 
-    console.log(`[ACPClient] 🎲 Selected random product: ${selectedProduct.name} ($${selectedProduct.price})`);
+    log.debug(`Selected random product: ${selectedProduct.name} ($${selectedProduct.price})`);
     return selectedProduct;
   }
 
   /**
    * Full ACP purchase flow: discover, catalog, create session
-   * Returns checkout session ready for payment
    */
   async initiatePurchase(
     agentAddress: string,
     preferredCategory?: string
   ): Promise<{ session: CheckoutSession; product: MerchantProduct; merchantCategory: string } | null> {
     try {
-      console.log(`[ACPClient] 🚀 Initiating ACP purchase flow for ${agentAddress}`);
+      log.info(`Initiating ACP purchase flow for ${agentAddress}`);
 
-      // Step 1: Discover merchants via registry
       const registry = await this.fetchZooRegistry();
 
-      // For now, only support food merchants
       const foodMerchants = registry.merchants.filter(m => m.category === 'food');
       if (foodMerchants.length === 0) {
-        console.log(`[ACPClient] ❌ No food merchants found in registry`);
+        log.warn('No food merchants found in registry');
         return null;
       }
 
-      // Step 2: Get merchant catalog
       const catalog = await this.getMerchantCatalog('food');
 
-      // Step 3: Select product
       const product = this.findRandomProduct(catalog, preferredCategory);
       if (!product) {
-        console.log(`[ACPClient] ❌ No available products found for purchase`);
+        log.warn('No available products found for purchase');
         return null;
       }
 
-      // Step 4: Create checkout session
       const session = await this.createCheckoutSession('food', product.sku, 1, agentAddress);
 
-      console.log(`[ACPClient] 🎯 Purchase flow initiated successfully`);
-      console.log(`[ACPClient] 📋 Summary: ${product.name} ($${product.price}) → Session ${session.session_id}`);
+      log.info(`Purchase flow initiated: ${product.name} ($${product.price}) -> Session ${session.session_id}`);
 
       return {
         session,
@@ -234,7 +222,7 @@ export class ACPClient {
       };
 
     } catch (error) {
-      console.error(`[ACPClient] ❌ Purchase initiation failed:`, error);
+      log.error('Purchase initiation failed:', error);
       return null;
     }
   }
@@ -245,13 +233,13 @@ export class ACPClient {
   private async makeRequest<T>(
     method: 'GET' | 'POST',
     url: string,
-    body?: any
+    body?: unknown
   ): Promise<T> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        console.log(`[ACPClient] 📡 ${method} ${url}${attempt > 1 ? ` (attempt ${attempt}/${this.maxRetries})` : ''}`);
+        log.debug(`${method} ${url}${attempt > 1 ? ` (attempt ${attempt}/${this.maxRetries})` : ''}`);
 
         const requestOptions: RequestInit = {
           method,
@@ -274,16 +262,16 @@ export class ACPClient {
 
         const data = await response.json();
 
-        console.log(`[ACPClient] ✓ Request successful (${response.status})`);
+        log.debug(`Request successful (${response.status})`);
         return data as T;
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[ACPClient] ⚠️  Attempt ${attempt}/${this.maxRetries} failed:`, lastError.message);
+        log.warn(`Attempt ${attempt}/${this.maxRetries} failed: ${lastError.message}`);
 
         if (attempt < this.maxRetries) {
-          const delayMs = this.retryDelayMs * Math.pow(2, attempt - 1); // Exponential backoff
-          console.log(`[ACPClient] ⏳ Retrying in ${delayMs}ms...`);
+          const delayMs = this.retryDelayMs * Math.pow(2, attempt - 1);
+          log.debug(`Retrying in ${delayMs}ms...`);
           await this.delay(delayMs);
         }
       }
@@ -292,9 +280,6 @@ export class ACPClient {
     throw lastError || new Error('Request failed after all retries');
   }
 
-  /**
-   * Utility method for delays
-   */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -303,7 +288,7 @@ export class ACPClient {
    * Health check for the ACP endpoints
    */
   async healthCheck(): Promise<{ registry: boolean; catalog: boolean; merchant_server: string }> {
-    console.log(`[ACPClient] 🏥 Running ACP health check...`);
+    log.info('Running ACP health check...');
 
     const health = {
       registry: false,
@@ -312,25 +297,23 @@ export class ACPClient {
     };
 
     try {
-      // Check registry endpoint
       await this.makeRequest('GET', `${this.baseUrl}/api/zoo/registry`);
       health.registry = true;
-      console.log(`[ACPClient] ✓ Registry endpoint healthy`);
+      log.info('Registry endpoint healthy');
     } catch (error) {
-      console.log(`[ACPClient] ❌ Registry endpoint failed:`, error instanceof Error ? error.message : String(error));
+      log.warn('Registry endpoint failed:', error instanceof Error ? error.message : String(error));
     }
 
     try {
-      // Check catalog endpoint
       await this.makeRequest('GET', `${this.baseUrl}/api/merchant/food/catalog`);
       health.catalog = true;
-      console.log(`[ACPClient] ✓ Catalog endpoint healthy`);
+      log.info('Catalog endpoint healthy');
     } catch (error) {
-      console.log(`[ACPClient] ❌ Catalog endpoint failed:`, error instanceof Error ? error.message : String(error));
+      log.warn('Catalog endpoint failed:', error instanceof Error ? error.message : String(error));
     }
 
     const healthyEndpoints = Object.values(health).filter(v => typeof v === 'boolean' && v).length;
-    console.log(`[ACPClient] 📊 Health check complete: ${healthyEndpoints}/2 endpoints healthy`);
+    log.info(`Health check complete: ${healthyEndpoints}/2 endpoints healthy`);
 
     return health;
   }

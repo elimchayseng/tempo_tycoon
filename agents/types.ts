@@ -1,6 +1,7 @@
 export interface AgentNeeds {
   food_need: number;      // 0-100
-  fun_need: number;       // 0-100 (not implemented yet, reserved for future)
+  /** @deprecated Reserved for future entertainment merchant — not actively evaluated */
+  fun_need: number;       // 0-100
 }
 
 export interface AgentState {

@@ -1,3 +1,4 @@
+import { createLogger } from '../shared/logger.js';
 import { BuyerAgent } from './buyer-agent.js';
 import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
@@ -11,6 +12,8 @@ import type {
   AgentEventType,
   MetricPoint
 } from './types.js';
+
+const log = createLogger('AgentRunner');
 
 export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
@@ -31,7 +34,7 @@ export class AgentRunner {
   private readonly maxMetricPoints = 1000;
 
   constructor() {
-    console.log(`[AgentRunner] 🎪 Initializing Agent Runner...`);
+    log.info('Initializing Agent Runner...');
 
     this.fundingManager = new FundingManager({
       refundThreshold: 10.0,
@@ -41,7 +44,7 @@ export class AgentRunner {
 
     this.stateManager = new StateManager();
 
-    console.log(`[AgentRunner] ✓ Agent Runner initialized`);
+    log.info('Agent Runner initialized');
   }
 
   /**
@@ -49,60 +52,50 @@ export class AgentRunner {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log(`[AgentRunner] ⚠️  Agent Runner already running`);
+      log.warn('Agent Runner already running');
       return;
     }
 
-    console.log(`[AgentRunner] 🚀 Starting Zoo Simulation Agent Runner...`);
+    log.info('Starting Zoo Simulation Agent Runner...');
 
     try {
-      // Step 1: Initialize state management
       await this.stateManager.initialize();
 
-      // Step 2: Create agent configurations
       const agentConfigs = this.createAgentConfigs();
 
       if (agentConfigs.length === 0) {
         throw new Error('No valid attendee accounts found for agent creation');
       }
 
-      // Step 3: Create and initialize agent instances
-      console.log(`[AgentRunner] 🤖 Creating ${agentConfigs.length} buyer agents...`);
+      log.info(`Creating ${agentConfigs.length} buyer agents...`);
 
       for (const config of agentConfigs) {
         const agent = new BuyerAgent(config);
-
-        // Subscribe to agent events for aggregation
         this.subscribeToAgentEvents(agent);
-
         this.agents.set(config.agent_id, agent);
-        console.log(`[AgentRunner] ✓ Created agent: ${config.agent_id}`);
+        log.debug(`Created agent: ${config.agent_id}`);
       }
 
-      // Step 4: Initial funding
-      console.log(`[AgentRunner] 💰 Performing initial funding...`);
+      log.info('Performing initial funding...');
       const fundingResult = await this.fundingManager.fundAllAttendees(agentConfigs);
 
       if (!fundingResult.success) {
         throw new Error(`Initial funding failed: ${fundingResult.error}`);
       }
 
-      console.log(`[AgentRunner] ✅ Initial funding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
+      log.info(`Initial funding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
 
-      // Step 5: Start all agents
-      console.log(`[AgentRunner] 🎯 Starting all agents...`);
+      log.info('Starting all agents...');
 
       const startPromises = Array.from(this.agents.values()).map(agent => agent.start());
       await Promise.all(startPromises);
 
-      // Step 6: Start periodic funding checks
       this.startFundingMonitor();
 
       this.isRunning = true;
       this.startTime = new Date();
 
-      console.log(`[AgentRunner] 🎉 All agents started successfully!`);
-      console.log(`[AgentRunner] 📊 Active agents: ${this.agents.size}`);
+      log.info(`All agents started successfully! Active agents: ${this.agents.size}`);
 
       this.emitEvent('simulation_started', {
         agent_count: this.agents.size,
@@ -111,7 +104,7 @@ export class AgentRunner {
       });
 
     } catch (error) {
-      console.error(`[AgentRunner] ❌ Failed to start agents:`, error);
+      log.error('Failed to start agents:', error);
       await this.stop();
       throw error;
     }
@@ -121,21 +114,19 @@ export class AgentRunner {
    * Stop all agents and cleanup
    */
   async stop(): Promise<void> {
-    console.log(`[AgentRunner] 🛑 Stopping Agent Runner...`);
+    log.info('Stopping Agent Runner...');
 
     this.isRunning = false;
 
-    // Stop funding monitor
     if (this.fundingCheckInterval) {
       clearInterval(this.fundingCheckInterval);
       this.fundingCheckInterval = null;
     }
 
-    // Stop all agents
     const stopPromises = Array.from(this.agents.values()).map(agent => agent.stop());
     await Promise.all(stopPromises);
 
-    console.log(`[AgentRunner] ✅ All agents stopped`);
+    log.info('All agents stopped');
 
     this.emitEvent('simulation_stopped', {
       agent_count: this.agents.size,
@@ -144,16 +135,10 @@ export class AgentRunner {
     });
   }
 
-  /**
-   * Get status of all agents
-   */
   getAgentStatuses(): AgentStatus[] {
     return Array.from(this.agents.values()).map(agent => agent.getStatus());
   }
 
-  /**
-   * Get aggregate metrics
-   */
   getMetrics(): AgentMetrics {
     const statuses = this.getAgentStatuses();
 
@@ -164,11 +149,9 @@ export class AgentRunner {
     const avgFoodNeed = statuses.reduce((sum, s) => sum + s.needs.food_need, 0) / statuses.length;
     const avgFunNeed = statuses.reduce((sum, s) => sum + s.needs.fun_need, 0) / statuses.length;
 
-    // Calculate purchases per minute
     const uptimeMinutes = this.startTime ? (Date.now() - this.startTime.getTime()) / 1000 / 60 : 1;
     const purchasesPerMinute = totalPurchases / Math.max(1, uptimeMinutes);
 
-    // Error rate calculation
     const totalCycles = statuses.reduce((sum, s) => sum + s.cycle_count, 0);
     const totalErrors = statuses.reduce((sum, s) => sum + s.error_count, 0);
     const errorRate = totalCycles > 0 ? totalErrors / totalCycles : 0;
@@ -183,13 +166,10 @@ export class AgentRunner {
         fun_need: Math.round(avgFunNeed)
       },
       purchases_per_minute: Math.round(purchasesPerMinute * 100) / 100,
-      error_rate: Math.round(errorRate * 10000) / 100 // Percentage with 2 decimals
+      error_rate: Math.round(errorRate * 10000) / 100
     };
   }
 
-  /**
-   * Record a metric point from a purchase event
-   */
   private recordMetric(point: MetricPoint): void {
     this.metricPoints.push(point);
     if (this.metricPoints.length > this.maxMetricPoints) {
@@ -197,9 +177,6 @@ export class AgentRunner {
     }
   }
 
-  /**
-   * Get time-series stats over a rolling window
-   */
   getTimeSeriesStats(windowMs: number = 60000) {
     const cutoff = Date.now() - windowMs;
     const recent = this.metricPoints.filter(p => p.timestamp >= cutoff);
@@ -220,11 +197,8 @@ export class AgentRunner {
     };
   }
 
-  /**
-   * Force funding check and refill if needed
-   */
   async checkAndRefundAgents(): Promise<void> {
-    console.log(`[AgentRunner] 💰 Performing funding check...`);
+    log.info('Performing funding check...');
 
     try {
       const zooAccounts = getAllZooAccounts();
@@ -233,14 +207,14 @@ export class AgentRunner {
       );
 
       if (attendeeAccounts.length === 0) {
-        console.log(`[AgentRunner] ⚠️  No attendee accounts found for funding check`);
+        log.warn('No attendee accounts found for funding check');
         return;
       }
 
       const fundingResult = await this.fundingManager.checkAndRefundAttendees(attendeeAccounts);
 
       if (fundingResult) {
-        console.log(`[AgentRunner] ✅ Refunding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
+        log.info(`Refunding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
 
         this.emitEvent('funding_completed', {
           reason: 'scheduled_refund',
@@ -250,23 +224,17 @@ export class AgentRunner {
       }
 
     } catch (error) {
-      console.error(`[AgentRunner] ❌ Funding check failed:`, error);
+      log.error('Funding check failed:', error);
       this.emitEvent('funding_failed', {
         error: error instanceof Error ? error.message : String(error)
       });
     }
   }
 
-  /**
-   * Get specific agent by ID
-   */
   getAgent(agentId: string): BuyerAgent | undefined {
     return this.agents.get(agentId);
   }
 
-  /**
-   * Force a purchase for a specific agent (for testing)
-   */
   async forcePurchase(agentId: string, maxBudget?: number): Promise<void> {
     const agent = this.agents.get(agentId);
     if (!agent) {
@@ -276,9 +244,6 @@ export class AgentRunner {
     await agent.forcePurchase(maxBudget);
   }
 
-  /**
-   * Get runner status
-   */
   getStatus() {
     const metrics = this.getMetrics();
     const uptimeSeconds = this.startTime ? Math.floor((Date.now() - this.startTime.getTime()) / 1000) : 0;
@@ -305,13 +270,9 @@ export class AgentRunner {
     };
   }
 
-  /**
-   * Create agent configurations from zoo accounts
-   */
   private createAgentConfigs(): AgentConfig[] {
     const configs: AgentConfig[] = [];
 
-    // Get attendee accounts
     const attendeeAccounts = [
       { id: 'attendee_1', role: 'attendee1' as const },
       { id: 'attendee_2', role: 'attendee2' as const },
@@ -322,7 +283,7 @@ export class AgentRunner {
       const account = getZooAccountByRole(role);
 
       if (!account) {
-        console.error(`[AgentRunner] ❌ No account found for ${role}`);
+        log.error(`No account found for ${role}`);
         continue;
       }
 
@@ -333,13 +294,13 @@ export class AgentRunner {
         initial_funding_amount: "50.00",
         refund_threshold: "10.00",
         refund_amount: "30.00",
-        polling_interval_ms: 3000, // 3 seconds for fast testing
+        polling_interval_ms: 3000,
         need_decay_rate: {
-          food_need: 5, // Slower degradation so purchases don't overlap
+          food_need: 5,
           fun_need: 4
         },
         purchase_threshold: {
-          food_need: 40, // Purchase when food < 40
+          food_need: 40,
           fun_need: 30
         },
         need_recovery: {
@@ -351,17 +312,13 @@ export class AgentRunner {
       };
 
       configs.push(config);
-      console.log(`[AgentRunner] ✓ Created config for ${id} (${account.address})`);
+      log.debug(`Created config for ${id} (${account.address})`);
     }
 
     return configs;
   }
 
-  /**
-   * Subscribe to events from an agent for aggregation
-   */
   private subscribeToAgentEvents(agent: BuyerAgent): void {
-    // Track purchases for metrics
     agent.on('purchase_completed', (event) => {
       this.totalPurchases++;
       this.totalSpent += parseFloat(event.data.purchase_record.amount);
@@ -384,7 +341,6 @@ export class AgentRunner {
       });
     });
 
-    // Forward all events with runner context
     const eventTypes: AgentEventType[] = [
       'agent_started', 'agent_stopped', 'needs_updated', 'purchase_initiated',
       'purchase_completed', 'purchase_failed', 'funding_received', 'funding_failed', 'error_occurred'
@@ -392,7 +348,6 @@ export class AgentRunner {
 
     for (const eventType of eventTypes) {
       agent.on(eventType, (event) => {
-        // Forward the original event to preserve the agent's agent_id
         const handlers = this.eventHandlers.get(eventType);
         if (handlers) {
           handlers.forEach(handler => handler(event));
@@ -401,21 +356,14 @@ export class AgentRunner {
     }
   }
 
-  /**
-   * Start periodic funding monitoring
-   */
   private startFundingMonitor(): void {
-    // Check funding every 30 seconds
     this.fundingCheckInterval = setInterval(() => {
       this.checkAndRefundAgents();
     }, 30000);
 
-    console.log(`[AgentRunner] ⏰ Funding monitor started (30s intervals)`);
+    log.info('Funding monitor started (30s intervals)');
   }
 
-  /**
-   * Event handling
-   */
   on(eventType: AgentEventType, handler: (event: AgentEvent) => void): void {
     if (!this.eventHandlers.has(eventType)) {
       this.eventHandlers.set(eventType, []);
@@ -423,7 +371,7 @@ export class AgentRunner {
     this.eventHandlers.get(eventType)!.push(handler);
   }
 
-  private emitEvent(type: AgentEventType, data: any): void {
+  private emitEvent(type: AgentEventType, data: unknown): void {
     const event: AgentEvent = {
       type,
       agent_id: 'agent_runner',
@@ -437,7 +385,7 @@ export class AgentRunner {
         try {
           handler(event);
         } catch (error) {
-          console.error(`[AgentRunner] ❌ Event handler error:`, error);
+          log.error('Event handler error:', error);
         }
       });
     }

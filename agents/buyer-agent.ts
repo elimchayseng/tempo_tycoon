@@ -1,3 +1,4 @@
+import { createLogger } from '../shared/logger.js';
 import { StateManager } from './state-manager.js';
 import { DecisionEngine } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
@@ -10,6 +11,8 @@ import type {
   AgentEvent,
   AgentEventType
 } from './types.js';
+
+const log = createLogger('BuyerAgent');
 
 export class BuyerAgent {
   private readonly config: AgentConfig;
@@ -31,7 +34,7 @@ export class BuyerAgent {
   constructor(config: AgentConfig) {
     this.config = config;
 
-    console.log(`[BuyerAgent:${config.agent_id}] 🤖 Initializing buyer agent...`);
+    log.info(`[${config.agent_id}] Initializing buyer agent...`);
 
     // Initialize components
     this.stateManager = new StateManager();
@@ -46,7 +49,7 @@ export class BuyerAgent {
     this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
     this.balanceSync = new BalanceSync();
 
-    console.log(`[BuyerAgent:${config.agent_id}] ✓ All components initialized`);
+    log.info(`[${config.agent_id}] All components initialized`);
   }
 
   /**
@@ -54,11 +57,11 @@ export class BuyerAgent {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log(`[BuyerAgent:${this.config.agent_id}] ⚠️  Agent already running`);
+      log.warn(`[${this.config.agent_id}] Agent already running`);
       return;
     }
 
-    console.log(`[BuyerAgent:${this.config.agent_id}] 🚀 Starting autonomous buyer agent...`);
+    log.info(`[${this.config.agent_id}] Starting autonomous buyer agent...`);
 
     try {
       // Initialize state management
@@ -76,13 +79,13 @@ export class BuyerAgent {
       this.startTime = new Date();
       this.scheduleNextCycle();
 
-      console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Agent started successfully`);
-      console.log(`[BuyerAgent:${this.config.agent_id}] ⏱️  Polling every ${this.config.polling_interval_ms}ms`);
+      log.info(`[${this.config.agent_id}] Agent started successfully`);
+      log.debug(`[${this.config.agent_id}] Polling every ${this.config.polling_interval_ms}ms`);
 
       this.emitEvent('agent_started', { config: this.config });
 
     } catch (error) {
-      console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Failed to start agent:`, error);
+      log.error(`[${this.config.agent_id}] Failed to start agent:`, error);
       await this.stop();
       throw error;
     }
@@ -92,7 +95,7 @@ export class BuyerAgent {
    * Stop the autonomous agent
    */
   async stop(): Promise<void> {
-    console.log(`[BuyerAgent:${this.config.agent_id}] 🛑 Stopping agent...`);
+    log.info(`[${this.config.agent_id}] Stopping agent...`);
 
     this.isRunning = false;
 
@@ -108,7 +111,7 @@ export class BuyerAgent {
       await this.stateManager.saveState(this.state);
     }
 
-    console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Agent stopped`);
+    log.info(`[${this.config.agent_id}] Agent stopped`);
     this.emitEvent('agent_stopped', { reason: 'manual_stop' });
   }
 
@@ -121,7 +124,7 @@ export class BuyerAgent {
     }
 
     try {
-      console.log(`[BuyerAgent:${this.config.agent_id}] 🔄 Starting cycle ${this.state.cycle_count + 1}...`);
+      log.debug(`[${this.config.agent_id}] Starting cycle ${this.state.cycle_count + 1}...`);
 
       // Step 1: Update needs (degradation)
       const previousNeeds = { ...this.state.needs };
@@ -155,7 +158,7 @@ export class BuyerAgent {
         this.state.last_purchase_time
       );
 
-      console.log(`[BuyerAgent:${this.config.agent_id}] 🤔 Decision: ${decision.shouldPurchase ? 'PURCHASE' : 'WAIT'} (${decision.reason})`);
+      log.info(`[${this.config.agent_id}] Decision: ${decision.shouldPurchase ? 'PURCHASE' : 'WAIT'} (${decision.reason})`);
 
       // Step 4: Execute purchase if needed
       if (decision.shouldPurchase) {
@@ -180,7 +183,7 @@ export class BuyerAgent {
     if (!this.state) return;
 
     try {
-      console.log(`[BuyerAgent:${this.config.agent_id}] 🛍️  Executing purchase (budget: $${maxBudget.toFixed(2)})...`);
+      log.info(`[${this.config.agent_id}] Executing purchase (budget: $${maxBudget.toFixed(2)})...`);
 
       // Update status to purchasing
       this.state.status = 'purchasing';
@@ -207,7 +210,7 @@ export class BuyerAgent {
       }
 
       // Step 3: Execute payment
-      console.log(`[BuyerAgent:${this.config.agent_id}] 💳 Making payment for ${product.name}...`);
+      log.info(`[${this.config.agent_id}] Making payment for ${product.name}...`);
 
       const paymentResult = await this.paymentManager.makePaymentWithRetry(session, product);
 
@@ -215,7 +218,7 @@ export class BuyerAgent {
         throw new Error(paymentResult.error || 'Payment failed');
       }
 
-      console.log(`[BuyerAgent:${this.config.agent_id}] ✅ Payment successful: ${paymentResult.tx_hash}`);
+      log.info(`[${this.config.agent_id}] Payment successful: ${paymentResult.tx_hash}`);
 
       // Step 4: Complete checkout with merchant
       const checkoutResult = await this.acpClient.completeCheckout(
@@ -225,7 +228,7 @@ export class BuyerAgent {
       );
 
       if (!checkoutResult.success || !checkoutResult.verified) {
-        console.error(`[BuyerAgent:${this.config.agent_id}] ⚠️  Checkout verification failed:`, checkoutResult.error);
+        log.warn(`[${this.config.agent_id}] Checkout verification failed:`, checkoutResult.error);
         // Note: Payment already went through, so we continue with need recovery
       }
 
@@ -250,13 +253,15 @@ export class BuyerAgent {
       this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
       this.state.last_purchase_time = purchaseRecord.completed_at;
 
-      // Step 8: Update balance (subtract payment + estimated fee)
-      const newBalance = parseFloat(this.state.balance) - parseFloat(paymentResult.amount) - this.paymentManager.estimateTransactionFee();
-      this.state.balance = Math.max(0, newBalance).toFixed(2);
+      // Step 8: Re-read authoritative balance from chain instead of
+      // speculatively subtracting (avoids floating-point vs fixed-point
+      // rounding mismatch that caused persistent $0.01 drift).
+      const postPurchaseBalance = await this.balanceSync.getBlockchainBalance(this.config.agent_id);
+      this.state.balance = postPurchaseBalance.toFixed(2);
       this.state.status = 'online';
 
-      console.log(`[BuyerAgent:${this.config.agent_id}] 🎉 Purchase completed successfully!`);
-      console.log(`[BuyerAgent:${this.config.agent_id}] 📊 Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
+      log.info(`[${this.config.agent_id}] Purchase completed successfully!`);
+      log.debug(`[${this.config.agent_id}] Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
 
       this.emitEvent('purchase_completed', {
         purchase_record: purchaseRecord,
@@ -265,7 +270,7 @@ export class BuyerAgent {
       });
 
     } catch (error) {
-      console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Purchase failed:`, error);
+      log.error(`[${this.config.agent_id}] Purchase failed:`, error);
 
       // Reset status
       if (this.state) {
@@ -290,7 +295,7 @@ export class BuyerAgent {
     this.errorCount++;
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Cycle error #${this.errorCount}:`, errorMessage);
+    log.error(`[${this.config.agent_id}] Cycle error #${this.errorCount}:`, errorMessage);
 
     // Update state to error status
     if (this.state) {
@@ -305,14 +310,14 @@ export class BuyerAgent {
 
     // If too many consecutive errors, stop the agent
     if (this.errorCount >= 5) {
-      console.error(`[BuyerAgent:${this.config.agent_id}] 🚨 Too many consecutive errors, stopping agent`);
+      log.error(`[${this.config.agent_id}] Too many consecutive errors, stopping agent`);
       await this.stop();
       return;
     }
 
     // Exponential backoff: wait longer after each error
     const backoffMs = Math.min(30000, 1000 * Math.pow(2, this.errorCount - 1));
-    console.log(`[BuyerAgent:${this.config.agent_id}] ⏳ Backing off for ${backoffMs}ms before retry...`);
+    log.warn(`[${this.config.agent_id}] Backing off for ${backoffMs}ms before retry...`);
 
     setTimeout(() => {
       if (this.isRunning) {
@@ -381,7 +386,7 @@ export class BuyerAgent {
     this.eventHandlers.get(eventType)!.push(handler);
   }
 
-  private emitEvent(type: AgentEventType, data: any): void {
+  private emitEvent(type: AgentEventType, data: unknown): void {
     const event: AgentEvent = {
       type,
       agent_id: this.config.agent_id,
@@ -395,7 +400,7 @@ export class BuyerAgent {
         try {
           handler(event);
         } catch (error) {
-          console.error(`[BuyerAgent:${this.config.agent_id}] ❌ Event handler error:`, error);
+          log.error(`[${this.config.agent_id}] Event handler error:`, error);
         }
       });
     }
@@ -405,8 +410,6 @@ export class BuyerAgent {
    * Get agent label for account operations
    */
   private getAgentLabel(): string {
-    // Convert agent_id to account label format
-    // e.g., "attendee_1" -> "Attendee 1"
     return this.config.agent_id
       .split('_')
       .map(part => part.charAt(0).toUpperCase() + part.slice(1))
@@ -421,9 +424,10 @@ export class BuyerAgent {
       throw new Error('Agent must be running to force purchase');
     }
 
-    console.log(`[BuyerAgent:${this.config.agent_id}] 🎯 Forcing immediate purchase...`);
+    log.info(`[${this.config.agent_id}] Forcing immediate purchase...`);
 
-    const budget = maxBudget || parseFloat(this.state.balance) * 0.5;
+    const balance = parseFloat(this.state.balance);
+    const budget = maxBudget || (isNaN(balance) ? 0 : balance * 0.5);
     await this.executePurchase(budget);
   }
 }
