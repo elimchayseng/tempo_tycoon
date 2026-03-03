@@ -94,7 +94,8 @@ function MerchantMetadata({ metadata }: { metadata: Record<string, unknown> }) {
     name: string;
     category: string;
     itemCount: number;
-    menu?: { name: string; price: string; category: string }[];
+    walletAddress?: string;
+    menu?: { name: string; price: string; category: string; costBasis?: string }[];
   }[];
   return (
     <div className="space-y-2">
@@ -104,14 +105,28 @@ function MerchantMetadata({ metadata }: { metadata: Record<string, unknown> }) {
             <span className="font-pixel text-[8px] text-[var(--zt-tan)]">🏪 {m.name}</span>
             <span className="font-pixel text-[7px] text-gray-400">{m.category}</span>
           </div>
+          {m.walletAddress && (
+            <div className="flex gap-2 mb-1">
+              <span className="font-pixel text-[7px] text-gray-400 shrink-0">Wallet:</span>
+              <span className="font-pixel text-[7px] text-[var(--zt-tan)] font-mono">{shortAddr(m.walletAddress)}</span>
+            </div>
+          )}
           {m.menu && m.menu.length > 0 && (
             <div className="space-y-0.5 pl-2 border-l border-[var(--zt-green-mid)]">
+              <div className="flex gap-2 items-center font-pixel text-[6px] text-gray-500 uppercase">
+                <span className="w-4" />
+                <span className="flex-1">Item</span>
+                <span className="w-10 text-right">Retail</span>
+                <span className="w-10 text-right">Cost</span>
+              </div>
               {m.menu.map((item) => (
                 <div key={item.name} className="flex gap-2 items-center">
                   <span className="text-xs shrink-0">{productEmoji(item.name)}</span>
-                  <span className="font-pixel text-[7px] text-gray-300">{item.name}</span>
-                  <span className="font-pixel text-[7px] text-gray-400">{item.category}</span>
-                  <span className="font-pixel text-[7px] text-[var(--zt-gold)] ml-auto">${item.price}</span>
+                  <span className="font-pixel text-[7px] text-gray-300 flex-1">{item.name}</span>
+                  <span className="font-pixel text-[7px] text-[var(--zt-gold)] w-10 text-right">${item.price}</span>
+                  {item.costBasis && (
+                    <span className="font-pixel text-[7px] text-amber-400/70 w-10 text-right">${item.costBasis}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -123,11 +138,35 @@ function MerchantMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function RunnerMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const buyer = metadata.buyerAgents as { count: number; pollingInterval: number; needDecayRate: number; purchaseThreshold: number } | undefined;
+  const merchant = metadata.merchantAgent as { agentId: string; pollingInterval: number; restockThreshold: number; maxStock: number; supplierAddress: string; initialFunding: string } | undefined;
+
   return (
-    <div className="space-y-0.5">
-      <MetadataDetail label="Polling" value={`${metadata.pollingInterval}ms`} />
-      <MetadataDetail label="Decay rate" value={String(metadata.needDecayRate)} />
-      <MetadataDetail label="Purchase threshold" value={String(metadata.purchaseThreshold)} />
+    <div className="space-y-2">
+      {/* Buyer agents section */}
+      <div>
+        <div className="font-pixel text-[7px] text-gray-400 uppercase tracking-wider mb-0.5">Buyer Agents ({buyer?.count ?? 3}x)</div>
+        <div className="space-y-0.5 pl-2 border-l border-[var(--zt-green-mid)]">
+          <MetadataDetail label="Polling" value={`${buyer?.pollingInterval ?? metadata.pollingInterval}ms`} />
+          <MetadataDetail label="Decay rate" value={String(buyer?.needDecayRate ?? metadata.needDecayRate)} />
+          <MetadataDetail label="Purchase threshold" value={`food_need < ${buyer?.purchaseThreshold ?? metadata.purchaseThreshold}`} />
+        </div>
+      </div>
+
+      {/* Merchant agent section */}
+      {merchant && (
+        <div>
+          <div className="font-pixel text-[7px] text-amber-400/80 uppercase tracking-wider mb-0.5">Merchant Agent</div>
+          <div className="space-y-0.5 pl-2 border-l border-amber-600/40">
+            <MetadataDetail label="Agent ID" value={merchant.agentId} />
+            <MetadataDetail label="Polling" value={`${merchant.pollingInterval}ms`} />
+            <MetadataDetail label="Restock at" value={`stock ≤ ${merchant.restockThreshold}`} />
+            <MetadataDetail label="Max stock" value={String(merchant.maxStock)} />
+            <MetadataDetail label="Supplier" value={shortAddr(merchant.supplierAddress)} />
+            <MetadataDetail label="Initial funding" value={merchant.initialFunding} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
