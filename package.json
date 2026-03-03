@@ -16,8 +16,13 @@
     "setup:wallets": "tsx scripts/setup-wallets.ts",
     "fund:agents": "tsx scripts/fund-agents.ts",
     "health:check": "tsx scripts/health-check.ts",
+    "test:unit": "tsx scripts/test-unit-logic.ts",
+    "test:api": "tsx scripts/test-api-endpoints.ts",
+    "test:ws": "tsx scripts/test-websocket.ts",
+    "test:lifecycle": "tsx scripts/test-simulation-lifecycle.ts",
     "test:integration": "tsx scripts/integration-test.ts",
-    "test:load": "tsx scripts/load-test.ts"
+    "test:load": "tsx scripts/load-test.ts",
+    "test:all": "npm run test:unit && npm run test:api && npm run test:ws"
   },
   "dependencies": {
     "viem": "latest",
