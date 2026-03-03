@@ -25,27 +25,27 @@
     "test:all": "npm run test:unit && npm run test:api && npm run test:ws"
   },
   "dependencies": {
-    "viem": "latest",
-    "hono": "latest",
     "@hono/node-server": "latest",
     "@hono/node-ws": "latest",
+    "dotenv": "^16.3.0",
+    "hono": "latest",
     "uuid": "^9.0.0",
-    "dotenv": "^16.3.0"
+    "viem": "latest"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/uuid": "^9.0.0",
+    "@tailwindcss/vite": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "tsx": "latest",
-    "concurrently": "latest",
-    "vite": "latest",
+    "@types/uuid": "^9.0.0",
     "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
     "react": "^19",
     "react-dom": "^19",
     "tailwindcss": "^4",
-    "@tailwindcss/vite": "^4"
+    "tsx": "latest",
+    "typescript": "^5",
+    "vite": "latest"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -44,6 +44,16 @@ export const config = {
     sessionTimeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '5'),
   },
 
+  // LLM inference configuration (Heroku Managed Inference)
+  llm: {
+    enabled: process.env.LLM_ENABLED === 'true',
+    inferenceUrl: process.env.INFERENCE_URL || '',
+    inferenceKey: process.env.INFERENCE_KEY || '',
+    model: process.env.LLM_MODEL || 'claude-4-5-haiku',
+    maxTokensPerResponse: 1024,
+    maxCallsPerSimulation: 100,
+  },
+
 } as const;
 
 // Validate configuration on startup

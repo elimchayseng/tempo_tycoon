@@ -36,6 +36,54 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
+## LLM Brain Layer (Heroku Managed Inference)
+
+```
+┌─────────────────────┐       HTTPS        ┌──────────────────────────┐
+│  Railway App        │────────────────────►│  Heroku Managed Inference│
+│  (tempo-zoo)        │  /v1/chat/completions│  (tempo-tycoon-agent-brain)│
+│                     │◄────────────────────│  Claude 4.5 Haiku        │
+│  BuyerAgent →       │    tool_calls resp  │  INFERENCE_URL + KEY     │
+│  BuyerBrain →       │                     │  (no deployed code)      │
+│  LLMClient (fetch)  │                     │                          │
+└─────────────────────┘                     └──────────────────────────┘
+```
+
+When `LLM_ENABLED=true` and Heroku inference credentials are configured, buyer agents use a `BuyerBrain` powered by Claude 4.5 Haiku to make contextual purchase decisions instead of random product selection.
+
+**Key components:**
+
+| File | Purpose |
+|------|---------|
+| `agents/llm/llm-client.ts` | Raw `fetch` HTTP client for Heroku `/v1/chat/completions` endpoint |
+| `agents/llm/buyer-brain.ts` | Orchestrates LLM calls with ACP-aligned tool definitions |
+| `agents/llm/prompts/buyer-system.ts` | Externalized, parameterized system prompt |
+
+**Decision flow with LLM:**
+
+1. Need decay triggers purchase decision (same as deterministic)
+2. `BuyerBrain.decide()` sends catalog + agent state to Claude
+3. LLM calls `acp_select_and_purchase` (specific SKU) or `acp_skip_cycle`
+4. Agent validates LLM choice (SKU exists, available, affordable)
+5. Executes purchase through existing ACP checkout flow
+6. On any LLM error → falls back to deterministic `DecisionEngine`
+
+**Safety guardrails:**
+
+- 100 LLM calls max per simulation (`maxCallsPerSimulation`)
+- 10-second timeout per request
+- Feature flag: `LLM_ENABLED=false` disables entirely
+- Any error falls back to deterministic engine
+
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `LLM_ENABLED` | Feature flag (`true`/`false`) |
+| `INFERENCE_URL` | Heroku inference endpoint base URL |
+| `INFERENCE_KEY` | Heroku addon-scoped API key |
+| `LLM_MODEL` | Model ID (default: `claude-4-5-haiku`) |
+
 ## Agent-to-Agent Commerce
 
 The zoo simulation implements true **agent-to-agent commerce** — not just agent-to-API:
@@ -71,7 +119,10 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 | `agents/buyer-agent.ts` | Autonomous loop: degrade needs → decide → purchase → update state |
 | `agents/merchant-agent.ts` | Autonomous loop: check inventory → restock low items → on-chain payment |
 | `agents/merchant-inventory.ts` | Shared inventory singleton (stock tracking, restock logic) |
-| `agents/decision-engine.ts` | Need-based purchase logic with configurable thresholds |
+| `agents/llm/llm-client.ts` | HTTP client for Heroku Managed Inference (OpenAI-compatible) |
+| `agents/llm/buyer-brain.ts` | LLM orchestration with ACP-aligned tool definitions |
+| `agents/llm/prompts/buyer-system.ts` | Externalized buyer system prompt |
+| `agents/decision-engine.ts` | Need-based purchase logic with configurable thresholds (deterministic fallback) |
 | `agents/acp-client.ts` | HTTP client for merchant ACP endpoints with caching + retry |
 | `agents/payment-manager.ts` | Blockchain tx execution via transaction queue |
 | `agents/circuit-breaker.ts` | Circuit breaker pattern for RPC and merchant calls |
@@ -89,7 +140,9 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 
 1. **Need decay:** Each 3s cycle, `DecisionEngine.degradeNeeds()` reduces food_need by ~5pts (±20% randomness)
 2. **Decision:** When food_need < 40 (threshold), agent decides to purchase
-3. **ACP discovery:** `ACPClient` fetches registry → catalog → selects random product
+3. **Product selection:**
+   - **With LLM** (`LLM_ENABLED=true`): `BuyerBrain.decide()` sends catalog + state to Claude → LLM picks specific product with reasoning
+   - **Without LLM** (fallback): `ACPClient` selects random product from catalog
 4. **Checkout:** Creates checkout session → gets payment address + amount
 5. **Payment:** `PaymentManager` sends AlphaUSD via `sendAction()` through transaction queue
 6. **Verification:** Merchant endpoint verifies on-chain tx via `SessionVerifier`

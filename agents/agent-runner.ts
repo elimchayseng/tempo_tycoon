@@ -10,6 +10,8 @@ import { getAllZooAccounts, getZooAccountByRole } from '../server/zoo-accounts.j
 import { refreshZooBalances } from '../server/routes/zoo-shared.js';
 import { ALPHA_USD } from '../server/tempo-client.js';
 import { config } from '../server/config.js';
+import { LLMClient } from './llm/llm-client.js';
+import { BuyerBrain } from './llm/buyer-brain.js';
 import type {
   AgentConfig,
   AgentStatus,
@@ -25,6 +27,7 @@ const log = createLogger('AgentRunner');
 export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
   private merchantAgent: MerchantAgent | null = null;
+  private buyerBrain: BuyerBrain | null = null;
   private readonly stateManager: StateManager;
 
   private isRunning = false;
@@ -99,10 +102,26 @@ export class AgentRunner {
         throw new Error('No valid attendee accounts found for agent creation');
       }
 
+      // Conditionally create LLM BuyerBrain when inference env vars are present
+      if (config.llm.enabled && config.llm.inferenceUrl && config.llm.inferenceKey) {
+        const llmClient = new LLMClient({
+          inferenceUrl: config.llm.inferenceUrl,
+          inferenceKey: config.llm.inferenceKey,
+          model: config.llm.model,
+          maxTokensPerResponse: config.llm.maxTokensPerResponse,
+          maxCallsPerSimulation: config.llm.maxCallsPerSimulation,
+        });
+        this.buyerBrain = new BuyerBrain(llmClient);
+        log.info('LLM buyer brain enabled via Heroku Managed Inference');
+      } else {
+        this.buyerBrain = null;
+        log.info('LLM buyer brain disabled (LLM_ENABLED not set or missing credentials)');
+      }
+
       log.info(`Creating ${agentConfigs.length} buyer agents...`);
 
       for (const agentConfig of agentConfigs) {
-        const agent = new BuyerAgent(agentConfig);
+        const agent = new BuyerAgent(agentConfig, this.buyerBrain ?? undefined);
         this.subscribeToAgentEvents(agent);
         this.agents.set(agentConfig.agent_id, agent);
         log.debug(`Created agent: ${agentConfig.agent_id}`);
@@ -172,6 +191,11 @@ export class AgentRunner {
       stopPromises.push(this.merchantAgent.stop());
     }
     await Promise.all(stopPromises);
+
+    // Reset LLM call counter
+    if (this.buyerBrain) {
+      this.buyerBrain.resetCallCount();
+    }
 
     // Clear agent maps for fresh start next time
     this.agents.clear();
@@ -369,6 +393,7 @@ export class AgentRunner {
       'agent_started', 'agent_stopped', 'needs_updated', 'purchase_initiated',
       'purchase_completed', 'purchase_failed', 'funding_received', 'funding_failed', 'error_occurred',
       'tx_flow' as AgentEventType,
+      'llm_decision',
     ];
 
     for (const eventType of eventTypes) {
