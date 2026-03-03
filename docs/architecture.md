@@ -6,7 +6,8 @@
 ┌──────────────────────────────────────────────────────────────┐
 │  Frontend (React 19 + Vite)                                  │
 │  web/App.tsx — Zoo Tycoon themed dashboard                   │
-│  ← WebSocket (zoo_agents, zoo_purchase, zoo_needs) →         │
+│  ← WebSocket (zoo_agents, zoo_purchase, zoo_merchant_state,  │
+│     zoo_restock_event, zoo_needs) →                          │
 ├──────────────────────────────────────────────────────────────┤
 │  Server (Hono)                                               │
 │  server/index.ts — main entry, routes, WebSocket, static     │
@@ -18,20 +19,36 @@
 │  │ /preflight     │                  │ /agents/fund       │  │
 │  └────────────────┴──────────────────┴────────────────────┘  │
 ├──────────────────────────────────────────────────────────────┤
-│  Agents (AgentRunner → 3x BuyerAgent)                        │
+│  Agents                                                      │
 │  agents/agent-runner.ts — lifecycle + event aggregation       │
-│  agents/buyer-agent.ts — autonomous loop per agent            │
-│  agents/decision-engine.ts — need decay + purchase logic      │
-│  agents/acp-client.ts — HTTP client for merchant endpoints    │
-│  agents/payment-manager.ts — blockchain tx execution          │
-│  agents/circuit-breaker.ts — resilience for RPC + merchant    │
-│  agents/balance-sync.ts — on-chain balance reads              │
-│  agents/funding-manager.ts — auto-refund from Zoo Master      │
+│  ┌──────────────────────┬────────────────────────────────┐   │
+│  │ 3x BuyerAgent        │ MerchantAgent                  │   │
+│  │ buyer-agent.ts        │ merchant-agent.ts              │   │
+│  │ decision-engine.ts    │ merchant-inventory.ts          │   │
+│  │ acp-client.ts         │ (shared inventory singleton)   │   │
+│  └──────────────────────┴────────────────────────────────┘   │
+│  Shared: payment-manager.ts, balance-sync.ts,                │
+│          circuit-breaker.ts, funding-manager.ts               │
 ├──────────────────────────────────────────────────────────────┤
 │  Tempo Moderato Testnet (chain 42431)                        │
 │  AlphaUSD TIP-20 token (6 decimals)                          │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+## Agent-to-Agent Commerce
+
+The zoo simulation implements true **agent-to-agent commerce** — not just agent-to-API:
+
+1. **BuyerAgents** autonomously decide to purchase food based on need decay, then pay the Merchant on-chain
+2. **MerchantAgent** autonomously monitors inventory and restocks by paying Zoo Master (supplier) on-chain
+3. Both directions involve real AlphaUSD transfers on the Tempo blockchain
+
+```
+BuyerAgent ──$AlphaUSD──► MerchantAgent ──$AlphaUSD──► Zoo Master (supplier)
+  (buyer)                   (merchant)                   (wholesaler)
+```
+
+The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts`) that both the agent and the HTTP merchant routes read from. When buyers purchase items, stock decrements; when stock drops to ≤1, the merchant autonomously restocks.
 
 ## Component Inventory
 
@@ -40,7 +57,7 @@
 | `server/index.ts` | Main entry — Hono app, WebSocket, static file serving, route mounting |
 | `server/routes/zoo-shared.ts` | Shared state: AgentRunner instance, `loadZooRegistry()`, `refreshZooBalances()` |
 | `server/routes/zoo-registry.ts` | Registry, status, health, preflight, transactions endpoints |
-| `server/routes/zoo-merchant.ts` | Food catalog, checkout create/complete, session management |
+| `server/routes/zoo-merchant.ts` | Food catalog (live inventory), checkout create/complete, session management |
 | `server/routes/zoo-agents.ts` | Agent start/stop/fund, metrics, force-purchase, event wiring |
 | `server/routes/zoo.ts` | Barrel file composing the three sub-routers |
 | `server/config.ts` | Centralized config from environment variables |
@@ -49,14 +66,16 @@
 | `server/zoo-accounts.ts` | Zoo wallet initialization from private keys |
 | `server/accounts.ts` | In-memory account store with balance tracking |
 | `server/instrumented-client.ts` | WebSocket broadcast + action lifecycle logging |
-| `agents/agent-runner.ts` | Manages 3 BuyerAgent instances, funding monitor, event aggregation |
+| `agents/agent-runner.ts` | Manages 3 BuyerAgents + 1 MerchantAgent, funding monitor, event aggregation |
 | `agents/buyer-agent.ts` | Autonomous loop: degrade needs → decide → purchase → update state |
+| `agents/merchant-agent.ts` | Autonomous loop: check inventory → restock low items → on-chain payment |
+| `agents/merchant-inventory.ts` | Shared inventory singleton (stock tracking, restock logic) |
 | `agents/decision-engine.ts` | Need-based purchase logic with configurable thresholds |
 | `agents/acp-client.ts` | HTTP client for merchant ACP endpoints with caching + retry |
 | `agents/payment-manager.ts` | Blockchain tx execution via transaction queue |
 | `agents/circuit-breaker.ts` | Circuit breaker pattern for RPC and merchant calls |
 | `agents/balance-sync.ts` | On-chain balance synchronization |
-| `agents/funding-manager.ts` | Batch funding from Zoo Master wallet |
+| `agents/funding-manager.ts` | Batch funding from Zoo Master wallet (attendees + merchant) |
 | `agents/state-manager.ts` | Persistent agent state (file-based) |
 | `shared/logger.ts` | Structured logger with `LOG_LEVEL` support |
 | `shared/types.ts` | Shared TypeScript types for frontend + backend |
@@ -64,14 +83,26 @@
 
 ## Data Flow
 
+### Buyer Agent (demand side)
+
 1. **Need decay:** Each 3s cycle, `DecisionEngine.degradeNeeds()` reduces food_need by ~5pts (±20% randomness)
 2. **Decision:** When food_need < 40 (threshold), agent decides to purchase
 3. **ACP discovery:** `ACPClient` fetches registry → catalog → selects random product
 4. **Checkout:** Creates checkout session → gets payment address + amount
 5. **Payment:** `PaymentManager` sends AlphaUSD via `sendAction()` through transaction queue
 6. **Verification:** Merchant endpoint verifies on-chain tx via `SessionVerifier`
-7. **Recovery:** `DecisionEngine.calculateNeedRecovery()` restores food_need based on product category
-8. **Broadcast:** Events flow to `AgentRunner` → WebSocket → React dashboard
+7. **Inventory:** Stock decremented, sale recorded on MerchantAgent
+8. **Recovery:** `DecisionEngine.calculateNeedRecovery()` restores food_need based on product category
+9. **Broadcast:** Events flow to `AgentRunner` → WebSocket → React dashboard
+
+### Merchant Agent (supply side)
+
+1. **Tick:** Every 5s, merchant agent checks inventory via `getSkusNeedingRestock()`
+2. **Detection:** Items with stock ≤ 1 (restock_threshold) are flagged
+3. **Cost calculation:** Units needed × cost_basis (retail price - $1.00)
+4. **Payment:** Merchant pays Zoo Master (supplier) via `PaymentManager.executeAlphaUsdTransferWithRetry()`
+5. **Restock:** On payment success, `restockItem(sku)` refills to max_stock (5)
+6. **Broadcast:** `restock_completed` → WebSocket → dashboard inventory update + restock animation
 
 ## Resilience Features
 
@@ -81,7 +112,7 @@
 - **Retry logic:** 3 attempts with exponential backoff (2s base) for payments
 - **Non-recoverable detection:** Skips retry for "insufficient funds" and "unknown account" errors
 - **Balance caching:** 60s TTL on registry and catalog responses
-- **Auto-refunding:** 30s interval funding monitor refunds agents below $10 threshold
+- **Auto-refunding:** 30s interval funding monitor refunds agents (buyers + merchant) below $10 threshold
 
 ## Tempo Blockchain Data Layer
 

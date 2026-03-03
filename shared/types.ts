@@ -163,6 +163,36 @@ export interface PreflightResult {
   checks: PreflightCheck[];
 }
 
+// Merchant Agent state for WebSocket broadcasts
+export interface ZooMerchantState {
+  inventory: Array<{
+    sku: string;
+    name: string;
+    price: string;
+    stock: number;
+    max_stock: number;
+    available: boolean;
+  }>;
+  total_revenue: string;
+  total_cost: string;
+  profit: string;
+  status: 'offline' | 'online' | 'restocking' | 'error';
+  balance: string;
+  restock_count: number;
+  sale_count: number;
+}
+
+// Restock event for real-time visualization
+export interface ZooRestockEvent {
+  sku: string;
+  name: string;
+  quantity: number;
+  cost: string;
+  tx_hash: string;
+  block_number: string;
+  timestamp: number;
+}
+
 export type WsMessage =
   | { type: "log"; entry: LogEntry }
   | { type: "accounts"; accounts: AccountsState }
@@ -173,7 +203,9 @@ export type WsMessage =
   | { type: "zoo_purchase"; receipt: ZooPurchaseReceipt }
   | { type: "zoo_network_stats"; stats: NetworkStats }
   | { type: "zoo_tx_flow"; event: TransactionFlowEvent }
-  | { type: "zoo_balance_update"; update: BalanceUpdate };
+  | { type: "zoo_balance_update"; update: BalanceUpdate }
+  | { type: "zoo_merchant_state"; merchant: ZooMerchantState }
+  | { type: "zoo_restock_event"; event: ZooRestockEvent };
 
 // API Request types for validation
 export interface SendRequest {
