@@ -291,3 +291,27 @@ Wallet funding uses the Tempo batch payment feature (`server/actions/batch.ts`):
 | running → complete | All buyers depleted below $10; `simulation_depleted` event triggers auto-stop |
 | running → stopping | Manual stop requested via dashboard |
 | stopping/complete → idle | `restart()` called; all ephemeral state cleared |
+
+## Testing
+
+Test scripts live in `scripts/` and run via `tsx` with no test framework dependency.
+
+| Script | Command | Requires Server | Description |
+|--------|---------|-----------------|-------------|
+| `test-unit-logic.ts` | `npm run test:unit` | No | Pure logic: DecisionEngine, CircuitBreaker, MerchantInventory, WalletGenerator |
+| `test-llm-inference.ts` | `npx tsx scripts/test-llm-inference.ts` | No | LLM endpoint connectivity, tool-call completions, BuyerBrain.decide() with mock catalog |
+| `test-api-endpoints.ts` | `npm run test:api` | Yes | HTTP endpoint smoke tests |
+| `test-websocket.ts` | `npm run test:ws` | Yes | WebSocket event delivery |
+| `test-simulation-lifecycle.ts` | `npm run test:lifecycle` | Yes | Full preflight → run → depletion lifecycle |
+
+### LLM Inference Tests (`test-llm-inference.ts`)
+
+Validates the Heroku Managed Inference integration end-to-end without running the simulation. Requires `INFERENCE_URL` and `INFERENCE_KEY` in `.env`.
+
+**What it covers:**
+1. **Endpoint connectivity** — raw fetch to `/v1/chat/completions`, verifies HTTP 200 + valid response shape
+2. **LLMClient basic chat** — tool call with a simple math prompt, verifies call count tracking
+3. **ACP tool-call completion** — sends mock catalog, verifies LLM returns `acp_select_and_purchase` or `acp_skip_cycle` with valid args
+4. **BuyerBrain.decide() moderate hunger** — full orchestration with food_need=30, verifies valid SKU selection + reasoning
+5. **BuyerBrain.decide() very hungry** — food_need=10 with purchase history, verifies LLM prefers main courses and avoids recent items
+6. **Call count tracking** — verifies increment on call, reset to 0 on `resetCallCount()`
