@@ -26,6 +26,7 @@ interface ActivityEntry {
   productEm: string;
   productName: string;
   amount: string;
+  fee?: string;
   key: string;
 }
 
@@ -94,7 +95,17 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
   // Purchase animation
   useEffect(() => {
-    if (!latestReceipt) return;
+    if (!latestReceipt) {
+      // Reset all purchase animation state when receipts are cleared (e.g. new simulation)
+      stepTimersRef.current.forEach(clearTimeout);
+      stepTimersRef.current = [];
+      setProtocolStep(null);
+      setAnim(null);
+      setBalanceFlash(false);
+      setActivity([]);
+      lastTxRef.current = null;
+      return;
+    }
     if (latestReceipt.tx_hash === lastTxRef.current) return;
 
     lastTxRef.current = latestReceipt.tx_hash;
@@ -122,6 +133,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
         productEm,
         productName: latestReceipt.product_name,
         amount: latestReceipt.amount,
+        fee: latestReceipt.fee_ausd,
         key: latestReceipt.tx_hash,
       },
       ...prev.slice(0, 4),
@@ -152,7 +164,16 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
   // Restock animation
   useEffect(() => {
     const latestRestock = restockEvents[0];
-    if (!latestRestock) return;
+    if (!latestRestock) {
+      // Reset all restock animation state when events are cleared (e.g. new simulation)
+      restockTimersRef.current.forEach(clearTimeout);
+      restockTimersRef.current = [];
+      setRestockProtocolStep(null);
+      setRestockAnim(null);
+      setShowRestockProtocol(false);
+      lastRestockRef.current = null;
+      return;
+    }
     if (latestRestock.tx_hash === lastRestockRef.current) return;
 
     lastRestockRef.current = latestRestock.tx_hash;
@@ -175,6 +196,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
         productEm: prodEm,
         productName: latestRestock.name,
         amount: latestRestock.cost,
+        fee: latestRestock.fee_ausd,
         key: `restock-${latestRestock.tx_hash}`,
       },
       ...prev.slice(0, 4),
@@ -356,6 +378,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                       <span className="text-gray-500">bought</span>
                       <span>{entry.productEm} {entry.productName}</span>
                       <span className="text-[var(--zt-gold)] ml-auto">${entry.amount}</span>
+                      {entry.fee && <span className="text-gray-500 text-[8px]">+${entry.fee} gas</span>}
                     </div>
                   ) : (
                     <div
@@ -365,6 +388,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                       <span className="text-amber-500/70 mr-auto">restocked</span>
                       <span>{entry.productEm} {entry.productName}</span>
                       <span className="text-amber-300">+${entry.amount}</span>
+                      {entry.fee && <span className="text-gray-500 text-[8px]">+${entry.fee} gas</span>}
                       <span>{entry.emoji}</span>
                     </div>
                   )
@@ -402,6 +426,8 @@ function RestockProtocolObject({ latestEvent }: { latestEvent: ZooRestockEvent }
   name: latestEvent.name,
   units: latestEvent.quantity,
   cost: `$${latestEvent.cost}`,
+  fee: latestEvent.fee_ausd ? `$${latestEvent.fee_ausd}` : undefined,
+  fee_payer: latestEvent.fee_payer ?? undefined,
   to: 'Zoo Master (supplier)',
   status: 'confirmed',
   tx_hash: latestEvent.tx_hash,

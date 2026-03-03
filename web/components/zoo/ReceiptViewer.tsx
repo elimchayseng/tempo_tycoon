@@ -102,6 +102,15 @@ export default function ReceiptViewer({ receipts, initialIndex, onClose }: Recei
               )}
             </div>
             <Row label="Block" value={receipt.block_number || "\u2014"} />
+            {receipt.fee_ausd && (
+              <Row label="Gas fee" value={`$${receipt.fee_ausd} AUSD`} />
+            )}
+            {receipt.fee_payer && (
+              <div className="flex justify-between items-center">
+                <span className="font-pixel text-[8px] text-[var(--zt-text-mid)] uppercase">Gas paid by</span>
+                <span className="font-pixel text-[10px] text-[var(--zt-gold)]">{receipt.fee_payer}</span>
+              </div>
+            )}
             {receipt.gas_used && (
               <Row label="Gas" value={Number(receipt.gas_used).toLocaleString()} />
             )}

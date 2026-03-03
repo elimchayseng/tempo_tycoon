@@ -9,6 +9,7 @@ import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } f
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
 import { balanceHistoryTracker } from "../balance-history.js";
 import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
+import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
 
 const log = createLogger('zoo-agents');
 
@@ -151,6 +152,8 @@ if (config.zoo.enabled) {
       tx_hash: rec.tx_hash ?? '',
       block_number: String(rec.block_number ?? ''),
       gas_used: String(rec.gas_used ?? ''),
+      fee_ausd: rec.fee_ausd ?? undefined,
+      fee_payer: rec.fee_payer ?? undefined,
       need_before: event.data.need_before ?? 0,
       need_after: event.data.new_needs?.food_need ?? 0,
       timestamp: Date.now(),
@@ -237,6 +240,8 @@ if (config.zoo.enabled) {
       cost: rec.cost,
       tx_hash: rec.tx_hash,
       block_number: rec.block_number,
+      fee_ausd: rec.fee_ausd ?? undefined,
+      fee_payer: rec.fee_payer ?? undefined,
       timestamp: Date.now(),
     };
     broadcast({ type: 'zoo_restock_event', event: restockEvent });
@@ -343,6 +348,20 @@ zooAgentRoutes.post("/agents/start", async (c) => {
     }
 
     await runner.start();
+
+    // Broadcast fresh zero-state so UI starts clean
+    const initialMerchant: ZooMerchantState = {
+      inventory: getInventorySnapshot(),
+      total_revenue: '0.00',
+      total_cost: '0.00',
+      profit: '0.00',
+      status: 'online',
+      balance: '0',
+      restock_count: 0,
+      sale_count: 0,
+    };
+    broadcast({ type: 'zoo_merchant_state', merchant: initialMerchant });
+    broadcastAgentStates();
 
     return c.json({
       success: true,

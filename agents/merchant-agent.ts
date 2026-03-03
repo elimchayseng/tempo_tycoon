@@ -221,6 +221,8 @@ export class MerchantAgent {
         cost: totalCost,
         tx_hash: paymentResult.tx_hash || 'unknown',
         block_number: paymentResult.block_number || 'unknown',
+        fee_ausd: paymentResult.fee_ausd,
+        fee_payer: paymentResult.fee_payer,
         completed_at: new Date(),
       };
 
@@ -262,6 +264,9 @@ export class MerchantAgent {
       total_cost: this.state.total_cost,
       profit: this.state.profit,
     });
+
+    // Broadcast updated state immediately so the UI reflects the sale
+    this.emitEvent('merchant_cycle_completed', this.getStateSnapshot());
   }
 
   private getStateSnapshot() {

@@ -30,6 +30,8 @@ export interface PurchaseRecord {
   amount: string;
   tx_hash: string;
   block_number: string | undefined;
+  fee_ausd?: string;
+  fee_payer?: string;
   completed_at: Date;
   need_before: AgentNeeds;
   need_after: AgentNeeds;
@@ -287,5 +289,7 @@ export interface RestockRecord {
   cost: string;
   tx_hash: string;
   block_number: string;
+  fee_ausd?: string;
+  fee_payer?: string;
   completed_at: Date;
 }

@@ -70,7 +70,7 @@ export default function ReceiptFeed({ receipts }: ReceiptFeedProps) {
                 <span className="font-pixel text-[9px] text-[var(--zt-text-dark)] truncate">
                   {receipt.product_name}
                 </span>
-                <span className="font-pixel text-[9px] text-[var(--zt-gold)] ml-auto whitespace-nowrap">
+                <span className="font-pixel text-[9px] text-emerald-800 ml-auto whitespace-nowrap">
                   ${receipt.amount}
                 </span>
               </button>

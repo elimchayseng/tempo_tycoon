@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useZoo } from "./hooks/useZoo";
+import { ApiService } from "./services/api";
 import { useBlockchainExplorer } from "./hooks/useBlockchainExplorer";
 import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
@@ -46,8 +47,9 @@ export default function App() {
     }
   }, [simulationComplete, phase, markComplete]);
 
-  const handleNewSimulation = () => {
+  const handleNewSimulation = async () => {
     resetSimulationData();
+    await ApiService.zooStopAgents().catch(() => {}); // best-effort stop server-side agents
     restart();
   };
 

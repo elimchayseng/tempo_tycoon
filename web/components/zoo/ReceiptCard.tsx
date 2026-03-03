@@ -55,6 +55,18 @@ export default function ReceiptCard({ receipt }: ReceiptCardProps) {
           <span className="font-pixel text-[6px] text-[var(--zt-text-mid)] uppercase">Block</span>
           <span className="font-mono text-[7px] text-[var(--zt-text-dark)]">{receipt.block_number || "—"}</span>
         </div>
+        {receipt.fee_ausd && (
+          <div className="flex justify-between">
+            <span className="font-pixel text-[6px] text-[var(--zt-text-mid)] uppercase">Gas fee</span>
+            <span className="font-mono text-[7px] text-[var(--zt-text-dark)]">${receipt.fee_ausd}</span>
+          </div>
+        )}
+        {receipt.fee_payer && (
+          <div className="flex justify-between">
+            <span className="font-pixel text-[6px] text-[var(--zt-text-mid)] uppercase">Gas paid by</span>
+            <span className="font-pixel text-[7px] text-[var(--zt-gold)]">{receipt.fee_payer}</span>
+          </div>
+        )}
         {receipt.gas_used && (
           <div className="flex justify-between">
             <span className="font-pixel text-[6px] text-[var(--zt-text-mid)] uppercase">Gas</span>

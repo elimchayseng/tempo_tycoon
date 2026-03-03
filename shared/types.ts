@@ -145,6 +145,8 @@ export interface ZooPurchaseReceipt {
   tx_hash: string;
   block_number: string;
   gas_used: string;
+  fee_ausd?: string;
+  fee_payer?: string;
   need_before: number;
   need_after: number;
   timestamp: number;
@@ -190,6 +192,8 @@ export interface ZooRestockEvent {
   cost: string;
   tx_hash: string;
   block_number: string;
+  fee_ausd?: string;
+  fee_payer?: string;
   timestamp: number;
 }
 

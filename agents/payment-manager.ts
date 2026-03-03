@@ -54,6 +54,8 @@ export interface PaymentResult {
   amount: string;
   error?: string;
   gas_used?: string;
+  fee_ausd?: string;
+  fee_payer?: string;
 }
 
 export class PaymentManager {
@@ -101,6 +103,8 @@ export class PaymentManager {
         tx_hash: sendResult.txHash,
         block_number: sendResult.blockNumber,
         gas_used: sendResult.gasUsed,
+        fee_ausd: sendResult.feeAusd,
+        fee_payer: sendResult.feePayer,
       };
 
       log.debug(`[${this.agentId}] Payment result:`, result);
@@ -186,6 +190,8 @@ export class PaymentManager {
       amount: paymentResult.amount,
       tx_hash: paymentResult.tx_hash || 'unknown',
       block_number: paymentResult.block_number || 'unknown',
+      fee_ausd: paymentResult.fee_ausd,
+      fee_payer: paymentResult.fee_payer,
       completed_at: new Date(),
       need_before: needsBefore,
       need_after: needsAfter
