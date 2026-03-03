@@ -158,6 +158,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     return () => {
       stepTimersRef.current.forEach(clearTimeout);
       stepTimersRef.current = [];
+      setProtocolStep(null);
+      setAnim(null);
+      setBalanceFlash(false);
     };
   }, [latestReceipt]);
 
@@ -226,6 +229,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     return () => {
       restockTimersRef.current.forEach(clearTimeout);
       restockTimersRef.current = [];
+      setRestockProtocolStep(null);
+      setShowRestockProtocol(false);
+      setRestockAnim(null);
     };
   }, [restockEvents]);
 
