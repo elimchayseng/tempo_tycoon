@@ -3,7 +3,8 @@ import { createLogger } from "../../shared/logger.js";
 import { config } from "../config.js";
 import { getZooAccountByRole } from "../zoo-accounts.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
-import { loadZooRegistry } from "./zoo-shared.js";
+import { loadZooRegistry, getAgentRunner } from "./zoo-shared.js";
+import { isAvailable, decrementStock, getInventorySnapshot } from "../../agents/merchant-inventory.js";
 
 const log = createLogger('zoo-merchant');
 
@@ -54,20 +55,29 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
       return c.json({ error: "Food merchant not found", code: "MERCHANT_NOT_FOUND" }, 404);
     }
 
+    // Use live inventory if available, otherwise fall back to static menu
+    const liveInventory = getInventorySnapshot();
+    const liveStockMap = new Map(liveInventory.map(i => [i.sku, i]));
+
     const catalog = {
       merchant_id: merchant.id,
       merchant_name: merchant.name,
       category: merchant.category,
       description: merchant.description,
-      products: merchant.menu.map((item: { sku: string; name: string; description?: string; price: string; category: string; available: boolean }) => ({
-        sku: item.sku,
-        name: item.name,
-        description: item.description,
-        price: item.price,
-        currency: "AlphaUSD",
-        category: item.category,
-        available: item.available
-      })),
+      products: merchant.menu.map((item: { sku: string; name: string; description?: string; price: string; category: string; available: boolean }) => {
+        const live = liveStockMap.get(item.sku);
+        return {
+          sku: item.sku,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          currency: "AlphaUSD",
+          category: item.category,
+          available: live ? live.available : item.available,
+          stock: live?.stock,
+          max_stock: live?.max_stock,
+        };
+      }),
       operating_hours: merchant.operating_hours,
       updated_at: new Date().toISOString()
     };
@@ -121,7 +131,7 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
       return c.json({ error: "Product not found", code: "PRODUCT_NOT_FOUND" }, 404);
     }
 
-    if (!product.available) {
+    if (!product.available || !isAvailable(sku)) {
       return c.json({ error: "Product not available", code: "PRODUCT_UNAVAILABLE" }, 400);
     }
 
@@ -255,6 +265,16 @@ zooMerchantRoutes.post("/food/checkout/complete", async (c) => {
 
     session.status = 'completed';
     activeSessions.delete(session_id);
+
+    // Decrement inventory stock
+    decrementStock(session.sku);
+
+    // Record sale on the merchant agent
+    const runner = getAgentRunner();
+    const merchantAgent = runner?.getMerchantAgent?.();
+    if (merchantAgent) {
+      merchantAgent.recordSale(session.sku, session.amount);
+    }
 
     const purchaseId = `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

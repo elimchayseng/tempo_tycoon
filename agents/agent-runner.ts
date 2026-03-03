@@ -1,5 +1,6 @@
 import { createLogger } from '../shared/logger.js';
 import { BuyerAgent } from './buyer-agent.js';
+import { MerchantAgent } from './merchant-agent.js';
 import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
 import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
@@ -11,6 +12,7 @@ import type {
   AgentMetrics,
   AgentEvent,
   AgentEventType,
+  MerchantConfig,
   MetricPoint
 } from './types.js';
 
@@ -18,6 +20,7 @@ const log = createLogger('AgentRunner');
 
 export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
+  private merchantAgent: MerchantAgent | null = null;
   private readonly fundingManager: FundingManager;
   private readonly stateManager: StateManager;
 
@@ -86,9 +89,44 @@ export class AgentRunner {
 
       log.info(`Initial funding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
 
+      // Fund merchant wallet
+      const merchantAccountForFunding = getZooAccountByRole('merchantA');
+      if (merchantAccountForFunding) {
+        const merchantFunding = await this.fundingManager.fundMerchantWallet(
+          merchantAccountForFunding.address,
+          'merchant_a'
+        );
+        if (merchantFunding.success) {
+          log.info(`Merchant funded: $${merchantFunding.total_amount}`);
+        } else {
+          log.warn(`Merchant funding failed: ${merchantFunding.error}`);
+        }
+      }
+
+      // Create and start the merchant agent
+      const merchantAccount = getZooAccountByRole('merchantA');
+      const zooMasterAccount = getZooAccountByRole('zooMaster');
+      if (merchantAccount && zooMasterAccount) {
+        const merchantConfig: MerchantConfig = {
+          agent_id: 'merchant_a',
+          private_key: merchantAccount.privateKey,
+          address: merchantAccount.address,
+          polling_interval_ms: 5000,
+          zoo_master_address: zooMasterAccount.address,
+        };
+        this.merchantAgent = new MerchantAgent(merchantConfig);
+        this.subscribeMerchantEvents(this.merchantAgent);
+        log.info('Merchant agent created');
+      } else {
+        log.warn('Merchant or Zoo Master account not found, skipping merchant agent');
+      }
+
       log.info('Starting all agents...');
 
       const startPromises = Array.from(this.agents.values()).map(agent => agent.start());
+      if (this.merchantAgent) {
+        startPromises.push(this.merchantAgent.start());
+      }
       await Promise.all(startPromises);
 
       this.startFundingMonitor();
@@ -96,7 +134,7 @@ export class AgentRunner {
       this.isRunning = true;
       this.startTime = new Date();
 
-      log.info(`All agents started successfully! Active agents: ${this.agents.size}`);
+      log.info(`All agents started successfully! Active buyer agents: ${this.agents.size}, merchant agent: ${this.merchantAgent ? 'active' : 'none'}`);
 
       this.emitEvent('simulation_started', {
         agent_count: this.agents.size,
@@ -125,6 +163,9 @@ export class AgentRunner {
     }
 
     const stopPromises = Array.from(this.agents.values()).map(agent => agent.stop());
+    if (this.merchantAgent) {
+      stopPromises.push(this.merchantAgent.stop());
+    }
     await Promise.all(stopPromises);
 
     log.info('All agents stopped');
@@ -205,11 +246,11 @@ export class AgentRunner {
       await refreshZooBalances();
       const zooAccounts = getAllZooAccounts();
       const attendeeAccounts = zooAccounts.filter(account =>
-        account.label.startsWith('Attendee')
+        account.label.startsWith('Attendee') || account.label === 'Merchant A'
       );
 
       if (attendeeAccounts.length === 0) {
-        log.warn('No attendee accounts found for funding check');
+        log.warn('No agent accounts found for funding check');
         return;
       }
 
@@ -231,6 +272,10 @@ export class AgentRunner {
         error: error instanceof Error ? error.message : String(error)
       });
     }
+  }
+
+  getMerchantAgent(): MerchantAgent | null {
+    return this.merchantAgent;
   }
 
   getAgent(agentId: string): BuyerAgent | undefined {
@@ -268,7 +313,8 @@ export class AgentRunner {
         balance: status.balance,
         purchase_count: status.purchase_count,
         cycle_count: status.cycle_count
-      }))
+      })),
+      merchant_agent: this.merchantAgent?.getStatus() ?? null,
     };
   }
 
@@ -351,6 +397,23 @@ export class AgentRunner {
 
     for (const eventType of eventTypes) {
       agent.on(eventType, (event) => {
+        const handlers = this.eventHandlers.get(eventType);
+        if (handlers) {
+          handlers.forEach(handler => handler(event));
+        }
+      });
+    }
+  }
+
+  private subscribeMerchantEvents(merchant: MerchantAgent): void {
+    const merchantEventTypes: AgentEventType[] = [
+      'agent_started', 'agent_stopped', 'error_occurred',
+      'merchant_cycle_completed', 'restock_initiated', 'restock_completed',
+      'restock_failed', 'sale_recorded',
+    ];
+
+    for (const eventType of merchantEventTypes) {
+      merchant.on(eventType, (event) => {
         const handlers = this.eventHandlers.get(eventType);
         if (handlers) {
           handlers.forEach(handler => handler(event));

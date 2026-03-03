@@ -104,15 +104,18 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     if (merchantCount > 0) {
       checks[3].status = "pass";
       checks[3].detail = `${merchantCount} merchant(s) loaded`;
+      const merchantAccount = getZooAccountByRole("merchantA");
       checks[3].metadata = {
         merchants: merchants.map((m: any) => ({
           name: m.name,
           category: m.category ?? "general",
           itemCount: m.menu?.length ?? 0,
+          walletAddress: merchantAccount?.address ?? "unknown",
           menu: (m.menu ?? []).map((item: any) => ({
             name: item.name,
             price: item.price,
             category: item.category,
+            costBasis: (Math.max(0, parseFloat(item.price) - 1.0)).toFixed(2),
           })),
         })),
       };
@@ -127,12 +130,24 @@ zooRegistryRoutes.post("/preflight", async (c) => {
 
   // 5. Agent runner
   if (getAgentRunner()) {
+    const zooMaster = getZooAccountByRole("zooMaster");
     checks[4].status = "pass";
     checks[4].detail = "Agent runner ready";
     checks[4].metadata = {
-      pollingInterval: config.zoo.agentPollingInterval,
-      needDecayRate: config.zoo.needDecayRate,
-      purchaseThreshold: config.zoo.purchaseThreshold,
+      buyerAgents: {
+        count: 3,
+        pollingInterval: config.zoo.agentPollingInterval,
+        needDecayRate: config.zoo.needDecayRate,
+        purchaseThreshold: config.zoo.purchaseThreshold,
+      },
+      merchantAgent: {
+        agentId: "merchant_a",
+        pollingInterval: 5000,
+        restockThreshold: 1,
+        maxStock: 5,
+        supplierAddress: zooMaster?.address ?? "unknown",
+        initialFunding: "$50.00",
+      },
     };
   } else {
     checks[4].status = "fail";

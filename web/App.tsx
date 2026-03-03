@@ -18,6 +18,8 @@ export default function App() {
     networkStats,
     txFlowEvents,
     balanceUpdates,
+    merchantState,
+    restockEvents,
   } = useWebSocket();
 
   const {
@@ -91,7 +93,7 @@ export default function App() {
           {/* Running dashboard */}
           {showDashboard && (
             <>
-              <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} />
+              <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} />
               <div className="border-b border-[var(--zt-green-mid)] shrink-0">
                 <AgentCardRow agents={zooAgents} />
               </div>

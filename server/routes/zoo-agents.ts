@@ -8,7 +8,7 @@ import { accountStore } from "../accounts.js";
 import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } from "./zoo-shared.js";
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
 import { balanceHistoryTracker } from "../balance-history.js";
-import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate } from "../../shared/types.js";
+import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
 
 const log = createLogger('zoo-agents');
 
@@ -207,6 +207,79 @@ if (config.zoo.enabled) {
     });
 
     broadcastAgentStates();
+  });
+
+  // Merchant agent event wiring
+  runner.on('merchant_cycle_completed', (event) => {
+    const merchantState: ZooMerchantState = event.data;
+    broadcast({ type: 'zoo_merchant_state', merchant: merchantState });
+  });
+
+  runner.on('restock_initiated', (event) => {
+    emitLog({
+      action: 'zoo_restock',
+      type: 'info',
+      label: `Merchant restocking ${event.data.name}, low stock: ${event.data.current_stock}`,
+      data: {
+        sku: event.data.sku,
+        name: event.data.name,
+        units: event.data.units,
+        cost: event.data.cost,
+      }
+    });
+  });
+
+  runner.on('restock_completed', (event) => {
+    const rec = event.data.record;
+    const restockEvent: ZooRestockEvent = {
+      sku: rec.sku,
+      name: rec.name,
+      quantity: rec.units,
+      cost: rec.cost,
+      tx_hash: rec.tx_hash,
+      block_number: rec.block_number,
+      timestamp: Date.now(),
+    };
+    broadcast({ type: 'zoo_restock_event', event: restockEvent });
+
+    emitLog({
+      action: 'zoo_restock',
+      type: 'tx_confirmed',
+      label: `Restocked ${rec.name}: +${rec.units} units ($${rec.cost})`,
+      data: {
+        sku: rec.sku,
+        tx_hash: rec.tx_hash,
+        block_number: rec.block_number,
+      }
+    });
+
+    // Increment zoo tx counter for restock transactions
+    incrementZooTxCount();
+
+    // Refresh balances after restock payment
+    refreshZooBalances().then(() => {
+      broadcast({ type: "accounts", accounts: accountStore.toPublic() });
+    }).catch((err) => {
+      log.debug('Failed to refresh balances after restock', err);
+    });
+  });
+
+  runner.on('restock_failed', (event) => {
+    emitLog({
+      action: 'zoo_restock',
+      type: 'error',
+      label: `Restock failed for ${event.data.name}: ${event.data.error}`,
+      data: event.data,
+    });
+  });
+
+  runner.on('sale_recorded', (event) => {
+    emitLog({
+      action: 'zoo_merchant',
+      type: 'info',
+      label: `Sale: ${event.data.sku} $${event.data.amount} (profit: $${event.data.profit})`,
+      data: event.data,
+    });
   });
 
   log.info('AgentRunner initialized and ready');

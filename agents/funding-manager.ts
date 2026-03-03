@@ -38,6 +38,21 @@ export class FundingManager {
     return this.executeBatchFunding(request);
   }
 
+  async fundMerchantWallet(merchantAddress: string, merchantAgentId: string): Promise<BatchFundingResult> {
+    log.info(`Initiating merchant funding for ${merchantAgentId}...`);
+
+    const request: BatchFundingRequest = {
+      recipients: [{
+        address: merchantAddress,
+        amount: this.initialFundingAmount,
+        agent_id: merchantAgentId,
+      }],
+      reason: 'initial_funding',
+    };
+
+    return this.executeBatchFunding(request);
+  }
+
   async checkAndTopUpAgentWallets(
     attendeeAccounts: { label: string; address: string; balances: Record<string, bigint> }[]
   ): Promise<BatchFundingResult | null> {

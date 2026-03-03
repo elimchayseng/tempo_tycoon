@@ -8,6 +8,8 @@ import type {
   NetworkStats,
   TransactionFlowEvent,
   BalanceUpdate,
+  ZooMerchantState,
+  ZooRestockEvent,
 } from "../lib/types";
 
 const RECONNECT_DELAYS = [500, 1000, 2000, 4000];
@@ -22,6 +24,8 @@ export function useWebSocket() {
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
   const [txFlowEvents, setTxFlowEvents] = useState<TransactionFlowEvent[]>([]);
   const [balanceUpdates, setBalanceUpdates] = useState<BalanceUpdate[]>([]);
+  const [merchantState, setMerchantState] = useState<ZooMerchantState | null>(null);
+  const [restockEvents, setRestockEvents] = useState<ZooRestockEvent[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
@@ -103,6 +107,12 @@ export function useWebSocket() {
           case "zoo_balance_update":
             setBalanceUpdates((prev) => [msg.update, ...prev].slice(0, 100));
             break;
+          case "zoo_merchant_state":
+            setMerchantState(msg.merchant);
+            break;
+          case "zoo_restock_event":
+            setRestockEvents((prev) => [msg.event, ...prev].slice(0, 50));
+            break;
         }
       };
     }
@@ -130,5 +140,7 @@ export function useWebSocket() {
     networkStats,
     txFlowEvents,
     balanceUpdates,
+    merchantState,
+    restockEvents,
   };
 }

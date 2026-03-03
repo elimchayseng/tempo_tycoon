@@ -20,4 +20,6 @@ export type {
   TxFlowStage,
   TransactionFlowEvent,
   BalanceUpdate,
+  ZooMerchantState,
+  ZooRestockEvent,
 } from '../../shared/types.js';

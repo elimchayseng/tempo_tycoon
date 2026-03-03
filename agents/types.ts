@@ -215,11 +215,75 @@ export type AgentEventType =
   | 'funding_received'
   | 'funding_completed'
   | 'funding_failed'
-  | 'error_occurred';
+  | 'error_occurred'
+  | 'merchant_cycle_completed'
+  | 'restock_initiated'
+  | 'restock_completed'
+  | 'restock_failed'
+  | 'sale_recorded';
 
 export interface AgentEvent {
   type: AgentEventType;
   agent_id: string;
   timestamp: Date;
   data: any;
+}
+
+// Merchant Agent types
+
+export interface MerchantConfig {
+  agent_id: string;
+  private_key: string;
+  address: string;
+  polling_interval_ms: number;
+  zoo_master_address: string;
+}
+
+export interface MerchantState {
+  agent_id: string;
+  address: string;
+  status: 'offline' | 'online' | 'restocking' | 'error';
+  balance: string;
+  total_revenue: string;
+  total_cost: string;
+  profit: string;
+  restock_count: number;
+  sale_count: number;
+  cycle_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MerchantStatus {
+  agent_id: string;
+  status: 'offline' | 'online' | 'restocking' | 'error';
+  balance: string;
+  wallet_address: string | null;
+  total_revenue: string;
+  total_cost: string;
+  profit: string;
+  restock_count: number;
+  sale_count: number;
+  cycle_count: number;
+  uptime_seconds: number;
+  error_count: number;
+  inventory: Array<{
+    sku: string;
+    name: string;
+    price: string;
+    stock: number;
+    max_stock: number;
+    available: boolean;
+  }>;
+}
+
+export interface RestockRecord {
+  restock_id: string;
+  sku: string;
+  name: string;
+  units: number;
+  cost: string;
+  tx_hash: string;
+  block_number: string;
+  completed_at: Date;
 }
