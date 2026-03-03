@@ -10,8 +10,6 @@
 | `npm run build` | Build frontend with Vite |
 | `npm run start` | Start production server |
 | `npm run check` | TypeScript type check (`tsc --noEmit`) |
-| `npm run setup:wallets` | Generate zoo wallet keypairs and write `.env` |
-| `npm run fund:agents` | Fund agent wallets from Zoo Master |
 | `npm run health:check` | Run health checks against running server |
 | `npm run test:integration` | Run integration tests |
 | `npm run test:load` | Run load tests |
@@ -22,18 +20,14 @@
 # Install dependencies
 npm install
 
-# Generate wallets and .env
-npm run setup:wallets
-
-# Fund the agents on Tempo testnet
-npm run fund:agents
-
-# Enable zoo simulation
-echo "ZOO_SIMULATION_ENABLED=true" >> .env
+# Copy .env (included in repo with sensible defaults)
+cp .env.example .env  # if not already present
 
 # Start development
 npm run dev
 ```
+
+No wallet generation or manual funding is needed — wallets are ephemeral and generated automatically during each preflight.
 
 ## Common Workflows
 
@@ -41,21 +35,11 @@ npm run dev
 
 1. Start the server: `npm run dev`
 2. Open `http://localhost:4000`
-3. Click **Run Preflight** to verify system readiness
-4. Click **Start Simulation** to begin agent loops
+3. Click **Start Zoo** — runs preflight (generates ephemeral wallets, funds via faucet)
+4. When preflight passes, click **Open Gates** to start agents
 5. Agents will autonomously purchase food as needs decay
-
-### Re-Funding Agents
-
-If agents run out of funds:
-
-```bash
-# Manual re-fund via script
-npm run fund:agents
-
-# Or via API while server is running
-curl -X POST http://localhost:4000/api/zoo/agents/fund
-```
+6. Simulation auto-stops when all buyers deplete below $10
+7. Click **New Simulation** to start fresh (clears all state, generates new wallets)
 
 ### Forcing a Purchase (Testing)
 

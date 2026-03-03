@@ -152,20 +152,21 @@ Each simulation run generates fresh wallets. No private keys are stored in `.env
 
 ### Flow
 
-1. **User clicks "Open Gates"** in the dashboard
-2. `AgentRunner.start()` clears previous agent state files
-3. `generateAllWallets()` creates 5 random wallets (Zoo Master, Merchant A, Attendee 1-3)
-4. `resetZooAccounts()` registers them in the in-memory `accountStore`
-5. `fundZooWallets()`:
-   - Requests faucet funds for Zoo Master via `Actions.faucet.fund()`
-   - Polls balance for up to 30s until faucet confirms
-   - Distributes via `batchAction()`: Merchant $100, each Attendee $50
-6. Agents start their autonomous loops
+1. **User clicks "Start Zoo"** → `POST /preflight`
+2. `AgentRunner.initializeWallets()` clears old state, generates wallets, funds via faucet + batch:
+   - `clearZooAccounts()` removes any wallets from a prior run
+   - `clearAllStates()` removes agent state files
+   - `generateAllWallets()` creates 5 random wallets (Zoo Master, Merchant A, Attendee 1-3)
+   - `resetZooAccounts()` registers them in the in-memory `accountStore`
+   - `fundZooWallets()`: requests faucet funds for Zoo Master, then distributes via batch (Merchant $100, each Attendee $50)
+3. Preflight phase transitions to **ready**
+4. **User clicks "Open Gates"** → `POST /agents/start` — agents are created using the already-funded wallets
 
 ### Depletion and Auto-Stop
 
 - Every 10s, `startDepletionMonitor()` checks on-chain balances of all 3 buyer agents
 - When **all** buyers are below `minBalanceThreshold` ($10), the simulation emits `simulation_depleted` and calls `stop()`
+- The server broadcasts `zoo_simulation_complete` via WebSocket
 - The frontend transitions to a "Simulation Complete" phase with a "New Simulation" button
 
 ### Batch Payment Distribution
@@ -175,3 +176,65 @@ Wallet funding uses the Tempo batch payment feature (`server/actions/batch.ts`):
 - 4 sequential `Actions.token.transferSync()` calls distribute funds
 - Each transfer includes a memo identifying the purpose ("Zoo Init: Merchant A", etc.)
 - Fees are paid by the sender (Zoo Master) in AlphaUSD
+
+## Simulation State Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIMULATION STATE FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────┐   Start Zoo   ┌───────────┐  all pass  ┌───────┐    │
+│  │ IDLE │──────────────►│ PREFLIGHT │───────────►│ READY │    │
+│  └──┬───┘               └───────────┘            └───┬───┘    │
+│     ▲                     │ Steps:                    │        │
+│     │                     │ 1. Check blockchain       │        │
+│     │                     │ 2. Generate wallets       │        │
+│     │                     │ 3. Fund via faucet+batch  │        │
+│     │                     │ 4. Verify balances        │        │
+│     │                     │ 5. Load merchant registry │        │
+│     │                     │ 6. Validate agent runner  │        │
+│     │                     │ 7. Funding strategy meta  │        │
+│     │                                                 │        │
+│     │               Open Gates                        │        │
+│     │                     ┌───────────┐               │        │
+│     │                     │ STARTING  │◄──────────────┘        │
+│     │                     └─────┬─────┘                        │
+│     │                           │ Creates agents               │
+│     │                           │ from funded wallets           │
+│     │                           ▼                              │
+│     │                     ┌─────────┐                          │
+│     │                     │ RUNNING │                          │
+│     │                     └────┬────┘                          │
+│     │                          │                               │
+│     │               ┌─────────┴──────────┐                    │
+│     │               │                    │                     │
+│     │          Manual Stop        All buyers                   │
+│     │               │           depleted < $10                 │
+│     │               ▼                    ▼                     │
+│     │          ┌─────────┐       ┌──────────┐                 │
+│     │          │ STOPPED │       │ COMPLETE │                 │
+│     │          └────┬────┘       └─────┬────┘                 │
+│     │               │                  │                       │
+│     │               │    New Simulation │                      │
+│     └───────────────┴──────────────────┘                      │
+│                                                                │
+│  On every transition to IDLE:                                  │
+│  • clearZooAccounts() removes ephemeral wallets                │
+│  • clearAllStates() removes agent state files                  │
+│  • resetSimulationData() clears frontend WebSocket state       │
+│                                                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### State Loading Timeline
+
+| Phase Transition | What Happens |
+|-----------------|--------------|
+| idle → preflight | Blockchain check, wallet generation, faucet funding, batch distribution, balance verification, merchant registry load, runner validation |
+| preflight → ready | All checks passed; wallets funded and ready |
+| ready → starting | `POST /agents/start` — agents created with pre-funded wallets |
+| starting → running | Agent autonomous loops begin (buyers every 3s, merchant every 5s) |
+| running → complete | All buyers depleted below $10; `simulation_depleted` event triggers auto-stop |
+| running → stopping | Manual stop requested via dashboard |
+| stopping/complete → idle | `restart()` called; all ephemeral state cleared |
