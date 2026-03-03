@@ -17,13 +17,21 @@ interface AnimState {
   txHash: string;
 }
 
+type LogEntryType = 'guest' | 'merchant';
+
 interface ActivityEntry {
-  guestEmoji: string;
-  guestAddr: string;
+  type: LogEntryType;
+  emoji: string;
+  label: string;
   productEm: string;
   productName: string;
   amount: string;
-  txHash: string;
+  key: string;
+}
+
+interface RestockAnimState {
+  productEm: string;
+  key: string;
 }
 
 function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestLabel: string): { text: string; delay: number }[] {
@@ -75,6 +83,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
   const lastTxRef = useRef<string | null>(null);
   const lastRestockRef = useRef<string | null>(null);
   const [anim, setAnim] = useState<AnimState | null>(null);
+  const [restockAnim, setRestockAnim] = useState<RestockAnimState | null>(null);
   const [balanceFlash, setBalanceFlash] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [protocolStep, setProtocolStep] = useState<string | null>(null);
@@ -104,16 +113,18 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     });
     setBalanceFlash(true);
 
+    // Add guest entry to activity log
     setActivity((prev) => [
       {
-        guestEmoji,
-        guestAddr,
+        type: 'guest' as const,
+        emoji: guestEmoji,
+        label: guestAddr,
         productEm,
         productName: latestReceipt.product_name,
         amount: latestReceipt.amount,
-        txHash: latestReceipt.tx_hash,
+        key: latestReceipt.tx_hash,
       },
-      ...prev.slice(0, 2),
+      ...prev.slice(0, 4),
     ]);
 
     stepTimersRef.current.forEach(clearTimeout);
@@ -147,6 +158,28 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     lastRestockRef.current = latestRestock.tx_hash;
     setShowRestockProtocol(true);
 
+    const prodEm = productEmoji(latestRestock.name);
+
+    // Trigger the drop animation
+    setRestockAnim({
+      productEm: prodEm,
+      key: latestRestock.tx_hash,
+    });
+
+    // Add merchant restock entry to activity log
+    setActivity((prev) => [
+      {
+        type: 'merchant' as const,
+        emoji: '🏪',
+        label: 'Merchant',
+        productEm: prodEm,
+        productName: latestRestock.name,
+        amount: latestRestock.cost,
+        key: `restock-${latestRestock.tx_hash}`,
+      },
+      ...prev.slice(0, 4),
+    ]);
+
     restockTimersRef.current.forEach(clearTimeout);
     restockTimersRef.current = [];
 
@@ -155,6 +188,12 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
       const id = setTimeout(() => setRestockProtocolStep(step.text), step.delay);
       restockTimersRef.current.push(id);
     }
+
+    // Clear restock anim after drop completes
+    const animTimer = setTimeout(() => {
+      setRestockAnim(null);
+    }, 1500);
+    restockTimersRef.current.push(animTimer);
 
     const hideTimer = setTimeout(() => {
       setShowRestockProtocol(false);
@@ -188,84 +227,98 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
         {/* Body */}
         <div className="bg-[var(--zt-green-dark)] px-4 py-3 space-y-3">
-          {/* Wallet address */}
-          <div className="font-pixel text-[10px] text-gray-500">
-            Wallet: {shortAddr(merchant.address)}
-          </div>
-
-          {/* Inventory grid */}
-          {inventory.length > 0 && (
-            <div className="space-y-1">
-              <div className="font-pixel text-[9px] text-gray-400 uppercase tracking-wider">Inventory</div>
-              {inventory.map((item) => (
-                <div key={item.sku} className="flex items-center gap-2 font-pixel text-[10px]">
-                  <span className="w-4 text-center">{productEmoji(item.name)}</span>
-                  <span className={`w-20 truncate ${item.stock === 0 ? 'text-gray-600' : 'text-[var(--zt-tan)]'}`}>
-                    {item.name}
-                  </span>
-                  <StockBar stock={item.stock} maxStock={item.max_stock} />
-                  <span className={`w-6 text-right ${
-                    item.stock === 0 ? 'text-red-500 font-bold' :
-                    item.stock <= 1 ? 'text-amber-400' :
-                    'text-gray-400'
-                  }`}>
-                    {item.stock === 0 ? 'OUT' : item.stock}
-                  </span>
-                </div>
-              ))}
+          {/* Wallet + Financials row */}
+          <div className="flex items-center justify-between">
+            <div className="font-pixel text-[10px] text-gray-500">
+              Wallet: {shortAddr(merchant.address)}
             </div>
-          )}
-
-          {/* Financials row */}
-          {merchantState && (
-            <div className="flex gap-4 font-pixel text-[10px]">
-              <span className="text-green-400">Rev: ${merchantState.total_revenue}</span>
-              <span className="text-red-400">Cost: ${merchantState.total_cost}</span>
-              <span className={`${parseFloat(merchantState.profit) >= 0 ? 'text-[var(--zt-gold)]' : 'text-red-500'}`}>
-                Profit: ${merchantState.profit}
-              </span>
-            </div>
-          )}
-
-          {/* Animation area */}
-          <div className="relative h-16 flex items-center justify-between px-4 overflow-hidden">
-            {/* Guest side */}
-            <div className="z-10 flex flex-col items-center">
-              <span className="text-3xl">{anim ? anim.guestEmoji : "🦁"}</span>
-              {anim && (
-                <span className="font-pixel text-[8px] text-[var(--zt-tan)] whitespace-nowrap mt-0.5">
-                  {anim.guestAddr}
+            {merchantState && (
+              <div className="flex gap-3 font-pixel text-[10px]">
+                <span className="text-green-400">Rev: ${merchantState.total_revenue}</span>
+                <span className="text-red-400">Cost: ${merchantState.total_cost}</span>
+                <span className={`${parseFloat(merchantState.profit) >= 0 ? 'text-[var(--zt-gold)]' : 'text-red-500'}`}>
+                  Profit: ${merchantState.profit}
                 </span>
-              )}
-            </div>
-
-            {/* Animated coin (left → right) */}
-            {anim && (
-              <div
-                key={`coin-${anim.txHash}`}
-                className="zt-coin-fly absolute left-12 text-sm whitespace-nowrap"
-              >
-                💸 <span className="text-base">${anim.amount}</span>
               </div>
             )}
-
-            {/* Animated product (right → left) */}
-            {anim && (
-              <div
-                key={`item-${anim.txHash}`}
-                className="zt-item-fly absolute right-12 text-lg"
-              >
-                {anim.productEm}
-              </div>
-            )}
-
-            {/* Shop side */}
-            <div className={`text-3xl z-10 ${anim ? "zt-shop-bounce" : ""}`} key={anim ? `shop-${anim.txHash}` : "shop-idle"}>
-              🏪
-            </div>
           </div>
 
-          {/* Protocol step text (purchases) */}
+          {/* Animation area with inventory shelf on the right */}
+          <div className="relative flex items-stretch gap-3">
+            {/* Main animation zone */}
+            <div className="flex-1 relative h-16 flex items-center justify-between px-4 overflow-hidden">
+              {/* Guest side */}
+              <div className="z-10 flex flex-col items-center">
+                <span className="text-3xl">{anim ? anim.guestEmoji : "🦁"}</span>
+                {anim && (
+                  <span className="font-pixel text-[8px] text-[var(--zt-tan)] whitespace-nowrap mt-0.5">
+                    {anim.guestAddr}
+                  </span>
+                )}
+              </div>
+
+              {/* Animated coin (left → right) */}
+              {anim && (
+                <div
+                  key={`coin-${anim.txHash}`}
+                  className="zt-coin-fly absolute left-12 text-sm whitespace-nowrap"
+                >
+                  💸 <span className="text-base">${anim.amount}</span>
+                </div>
+              )}
+
+              {/* Animated product (right → left) */}
+              {anim && (
+                <div
+                  key={`item-${anim.txHash}`}
+                  className="zt-item-fly absolute right-12 text-lg"
+                >
+                  {anim.productEm}
+                </div>
+              )}
+
+              {/* Shop side with restock drop zone */}
+              <div className="relative z-10">
+                {/* Restock drop animation — product falls into shop */}
+                {restockAnim && (
+                  <div
+                    key={`restock-${restockAnim.key}`}
+                    className="zt-restock-drop absolute -top-2 left-1/2 -translate-x-1/2 text-xl pointer-events-none"
+                  >
+                    {restockAnim.productEm}
+                  </div>
+                )}
+                <div
+                  className={`text-3xl ${anim ? "zt-shop-bounce" : ""} ${restockAnim ? "zt-shop-absorb" : ""}`}
+                  key={anim ? `shop-${anim.txHash}` : restockAnim ? `shop-restock-${restockAnim.key}` : "shop-idle"}
+                >
+                  🏪
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory shelf — right-aligned next to shop */}
+            {inventory.length > 0 && (
+              <div className="shrink-0 space-y-0.5 flex flex-col justify-center">
+                <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider text-right mb-0.5">Stock</div>
+                {inventory.map((item) => (
+                  <div key={item.sku} className="flex items-center gap-1 font-pixel text-[9px]">
+                    <span className="text-xs">{productEmoji(item.name)}</span>
+                    <StockBar stock={item.stock} maxStock={item.max_stock} />
+                    <span className={`w-5 text-right ${
+                      item.stock === 0 ? 'text-red-500 font-bold' :
+                      item.stock <= 1 ? 'text-amber-400' :
+                      'text-gray-500'
+                    }`}>
+                      {item.stock === 0 ? '!' : item.stock}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Protocol step text (purchases) — left-aligned, gold */}
           {protocolStep && (
             <div
               key={protocolStep}
@@ -276,34 +329,46 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             </div>
           )}
 
-          {/* Restock protocol step */}
+          {/* Restock protocol step — right-aligned, amber */}
           {showRestockProtocol && restockProtocolStep && (
             <div
               key={restockProtocolStep}
-              className="zt-step-fade font-pixel text-[10px] text-amber-400 px-1 truncate"
+              className="zt-step-fade font-pixel text-[10px] text-amber-400 px-1 truncate text-right"
               style={{ textShadow: "0 0 6px rgba(245,158,11,0.4)" }}
             >
-              &gt; {restockProtocolStep}
+              {restockProtocolStep} &lt;
             </div>
           )}
 
-          {/* Mini activity log */}
+          {/* Activity log — guest left, merchant right */}
           {activity.length > 0 && (
             <>
               <div className="border-t border-dashed border-[var(--zt-green-mid)] my-1" />
               <div className="space-y-1">
-                {activity.map((entry) => (
-                  <div
-                    key={entry.txHash}
-                    className="font-pixel text-[10px] text-[var(--zt-tan)] flex items-center gap-1.5"
-                  >
-                    <span>{entry.guestEmoji}</span>
-                    <span className="text-[var(--zt-tan)]">{entry.guestAddr}</span>
-                    <span className="text-gray-500">bought</span>
-                    <span>{entry.productEm} {entry.productName}</span>
-                    <span className="text-[var(--zt-gold)] ml-auto">${entry.amount}</span>
-                  </div>
-                ))}
+                {activity.map((entry) =>
+                  entry.type === 'guest' ? (
+                    <div
+                      key={entry.key}
+                      className="font-pixel text-[10px] text-[var(--zt-tan)] flex items-center gap-1.5"
+                    >
+                      <span>{entry.emoji}</span>
+                      <span className="text-[var(--zt-tan)]">{entry.label}</span>
+                      <span className="text-gray-500">bought</span>
+                      <span>{entry.productEm} {entry.productName}</span>
+                      <span className="text-[var(--zt-gold)] ml-auto">${entry.amount}</span>
+                    </div>
+                  ) : (
+                    <div
+                      key={entry.key}
+                      className="font-pixel text-[10px] text-amber-400 flex items-center gap-1.5 justify-end"
+                    >
+                      <span className="text-amber-500/70 mr-auto">restocked</span>
+                      <span>{entry.productEm} {entry.productName}</span>
+                      <span className="text-amber-300">+${entry.amount}</span>
+                      <span>{entry.emoji}</span>
+                    </div>
+                  )
+                )}
               </div>
             </>
           )}
