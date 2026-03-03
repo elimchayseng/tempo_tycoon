@@ -62,9 +62,9 @@ function AccountsMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 function BalancesMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   const wallets = (metadata.wallets ?? []) as { label: string; address: string; balance: string }[];
   const attendeeEmojis: Record<string, string> = {
-    "Attendee 1": ANIMAL_EMOJI.attendee_1 ?? "",
-    "Attendee 2": ANIMAL_EMOJI.attendee_2 ?? "",
-    "Attendee 3": ANIMAL_EMOJI.attendee_3 ?? "",
+    "Guest 1": ANIMAL_EMOJI.attendee_1 ?? "",
+    "Guest 2": ANIMAL_EMOJI.attendee_2 ?? "",
+    "Guest 3": ANIMAL_EMOJI.attendee_3 ?? "",
   };
   return (
     <div className="space-y-0.5">
@@ -171,12 +171,32 @@ function RunnerMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   );
 }
 
+function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const distribution = metadata.distribution as { merchant: string; attendees: string } | undefined;
+  return (
+    <div className="space-y-0.5">
+      <MetadataDetail label="Method" value={metadata.method as string} />
+      <MetadataDetail label="Lifecycle" value={metadata.lifecycle as string} />
+      {distribution && (
+        <>
+          <MetadataDetail label="Merchant" value={distribution.merchant} />
+          <MetadataDetail label="Attendees" value={distribution.attendees} />
+        </>
+      )}
+      <MetadataDetail label="Total" value={metadata.total as string} />
+      <MetadataDetail label="Refunding" value={metadata.refunding as string} />
+      <MetadataDetail label="Auto-stop" value={metadata.autoStop as string} />
+    </div>
+  );
+}
+
 const METADATA_RENDERERS: Record<string, React.FC<{ metadata: Record<string, unknown> }>> = {
   blockchain: BlockchainMetadata,
   accounts: AccountsMetadata,
   balances: BalancesMetadata,
   merchants: MerchantMetadata,
   runner: RunnerMetadata,
+  funding: FundingMetadata,
 };
 
 export default function PreflightPanel({

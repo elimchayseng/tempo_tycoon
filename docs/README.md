@@ -15,20 +15,14 @@ An autonomous agent commerce simulation on the Tempo blockchain. Three AI-driven
 # 1. Install dependencies
 npm install
 
-# 2. Set up wallets (generates .env with 5 zoo accounts)
-npm run setup:wallets
+# 2. Configure .env (RPC and simulation params only — no private keys needed)
+# A sensible .env is included; adjust RPC_URL if needed
 
-# 3. Fund agent wallets on Tempo testnet
-npm run fund:agents
-
-# 4. Enable zoo simulation
-echo "ZOO_SIMULATION_ENABLED=true" >> .env
-
-# 5. Start dev server + dashboard
+# 3. Start dev server + dashboard
 npm run dev
 ```
 
-The dashboard is available at `http://localhost:4000`. Click **Start Simulation** to begin.
+The dashboard is available at `http://localhost:5173` (dev) or `http://localhost:4000` (production). Click **Start Zoo** to begin. Wallets are generated automatically each run — no manual wallet setup required.
 
 ## Project Structure
 
@@ -39,15 +33,17 @@ server/           Hono API server + WebSocket
   actions/        Blockchain operations (send, batch, etc.)
   config.ts       Centralized configuration
 agents/           Autonomous buyer agents
-  agent-runner.ts Manages 3 buyer agent instances
+  agent-runner.ts Manages 3 buyer agent instances + wallet lifecycle
   buyer-agent.ts  Core agent loop
-  decision-engine.ts  Need-based purchase logic
+  wallet-generator.ts  Ephemeral wallet generation
+  wallet-funder.ts     Faucet + batch distribution
+  decision-engine.ts   Need-based purchase logic
   acp-client.ts   HTTP client for merchant APIs
-  payment-manager.ts  Blockchain tx execution + queue
+  payment-manager.ts   Blockchain tx execution + queue
 shared/           Shared utilities (logger, types, validation)
 web/              React dashboard (Zoo Tycoon UI theme)
 config/           zoo_map.json merchant registry
-scripts/          Setup, funding, and test scripts
+scripts/          Test and health check scripts
 docs/             Documentation
 ```
 

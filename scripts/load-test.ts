@@ -6,11 +6,10 @@
  * doesn't create its own competing AgentRunner:
  *   ZOO_SIMULATION_ENABLED=false npm run dev:server
  *
- * Usage: tsx scripts/load-test.ts [agents=3] [minutes=2]
+ * Usage: tsx scripts/load-test.ts [minutes=2]
  * Exit 0 on success, 1 if success rate < 50%.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const DEFAULT_MINUTES = 2;
@@ -21,27 +20,39 @@ async function main() {
 
   console.log(`=== Load Test: ${minutes} minute(s) ===\n`);
 
-  // Initialize zoo accounts in the account store (normally done by the dev server)
-  initializeZooAccounts();
-
   const runner = new AgentRunner();
 
   let purchases = 0;
   let failures = 0;
+  let restocks = 0;
+  let merchantRevenue = 0;
   const latencies: number[] = [];
 
   runner.on('purchase_completed', (event) => {
     purchases++;
     if (event.data.latencyMs) latencies.push(event.data.latencyMs);
-    process.stdout.write(`\r  Purchases: ${purchases} | Failures: ${failures}`);
+    if (event.data.purchase_record?.amount) {
+      merchantRevenue += parseFloat(event.data.purchase_record.amount) || 0;
+    }
+    process.stdout.write(`\r  Purchases: ${purchases} | Failures: ${failures} | Restocks: ${restocks}`);
   });
 
   runner.on('purchase_failed', () => {
     failures++;
-    process.stdout.write(`\r  Purchases: ${purchases} | Failures: ${failures}`);
+    process.stdout.write(`\r  Purchases: ${purchases} | Failures: ${failures} | Restocks: ${restocks}`);
+  });
+
+  runner.on('restock_completed', () => {
+    restocks++;
+    process.stdout.write(`\r  Purchases: ${purchases} | Failures: ${failures} | Restocks: ${restocks}`);
   });
 
   try {
+    // Initialize ephemeral wallets (generate + fund) — required before start()
+    console.log('[LOAD] Initializing ephemeral wallets...');
+    await runner.initializeWallets();
+    console.log('[LOAD] Wallets initialized and funded.');
+
     await runner.start();
 
     const agentCount = runner.getAgentStatuses().length;
@@ -72,7 +83,12 @@ async function main() {
     console.log(`Avg latency:     ${avgLatency}ms`);
     console.log(`Purchases/min:   ${metrics.purchases_per_minute}`);
     console.log(`Total spent:     $${metrics.total_spent}`);
-    console.log(`Time-series stats (full window):`, timeSeries);
+
+    console.log('\n--- Merchant Metrics ---');
+    console.log(`Revenue:         $${merchantRevenue.toFixed(2)}`);
+    console.log(`Restocks:        ${restocks}`);
+
+    console.log('\nTime-series stats (full window):', timeSeries);
 
     if (successRate < 50) {
       console.error('\n[FAIL] Success rate below 50%');

@@ -64,10 +64,12 @@ Runs pre-flight checks before starting the zoo simulation.
   "success": true,
   "checks": [
     { "id": "blockchain", "label": "Blockchain connectivity", "status": "pass", "detail": "Block #123" },
+    { "id": "wallets", "label": "Wallet initialization", "status": "pass", "detail": "5 ephemeral wallets generated & funded" },
     { "id": "accounts", "label": "Zoo accounts initialized", "status": "pass", "detail": "5 accounts found" },
     { "id": "balances", "label": "Wallet balances", "status": "pass" },
     { "id": "merchants", "label": "Merchant registry", "status": "pass" },
-    { "id": "runner", "label": "Agent runner", "status": "pass" }
+    { "id": "runner", "label": "Agent runner", "status": "pass" },
+    { "id": "funding", "label": "Funding strategy metadata", "status": "pass" }
   ]
 }
 ```
@@ -152,13 +154,10 @@ Aggregate metrics.
 ```
 
 ### `POST /api/zoo/agents/start`
-Start all agents. Performs initial funding, then starts autonomous loops.
+Start all agents. Creates agents using already-funded wallets from preflight, then starts autonomous loops. No initial funding occurs at start — wallets are funded during the preflight phase.
 
 ### `POST /api/zoo/agents/stop`
 Stop all agents.
-
-### `POST /api/zoo/agents/fund`
-Trigger manual funding check. Refunds agents below the $10 threshold.
 
 ### `POST /api/zoo/agents/:agentId/purchase`
 Force a specific agent to make an immediate purchase (for testing).
@@ -268,6 +267,13 @@ Connect to `ws://localhost:4000/ws`.
 | `zoo_needs` | Agent need level updates |
 | `zoo_agents` | Full agent state array broadcast |
 | `accounts` | Updated account balances |
+| `zoo_merchant_state` | Merchant cycle data (inventory, revenue, sales) |
+| `zoo_restock_event` | Merchant restock completed |
+| `zoo_balance_update` | Agent balance change |
+| `zoo_tx_flow` | Transaction lifecycle stages |
+| `zoo_network_stats` | Network metrics (periodic) |
+| `zoo_funding_progress` | Wallet funding progress during preflight |
+| `zoo_simulation_complete` | All buyers depleted, simulation ending |
 
 ### Error Response Format
 

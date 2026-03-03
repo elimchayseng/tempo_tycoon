@@ -3,12 +3,13 @@ import { createLogger } from "../../shared/logger.js";
 import { config } from "../config.js";
 import { AgentRunner } from "../../agents/agent-runner.js";
 import { emitLog, broadcast } from "../instrumented-client.js";
-import { getZooAccountByRole } from "../zoo-accounts.js";
+import { getZooAccountByRole, clearZooAccounts } from "../zoo-accounts.js";
 import { accountStore } from "../accounts.js";
 import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } from "./zoo-shared.js";
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
 import { balanceHistoryTracker } from "../balance-history.js";
 import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
+import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
 
 const log = createLogger('zoo-agents');
 
@@ -55,6 +56,22 @@ if (config.zoo.enabled) {
     });
   });
 
+  // Broadcast funding progress during wallet init
+  runner.on('funding_progress' as any, (event: any) => {
+    broadcast({ type: 'zoo_funding_progress', step: event.data.step, detail: event.data.detail });
+  });
+
+  // Auto-stop on depletion — broadcast completion event
+  runner.on('simulation_depleted' as any, (event: any) => {
+    emitLog({
+      action: 'zoo_simulation',
+      type: 'info',
+      label: 'Simulation Complete — All buyers depleted',
+      data: event.data,
+    });
+    broadcast({ type: 'zoo_simulation_complete', data: event.data });
+  });
+
   // Broadcast network stats every 5 seconds while simulation is active
   let networkStatsInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -74,6 +91,8 @@ if (config.zoo.enabled) {
       clearInterval(networkStatsInterval);
       networkStatsInterval = null;
     }
+    // Clear ephemeral zoo accounts so next preflight starts fresh
+    clearZooAccounts();
   });
 
   // Emit tx flow events at purchase stages
@@ -133,6 +152,8 @@ if (config.zoo.enabled) {
       tx_hash: rec.tx_hash ?? '',
       block_number: String(rec.block_number ?? ''),
       gas_used: String(rec.gas_used ?? ''),
+      fee_ausd: rec.fee_ausd ?? undefined,
+      fee_payer: rec.fee_payer ?? undefined,
       need_before: event.data.need_before ?? 0,
       need_after: event.data.new_needs?.food_need ?? 0,
       timestamp: Date.now(),
@@ -173,25 +194,6 @@ if (config.zoo.enabled) {
     }).catch((err) => {
       log.debug('Failed to refresh balances after purchase', err);
     });
-  });
-
-  // Record balance history on funding events
-  runner.on('funding_completed', async (event) => {
-    await refreshZooBalances();
-    const fundedAgents = event.data?.funded_agents ?? [];
-    for (const agentId of fundedAgents) {
-      // Map agent_id (attendee_1) → role key (attendee1) for account lookup
-      const roleKey = agentId.replace('_', '') as any;
-      const account = getZooAccountByRole(roleKey);
-      const balanceRaw = account?.balances[config.contracts.alphaUsd] ?? BigInt(0);
-      const balanceUsd = (Number(balanceRaw) / 1_000_000).toFixed(2);
-
-      balanceHistoryTracker.record(agentId, {
-        timestamp: Date.now(),
-        balance: balanceUsd,
-        event: 'funding',
-      });
-    }
   });
 
   runner.on('needs_updated', (event) => {
@@ -238,6 +240,8 @@ if (config.zoo.enabled) {
       cost: rec.cost,
       tx_hash: rec.tx_hash,
       block_number: rec.block_number,
+      fee_ausd: rec.fee_ausd ?? undefined,
+      fee_payer: rec.fee_payer ?? undefined,
       timestamp: Date.now(),
     };
     broadcast({ type: 'zoo_restock_event', event: restockEvent });
@@ -345,6 +349,20 @@ zooAgentRoutes.post("/agents/start", async (c) => {
 
     await runner.start();
 
+    // Broadcast fresh zero-state so UI starts clean
+    const initialMerchant: ZooMerchantState = {
+      inventory: getInventorySnapshot(),
+      total_revenue: '0.00',
+      total_cost: '0.00',
+      profit: '0.00',
+      status: 'online',
+      balance: '0',
+      restock_count: 0,
+      sale_count: 0,
+    };
+    broadcast({ type: 'zoo_merchant_state', merchant: initialMerchant });
+    broadcastAgentStates();
+
     return c.json({
       success: true,
       message: "All agents started successfully",
@@ -374,6 +392,9 @@ zooAgentRoutes.post("/agents/stop", async (c) => {
 
     await runner.stop();
 
+    // Clear ephemeral zoo accounts so next preflight starts fresh
+    clearZooAccounts();
+
     return c.json({
       success: true,
       message: "All agents stopped successfully",
@@ -384,35 +405,6 @@ zooAgentRoutes.post("/agents/stop", async (c) => {
     return c.json({
       error: "Failed to stop agents",
       code: "AGENT_STOP_ERROR",
-      details: error instanceof Error ? error.message : String(error)
-    }, 500);
-  }
-});
-
-// POST /agents/fund
-zooAgentRoutes.post("/agents/fund", async (c) => {
-  try {
-    if (!config.zoo.enabled) {
-      return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
-    }
-
-    const runner = getAgentRunner();
-    if (!runner) {
-      return c.json({ error: "Agent runner not initialized", code: "RUNNER_NOT_INITIALIZED" }, 500);
-    }
-
-    await runner.checkAndRefundAgents();
-
-    return c.json({
-      success: true,
-      message: "Funding check completed",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    log.error('Agent funding error:', error);
-    return c.json({
-      error: "Failed to trigger funding",
-      code: "AGENT_FUNDING_ERROR",
       details: error instanceof Error ? error.message : String(error)
     }, 500);
   }

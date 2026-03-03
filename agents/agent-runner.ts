@@ -1,11 +1,15 @@
 import { createLogger } from '../shared/logger.js';
 import { BuyerAgent } from './buyer-agent.js';
 import { MerchantAgent } from './merchant-agent.js';
-import { FundingManager } from './funding-manager.js';
 import { StateManager } from './state-manager.js';
+import { generateAllWallets } from './wallet-generator.js';
+import { fundZooWallets } from './wallet-funder.js';
+import { resetZooAccounts } from '../server/zoo-accounts.js';
 import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
 import { getAllZooAccounts, getZooAccountByRole } from '../server/zoo-accounts.js';
 import { refreshZooBalances } from '../server/routes/zoo-shared.js';
+import { ALPHA_USD } from '../server/tempo-client.js';
+import { config } from '../server/config.js';
 import type {
   AgentConfig,
   AgentStatus,
@@ -21,11 +25,10 @@ const log = createLogger('AgentRunner');
 export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
   private merchantAgent: MerchantAgent | null = null;
-  private readonly fundingManager: FundingManager;
   private readonly stateManager: StateManager;
 
   private isRunning = false;
-  private fundingCheckInterval: NodeJS.Timeout | null = null;
+  private depletionCheckInterval: NodeJS.Timeout | null = null;
   private startTime: Date | null = null;
 
   // Event aggregation
@@ -39,20 +42,47 @@ export class AgentRunner {
 
   constructor() {
     log.info('Initializing Agent Runner...');
-
-    this.fundingManager = new FundingManager({
-      refundThreshold: 10.0,
-      initialFundingAmount: "50.00",
-      refundAmount: "30.00"
-    });
-
     this.stateManager = new StateManager();
-
     log.info('Agent Runner initialized');
   }
 
   /**
-   * Initialize and start all agents
+   * Generate fresh ephemeral wallets and fund them.
+   * Called during preflight so balances are visible before "Open Gates".
+   */
+  async initializeWallets(): Promise<void> {
+    log.info('Initializing ephemeral wallets...');
+
+    // Clear previous agent state files
+    await this.stateManager.initialize();
+    await this.stateManager.clearAllStates();
+    log.info('Cleared previous agent states');
+
+    const progressCallback = (step: string, detail?: string) => {
+      log.info(`[Funding] ${step}${detail ? ` — ${detail}` : ''}`);
+      this.emitEvent('funding_progress', { step, detail });
+    };
+
+    progressCallback('Generating 5 ephemeral wallets...');
+    const wallets = generateAllWallets();
+    log.info(`Generated ${wallets.length} wallets`);
+    wallets.forEach(w => log.debug(`  ${w.label}: ${w.address}`));
+
+    // Register wallets in account store
+    resetZooAccounts(wallets);
+    log.info('Registered wallets in account store');
+
+    // Fund wallets via faucet + batch distribution
+    await fundZooWallets(wallets, progressCallback);
+    log.info('Wallet funding complete');
+
+    // Refresh balances from chain
+    await refreshZooBalances();
+    log.info('Wallet initialization complete');
+  }
+
+  /**
+   * Start all agents (wallets must already be initialized via initializeWallets)
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -63,8 +93,6 @@ export class AgentRunner {
     log.info('Starting Zoo Simulation Agent Runner...');
 
     try {
-      await this.stateManager.initialize();
-
       const agentConfigs = this.createAgentConfigs();
 
       if (agentConfigs.length === 0) {
@@ -73,34 +101,11 @@ export class AgentRunner {
 
       log.info(`Creating ${agentConfigs.length} buyer agents...`);
 
-      for (const config of agentConfigs) {
-        const agent = new BuyerAgent(config);
+      for (const agentConfig of agentConfigs) {
+        const agent = new BuyerAgent(agentConfig);
         this.subscribeToAgentEvents(agent);
-        this.agents.set(config.agent_id, agent);
-        log.debug(`Created agent: ${config.agent_id}`);
-      }
-
-      log.info('Performing initial funding...');
-      const fundingResult = await this.fundingManager.fundAllAgentWallets(agentConfigs);
-
-      if (!fundingResult.success) {
-        throw new Error(`Initial funding failed: ${fundingResult.error}`);
-      }
-
-      log.info(`Initial funding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
-
-      // Fund merchant wallet
-      const merchantAccountForFunding = getZooAccountByRole('merchantA');
-      if (merchantAccountForFunding) {
-        const merchantFunding = await this.fundingManager.fundMerchantWallet(
-          merchantAccountForFunding.address,
-          'merchant_a'
-        );
-        if (merchantFunding.success) {
-          log.info(`Merchant funded: $${merchantFunding.total_amount}`);
-        } else {
-          log.warn(`Merchant funding failed: ${merchantFunding.error}`);
-        }
+        this.agents.set(agentConfig.agent_id, agent);
+        log.debug(`Created agent: ${agentConfig.agent_id}`);
       }
 
       // Create and start the merchant agent
@@ -129,17 +134,17 @@ export class AgentRunner {
       }
       await Promise.all(startPromises);
 
-      this.startFundingMonitor();
+      this.startDepletionMonitor();
 
       this.isRunning = true;
       this.startTime = new Date();
 
       log.info(`All agents started successfully! Active buyer agents: ${this.agents.size}, merchant agent: ${this.merchantAgent ? 'active' : 'none'}`);
 
+      const allAccounts = getAllZooAccounts();
       this.emitEvent('simulation_started', {
         agent_count: this.agents.size,
-        initial_funding: fundingResult.total_amount,
-        funded_agents: fundingResult.funded_agents
+        wallets: allAccounts.map(a => ({ label: a.label, address: a.address })),
       });
 
     } catch (error) {
@@ -157,9 +162,9 @@ export class AgentRunner {
 
     this.isRunning = false;
 
-    if (this.fundingCheckInterval) {
-      clearInterval(this.fundingCheckInterval);
-      this.fundingCheckInterval = null;
+    if (this.depletionCheckInterval) {
+      clearInterval(this.depletionCheckInterval);
+      this.depletionCheckInterval = null;
     }
 
     const stopPromises = Array.from(this.agents.values()).map(agent => agent.stop());
@@ -167,6 +172,13 @@ export class AgentRunner {
       stopPromises.push(this.merchantAgent.stop());
     }
     await Promise.all(stopPromises);
+
+    // Clear agent maps for fresh start next time
+    this.agents.clear();
+    this.merchantAgent = null;
+    this.totalPurchases = 0;
+    this.totalSpent = 0;
+    this.metricPoints.length = 0;
 
     log.info('All agents stopped');
 
@@ -239,41 +251,6 @@ export class AgentRunner {
     };
   }
 
-  async checkAndRefundAgents(): Promise<void> {
-    log.info('Performing funding check...');
-
-    try {
-      await refreshZooBalances();
-      const zooAccounts = getAllZooAccounts();
-      const attendeeAccounts = zooAccounts.filter(account =>
-        account.label.startsWith('Attendee') || account.label === 'Merchant A'
-      );
-
-      if (attendeeAccounts.length === 0) {
-        log.warn('No agent accounts found for funding check');
-        return;
-      }
-
-      const fundingResult = await this.fundingManager.checkAndTopUpAgentWallets(attendeeAccounts);
-
-      if (fundingResult) {
-        log.info(`Refunding completed: $${fundingResult.total_amount} to ${fundingResult.funded_agents.length} agents`);
-
-        this.emitEvent('funding_completed', {
-          reason: 'scheduled_refund',
-          amount: fundingResult.total_amount,
-          funded_agents: fundingResult.funded_agents
-        });
-      }
-
-    } catch (error) {
-      log.error('Funding check failed:', error);
-      this.emitEvent('funding_failed', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  }
-
   getMerchantAgent(): MerchantAgent | null {
     return this.merchantAgent;
   }
@@ -299,7 +276,6 @@ export class AgentRunner {
       is_running: this.isRunning,
       start_time: this.startTime?.toISOString(),
       uptime_seconds: uptimeSeconds,
-      funding_manager: this.fundingManager.getStatus(),
       metrics,
       time_series: this.getTimeSeriesStats(),
       circuit_breakers: {
@@ -335,7 +311,7 @@ export class AgentRunner {
         continue;
       }
 
-      const config: AgentConfig = {
+      const agentConfig: AgentConfig = {
         agent_id: id,
         private_key: account.privateKey,
         address: account.address,
@@ -359,7 +335,7 @@ export class AgentRunner {
         }
       };
 
-      configs.push(config);
+      configs.push(agentConfig);
       log.debug(`Created config for ${id} (${account.address})`);
     }
 
@@ -422,12 +398,41 @@ export class AgentRunner {
     }
   }
 
-  private startFundingMonitor(): void {
-    this.fundingCheckInterval = setInterval(() => {
-      this.checkAndRefundAgents();
-    }, 30000);
+  /**
+   * Monitor for depletion — checks every 10s if ALL buyer agents are below threshold.
+   * When depleted, emits simulation_depleted and auto-stops.
+   */
+  private startDepletionMonitor(): void {
+    const threshold = config.zoo.minBalanceThreshold;
 
-    log.info('Funding monitor started (30s intervals)');
+    this.depletionCheckInterval = setInterval(async () => {
+      if (!this.isRunning) return;
+
+      try {
+        await refreshZooBalances();
+        const buyerRoles = ['attendee1', 'attendee2', 'attendee3'] as const;
+        const allDepleted = buyerRoles.every(role => {
+          const account = getZooAccountByRole(role);
+          if (!account) return true;
+          const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
+          const balanceUsd = Number(balanceBigInt) / 1_000_000;
+          return balanceUsd < threshold;
+        });
+
+        if (allDepleted) {
+          log.info(`All buyer agents depleted (below $${threshold}). Auto-stopping simulation.`);
+          this.emitEvent('simulation_depleted', {
+            threshold,
+            message: 'All buyer agents have insufficient funds',
+          });
+          await this.stop();
+        }
+      } catch (error) {
+        log.error('Depletion check failed:', error);
+      }
+    }, 10_000);
+
+    log.info(`Depletion monitor started (10s intervals, threshold: $${threshold})`);
   }
 
   on(eventType: AgentEventType, handler: (event: AgentEvent) => void): void {

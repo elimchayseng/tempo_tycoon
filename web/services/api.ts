@@ -12,7 +12,7 @@ import type {
 
 // Configuration for API calls
 const API_BASE_URL = '/api';
-const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_TIMEOUT = 60000; // 60 seconds (accommodates faucet + distribution during start)
 
 // Custom error class for API errors
 export class ApiError extends Error {
@@ -144,10 +144,6 @@ export class ApiService {
 
   static async zooGetStatus(): Promise<unknown> {
     return apiRequest('/zoo/status', { method: 'GET' });
-  }
-
-  static async zooFundAgents(): Promise<{ success: boolean }> {
-    return apiRequest('/zoo/agents/fund');
   }
 
   // Blockchain explorer data endpoints

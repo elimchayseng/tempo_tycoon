@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import type { PreflightCheck } from "../lib/types";
 import { ApiService, formatApiError } from "../services/api";
 
-export type ZooPhase = "idle" | "preflight" | "ready" | "starting" | "running" | "stopping";
+export type ZooPhase = "idle" | "preflight" | "ready" | "starting" | "running" | "stopping" | "complete";
 
 export function useZoo() {
   const [phase, setPhase] = useState<ZooPhase>("idle");
@@ -16,6 +16,7 @@ export function useZoo() {
     // Initialize checks as pending
     const initialChecks: PreflightCheck[] = [
       { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
+      { id: "wallets", label: "Wallet initialization", status: "pending" },
       { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
       { id: "balances", label: "Wallet balances", status: "pending" },
       { id: "merchants", label: "Merchant registry", status: "pending" },
@@ -61,6 +62,7 @@ export function useZoo() {
     setPhase("stopping");
     try {
       await ApiService.zooStopAgents();
+      setPreflightChecks([]);
       setPhase("idle");
     } catch (e) {
       setError(formatApiError(e));
@@ -74,6 +76,10 @@ export function useZoo() {
     setError(null);
   }, []);
 
+  const markComplete = useCallback(() => {
+    setPhase("complete");
+  }, []);
+
   return {
     phase,
     preflightChecks,
@@ -82,5 +88,6 @@ export function useZoo() {
     openGates,
     stopZoo,
     restart,
+    markComplete,
   };
 }

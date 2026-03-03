@@ -16,7 +16,7 @@
 │  │ /registry      │ /food/catalog    │ /agents/start|stop │  │
 │  │ /status        │ /food/checkout/* │ /agents/status     │  │
 │  │ /health        │                  │ /agents/metrics    │  │
-│  │ /preflight     │                  │ /agents/fund       │  │
+│  │ /preflight     │                  │                    │  │
 │  └────────────────┴──────────────────┴────────────────────┘  │
 ├──────────────────────────────────────────────────────────────┤
 │  Agents                                                      │
@@ -28,7 +28,8 @@
 │  │ acp-client.ts         │ (shared inventory singleton)   │   │
 │  └──────────────────────┴────────────────────────────────┘   │
 │  Shared: payment-manager.ts, balance-sync.ts,                │
-│          circuit-breaker.ts, funding-manager.ts               │
+│          circuit-breaker.ts, wallet-generator.ts,             │
+│          wallet-funder.ts                                     │
 ├──────────────────────────────────────────────────────────────┤
 │  Tempo Moderato Testnet (chain 42431)                        │
 │  AlphaUSD TIP-20 token (6 decimals)                          │
@@ -58,15 +59,15 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 | `server/routes/zoo-shared.ts` | Shared state: AgentRunner instance, `loadZooRegistry()`, `refreshZooBalances()` |
 | `server/routes/zoo-registry.ts` | Registry, status, health, preflight, transactions endpoints |
 | `server/routes/zoo-merchant.ts` | Food catalog (live inventory), checkout create/complete, session management |
-| `server/routes/zoo-agents.ts` | Agent start/stop/fund, metrics, force-purchase, event wiring |
+| `server/routes/zoo-agents.ts` | Agent start/stop, metrics, force-purchase, event wiring |
 | `server/routes/zoo.ts` | Barrel file composing the three sub-routers |
 | `server/config.ts` | Centralized config from environment variables |
 | `server/tempo-client.ts` | viem public/wallet client for Tempo blockchain |
 | `server/middleware/session-verifier.ts` | On-chain transaction verification for checkout completion |
-| `server/zoo-accounts.ts` | Zoo wallet initialization from private keys |
+| `server/zoo-accounts.ts` | Zoo wallet registration (ephemeral, generated per run) |
 | `server/accounts.ts` | In-memory account store with balance tracking |
 | `server/instrumented-client.ts` | WebSocket broadcast + action lifecycle logging |
-| `agents/agent-runner.ts` | Manages 3 BuyerAgents + 1 MerchantAgent, funding monitor, event aggregation |
+| `agents/agent-runner.ts` | Manages 3 BuyerAgents + 1 MerchantAgent, wallet lifecycle, depletion monitor, event aggregation |
 | `agents/buyer-agent.ts` | Autonomous loop: degrade needs → decide → purchase → update state |
 | `agents/merchant-agent.ts` | Autonomous loop: check inventory → restock low items → on-chain payment |
 | `agents/merchant-inventory.ts` | Shared inventory singleton (stock tracking, restock logic) |
@@ -75,7 +76,8 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 | `agents/payment-manager.ts` | Blockchain tx execution via transaction queue |
 | `agents/circuit-breaker.ts` | Circuit breaker pattern for RPC and merchant calls |
 | `agents/balance-sync.ts` | On-chain balance synchronization |
-| `agents/funding-manager.ts` | Batch funding from Zoo Master wallet (attendees + merchant) |
+| `agents/wallet-generator.ts` | Generates 5 ephemeral wallets per simulation run |
+| `agents/wallet-funder.ts` | Faucet request + batch distribution to all agents |
 | `agents/state-manager.ts` | Persistent agent state (file-based) |
 | `shared/logger.ts` | Structured logger with `LOG_LEVEL` support |
 | `shared/types.ts` | Shared TypeScript types for frontend + backend |
@@ -112,7 +114,7 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 - **Retry logic:** 3 attempts with exponential backoff (2s base) for payments
 - **Non-recoverable detection:** Skips retry for "insufficient funds" and "unknown account" errors
 - **Balance caching:** 60s TTL on registry and catalog responses
-- **Auto-refunding:** 30s interval funding monitor refunds agents (buyers + merchant) below $10 threshold
+- **Depletion detection:** 10s interval checks if all buyer agents are below $10 threshold; auto-stops simulation when depleted
 
 ## Tempo Blockchain Data Layer
 
@@ -143,3 +145,96 @@ The Tempo Moderato testnet (chain 42431) is the authoritative source for all bal
 - The in-memory `accountStore` is a cache updated after on-chain reads
 - API endpoints and agents always refresh from chain before reading balances
 - `balanceHistoryTracker` and `StateManager` are supplementary tracking, not authoritative
+
+## Wallet Lifecycle (Ephemeral Model)
+
+Each simulation run generates fresh wallets. No private keys are stored in `.env` or persisted between runs.
+
+### Flow
+
+1. **User clicks "Start Zoo"** → `POST /preflight`
+2. `AgentRunner.initializeWallets()` clears old state, generates wallets, funds via faucet + batch:
+   - `clearZooAccounts()` removes any wallets from a prior run
+   - `clearAllStates()` removes agent state files
+   - `generateAllWallets()` creates 5 random wallets (Zoo Master, Merchant A, Attendee 1-3)
+   - `resetZooAccounts()` registers them in the in-memory `accountStore`
+   - `fundZooWallets()`: requests faucet funds for Zoo Master, then distributes via batch (Merchant $100, each Attendee $50)
+3. Preflight phase transitions to **ready**
+4. **User clicks "Open Gates"** → `POST /agents/start` — agents are created using the already-funded wallets
+
+### Depletion and Auto-Stop
+
+- Every 10s, `startDepletionMonitor()` checks on-chain balances of all 3 buyer agents
+- When **all** buyers are below `minBalanceThreshold` ($10), the simulation emits `simulation_depleted` and calls `stop()`
+- The server broadcasts `zoo_simulation_complete` via WebSocket
+- The frontend transitions to a "Simulation Complete" phase with a "New Simulation" button
+
+### Batch Payment Distribution
+
+Wallet funding uses the Tempo batch payment feature (`server/actions/batch.ts`):
+- Zoo Master is the single payer
+- 4 sequential `Actions.token.transferSync()` calls distribute funds
+- Each transfer includes a memo identifying the purpose ("Zoo Init: Merchant A", etc.)
+- Fees are paid by the sender (Zoo Master) in AlphaUSD
+
+## Simulation State Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SIMULATION STATE FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────┐   Start Zoo   ┌───────────┐  all pass  ┌───────┐    │
+│  │ IDLE │──────────────►│ PREFLIGHT │───────────►│ READY │    │
+│  └──┬───┘               └───────────┘            └───┬───┘    │
+│     ▲                     │ Steps:                    │        │
+│     │                     │ 1. Check blockchain       │        │
+│     │                     │ 2. Generate wallets       │        │
+│     │                     │ 3. Fund via faucet+batch  │        │
+│     │                     │ 4. Verify balances        │        │
+│     │                     │ 5. Load merchant registry │        │
+│     │                     │ 6. Validate agent runner  │        │
+│     │                     │ 7. Funding strategy meta  │        │
+│     │                                                 │        │
+│     │               Open Gates                        │        │
+│     │                     ┌───────────┐               │        │
+│     │                     │ STARTING  │◄──────────────┘        │
+│     │                     └─────┬─────┘                        │
+│     │                           │ Creates agents               │
+│     │                           │ from funded wallets           │
+│     │                           ▼                              │
+│     │                     ┌─────────┐                          │
+│     │                     │ RUNNING │                          │
+│     │                     └────┬────┘                          │
+│     │                          │                               │
+│     │               ┌─────────┴──────────┐                    │
+│     │               │                    │                     │
+│     │          Manual Stop        All buyers                   │
+│     │               │           depleted < $10                 │
+│     │               ▼                    ▼                     │
+│     │          ┌─────────┐       ┌──────────┐                 │
+│     │          │ STOPPED │       │ COMPLETE │                 │
+│     │          └────┬────┘       └─────┬────┘                 │
+│     │               │                  │                       │
+│     │               │    New Simulation │                      │
+│     └───────────────┴──────────────────┘                      │
+│                                                                │
+│  On every transition to IDLE:                                  │
+│  • clearZooAccounts() removes ephemeral wallets                │
+│  • clearAllStates() removes agent state files                  │
+│  • resetSimulationData() clears frontend WebSocket state       │
+│                                                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### State Loading Timeline
+
+| Phase Transition | What Happens |
+|-----------------|--------------|
+| idle → preflight | Blockchain check, wallet generation, faucet funding, batch distribution, balance verification, merchant registry load, runner validation |
+| preflight → ready | All checks passed; wallets funded and ready |
+| ready → starting | `POST /agents/start` — agents created with pre-funded wallets |
+| starting → running | Agent autonomous loops begin (buyers every 3s, merchant every 5s) |
+| running → complete | All buyers depleted below $10; `simulation_depleted` event triggers auto-stop |
+| running → stopping | Manual stop requested via dashboard |
+| stopping/complete → idle | `restart()` called; all ephemeral state cleared |

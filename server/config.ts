@@ -44,14 +44,6 @@ export const config = {
     sessionTimeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '5'),
   },
 
-  // Zoo wallet private keys
-  wallets: {
-    zooMaster: process.env.ZOO_MASTER_PRIVATE_KEY,
-    merchantA: process.env.MERCHANT_A_PRIVATE_KEY,
-    attendee1: process.env.ATTENDEE_1_PRIVATE_KEY,
-    attendee2: process.env.ATTENDEE_2_PRIVATE_KEY,
-    attendee3: process.env.ATTENDEE_3_PRIVATE_KEY,
-  },
 } as const;
 
 // Validate configuration on startup
@@ -70,14 +62,6 @@ export function validateConfig(): void {
 
   // Zoo-specific validation (only when zoo simulation is enabled)
   if (config.zoo.enabled) {
-    const requiredWallets = ['zooMaster', 'merchantA', 'attendee1', 'attendee2', 'attendee3'] as const;
-    for (const wallet of requiredWallets) {
-      const key = config.wallets[wallet];
-      if (!key || !key.startsWith('0x') || key.length !== 66) {
-        throw new Error(`Invalid or missing private key for ${wallet}. Expected 64-character hex string with 0x prefix.`);
-      }
-    }
-
     if (config.zoo.agentPollingInterval < 1000 || config.zoo.agentPollingInterval > 60000) {
       throw new Error('agentPollingInterval must be between 1000ms and 60000ms (1-60 seconds)');
     }

@@ -295,5 +295,7 @@ export async function transferAlphaUsdAction(params: {
     txHash: result.receipt.transactionHash,
     blockNumber: result.receipt.blockNumber.toString(),
     gasUsed: result.receipt.gasUsed.toString(),
+    feeAusd: formatAlphaUsd(feePaid),
+    feePayer: senderAcct.label,
   };
 }

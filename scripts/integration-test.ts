@@ -10,7 +10,6 @@
  * Exit 0 on success, 1 on failure.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const TIMEOUT_MS = 60_000;
@@ -18,18 +17,17 @@ const TIMEOUT_MS = 60_000;
 async function main() {
   console.log('=== Integration Test: Single Purchase Cycle ===\n');
 
-  // Initialize zoo accounts in the account store (normally done by the dev server)
-  initializeZooAccounts();
-
   const runner = new AgentRunner();
   let purchaseCompleted = false;
   let purchaseError: string | null = null;
   let txHash: string | null = null;
+  let receiptData: any = null;
 
   // Listen for the first purchase event
   runner.on('purchase_completed', (event) => {
     purchaseCompleted = true;
-    txHash = event.data.purchase_record?.tx_hash ?? null;
+    receiptData = event.data.purchase_record ?? event.data;
+    txHash = receiptData?.tx_hash ?? null;
     console.log(`\n[TEST] Purchase completed: tx_hash=${txHash}`);
   });
 
@@ -39,19 +37,27 @@ async function main() {
   });
 
   try {
-    // Start the runner (funds agents, starts loops)
+    // Initialize ephemeral wallets (generate + fund) — required before start()
+    console.log('[TEST] Initializing ephemeral wallets...');
+    await runner.initializeWallets();
+    console.log('[TEST] Wallets initialized and funded.');
+
+    // Start the runner (creates agents, starts loops)
     await runner.start();
 
     console.log('[TEST] Runner started, waiting for agents to initialize...');
     await sleep(3000);
 
-    // Force a purchase on the first agent
+    // Verify merchant agent started alongside buyer agents
     const statuses = runner.getAgentStatuses();
+    const buyerCount = statuses.filter((s: any) => s.role !== 'merchant').length;
+    console.log(`[TEST] Agents running: ${statuses.length} total (${buyerCount} buyers)`);
     if (statuses.length === 0) {
       throw new Error('No agents available');
     }
 
-    const targetAgent = statuses[0].agent_id;
+    // Force a purchase on the first buyer agent
+    const targetAgent = statuses.find((s: any) => s.role !== 'merchant')?.agent_id ?? statuses[0].agent_id;
     console.log(`[TEST] Forcing purchase on ${targetAgent}...`);
     await runner.forcePurchase(targetAgent);
 
@@ -63,7 +69,7 @@ async function main() {
 
     // Collect results
     const finalStatuses = runner.getAgentStatuses();
-    const agentStatus = finalStatuses.find(s => s.agent_id === targetAgent);
+    const agentStatus = finalStatuses.find((s: any) => s.agent_id === targetAgent);
     const metrics = runner.getMetrics();
 
     console.log('\n=== Results ===');
@@ -71,7 +77,7 @@ async function main() {
     console.log(`TX hash:           ${txHash ?? 'none'}`);
     console.log(`Agent balance:     $${agentStatus?.balance ?? '?'}`);
     console.log(`Total purchases:   ${metrics.total_purchases}`);
-    console.log(`Needs recovered:   food=${agentStatus?.needs.food_need ?? '?'}`);
+    console.log(`Needs recovered:   food=${agentStatus?.needs?.food_need ?? '?'}`);
 
     await runner.stop();
 
@@ -84,6 +90,23 @@ async function main() {
     if (!txHash || txHash === 'unknown') {
       console.error('\n[FAIL] No valid tx_hash returned');
       process.exit(1);
+    }
+
+    // Verify receipt data shape
+    const receiptFields = ['product_name', 'amount', 'tx_hash', 'block_number'];
+    const missingFields = receiptFields.filter(f => receiptData?.[f] === undefined);
+    if (missingFields.length > 0) {
+      console.warn(`[WARN] Receipt missing fields: ${missingFields.join(', ')}`);
+    } else {
+      console.log('[TEST] Receipt shape verified (product_name, amount, tx_hash, block_number)');
+    }
+
+    // Verify agent needs recovered after purchase
+    const foodNeed = agentStatus?.needs?.food_need;
+    if (typeof foodNeed === 'number' && foodNeed > 40) {
+      console.log(`[TEST] Needs recovery verified (food_need=${foodNeed} > 40 after purchase)`);
+    } else {
+      console.warn(`[WARN] Needs recovery uncertain (food_need=${foodNeed})`);
     }
 
     console.log('\n[PASS] Integration test passed!');

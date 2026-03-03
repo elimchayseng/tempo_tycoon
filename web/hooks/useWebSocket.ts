@@ -26,6 +26,8 @@ export function useWebSocket() {
   const [balanceUpdates, setBalanceUpdates] = useState<BalanceUpdate[]>([]);
   const [merchantState, setMerchantState] = useState<ZooMerchantState | null>(null);
   const [restockEvents, setRestockEvents] = useState<ZooRestockEvent[]>([]);
+  const [simulationComplete, setSimulationComplete] = useState(false);
+  const [fundingProgress, setFundingProgress] = useState<{ step: string; detail?: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
@@ -113,6 +115,12 @@ export function useWebSocket() {
           case "zoo_restock_event":
             setRestockEvents((prev) => [msg.event, ...prev].slice(0, 50));
             break;
+          case "zoo_simulation_complete":
+            setSimulationComplete(true);
+            break;
+          case "zoo_funding_progress":
+            setFundingProgress({ step: (msg as any).step, detail: (msg as any).detail });
+            break;
         }
       };
     }
@@ -127,6 +135,19 @@ export function useWebSocket() {
 
   const clearLogs = useCallback(() => setLogs([]), []);
   const clearReceipts = useCallback(() => setReceipts([]), []);
+  const resetSimulationData = useCallback(() => {
+    setZooAgents([]);
+    setReceipts([]);
+    setNetworkStats(null);
+    setTxFlowEvents([]);
+    setBalanceUpdates([]);
+    setMerchantState(null);
+    setRestockEvents([]);
+    setLogs([]);
+    setAccounts([]);
+    setSimulationComplete(false);
+    setFundingProgress(null);
+  }, []);
 
   return {
     logs,
@@ -142,5 +163,8 @@ export function useWebSocket() {
     balanceUpdates,
     merchantState,
     restockEvents,
+    simulationComplete,
+    fundingProgress,
+    resetSimulationData,
   };
 }

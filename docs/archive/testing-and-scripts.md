@@ -1,27 +1,24 @@
 # Scripts, Testing, and Environment Guide
 
+> **Note:** This document is partially archived. Wallet management is now ephemeral — private keys
+> are generated automatically during preflight and do not need to be stored in `.env`.
+> See `docs/development.md` for the current testing guide.
+
 Complete reference for all CLI scripts, testing workflows, and environment configuration.
 
 ## Environment Setup
 
 ### The `.env` file
 
-All scripts and the dev server read configuration from a `.env` file in the project root. There is no `.env.example` checked into the repo (it is gitignored to avoid leaking generated keys). You need to create `.env` yourself.
+The `.env` file is optional for most workflows. Wallets are now **ephemeral** — generated fresh during each preflight — so no private keys are needed in `.env`.
 
-**Minimal `.env`:**
+**Minimal `.env` (if needed):**
 
 ```bash
-# Blockchain
+# Blockchain (usually auto-configured)
 RPC_URL=https://rpc.moderato.tempo.xyz
 EXPLORER_URL=https://explore.moderato.tempo.xyz
 CHAIN_ID=42431
-
-# Zoo Wallets — generate with: npm run setup:wallets
-ZOO_MASTER_PRIVATE_KEY=0x...
-MERCHANT_A_PRIVATE_KEY=0x...
-ATTENDEE_1_PRIVATE_KEY=0x...
-ATTENDEE_2_PRIVATE_KEY=0x...
-ATTENDEE_3_PRIVATE_KEY=0x...
 
 # Simulation Parameters (all optional, shown with defaults)
 ZOO_SIMULATION_ENABLED=true
@@ -36,8 +33,6 @@ MIN_BALANCE_THRESHOLD=10.0     # AlphaUSD — triggers refunding
 - **Dev server** (`npm run dev:server`): loaded via `server/env.ts`, which calls `dotenv.config()` pointing at the root `.env`.
 - **Scripts** (`npm run fund:agents`, `test:integration`, etc.): loaded via `import 'dotenv/config'` at the top of each script.
 - **Agents** (`npm run dev:agents`): loaded through the server's env.ts when imported transitively.
-
-If you see `Missing environment variable` errors, make sure your `.env` exists at the project root and contains all five private keys plus `RPC_URL`.
 
 ---
 
@@ -106,23 +101,92 @@ npm run fund:agents
 
 **Script:** `scripts/health-check.ts`
 
-Runs a comprehensive check of the entire system. Does not require the dev server to be running (it will report the server as unhealthy if it's down, but other checks still run).
+Runs a comprehensive check of the entire system. Does not require the dev server to be running (blockchain checks still run; server-dependent checks report warnings if server is down).
 
 ```bash
 npm run health:check
 ```
 
 **What it checks:**
-1. Environment variables (all 5 keys + RPC_URL)
-2. Tempo blockchain connectivity (chain ID, block number)
-3. Wallet balances for all 5 wallets (warns < 10 AlphaUSD, errors < 1)
-4. Dev server health endpoint (`/api/health`)
+1. Tempo blockchain connectivity (chain ID, block number)
+2. Server health endpoint (`/api/health`)
+3. Preflight endpoint (`POST /api/zoo/preflight`)
+4. Zoo registry endpoint (`GET /api/zoo/registry`)
+5. Merchant catalog endpoint (`GET /api/merchant/food/catalog`)
+6. WebSocket connectivity (`ws://localhost:4000/ws`)
 
 **Exit codes:**
 - `0` — all checks pass (or warnings only)
 - `1` — one or more errors
 
 **When to use:** Before starting the simulation, after deploying, or to diagnose issues.
+
+---
+
+### `npm run test:unit`
+
+**Script:** `scripts/test-unit-logic.ts`
+
+Pure logic tests that run instantly with no external dependencies (no server, no blockchain).
+
+```bash
+npm run test:unit
+```
+
+**What it tests:**
+- **DecisionEngine**: need degradation, purchase threshold, urgency calculation, budget allocation, food category selection
+- **CircuitBreaker**: state transitions (CLOSED/OPEN/HALF_OPEN), failure counting, reset timeout, manual reset
+- **MerchantInventory**: initialize, decrement stock, availability check, restock detection/execution
+- **WalletGenerator**: generates 5 wallets, valid addresses, unique keys
+
+---
+
+### `npm run test:api`
+
+**Script:** `scripts/test-api-endpoints.ts`
+
+Tests every REST endpoint for correct status codes and response shapes. Requires a running server.
+
+```bash
+npm run dev:server   # in one terminal
+npm run test:api     # in another
+```
+
+---
+
+### `npm run test:ws`
+
+**Script:** `scripts/test-websocket.ts`
+
+Connects to the WebSocket endpoint, verifies the connection acknowledgment message, and disconnects.
+
+```bash
+npm run dev:server   # in one terminal
+npm run test:ws      # in another
+```
+
+---
+
+### `npm run test:lifecycle`
+
+**Script:** `scripts/test-simulation-lifecycle.ts`
+
+Full end-to-end lifecycle: preflight -> start agents -> verify running -> check catalog -> stop -> verify stopped.
+
+```bash
+npm run dev:server       # in one terminal
+npm run test:lifecycle   # in another
+```
+
+---
+
+### `npm run test:all`
+
+Runs the three fast test suites in sequence:
+
+```bash
+npm run test:all   # = test:unit && test:api && test:ws
+```
 
 ---
 
@@ -144,12 +208,13 @@ npm run test:integration
 The integration test creates its own `AgentRunner` internally. If the server also starts an `AgentRunner` (the default when `ZOO_SIMULATION_ENABLED=true`), you get two competing runners fighting over the same wallets and nonces. Disabling it on the server side lets the test control the full lifecycle.
 
 **What it does:**
-1. Initializes zoo accounts in the local account store
-2. Creates an `AgentRunner` with all 3 attendee agents
-3. Funds agents if needed
-4. Forces a purchase on the first agent
+1. Creates an `AgentRunner` and calls `initializeWallets()` (generates ephemeral wallets + funds via faucet)
+2. Calls `start()` to create buyer agents + merchant agent
+3. Verifies merchant agent starts alongside buyer agents
+4. Forces a purchase on the first buyer agent
 5. Waits up to 60 seconds for the purchase event
-6. Verifies a valid `tx_hash` was returned
+6. Verifies a valid `tx_hash` and receipt data shape (product_name, amount, tx_hash, block_number)
+7. Verifies agent needs recovered after purchase
 
 **Exit codes:**
 - `0` — purchase completed with valid tx hash
@@ -252,28 +317,38 @@ Requires the dev server to already be running on port 4000 so agents can reach m
 # 1. Install dependencies
 npm install
 
-# 2. Generate wallets
-npm run setup:wallets
-# Copy the output into a new .env file at the project root
+# 2. (Optional) Create .env with RPC_URL if not using default
+# echo "RPC_URL=https://rpc.moderato.tempo.xyz" > .env
 
-# 3. Add blockchain config to .env
-# RPC_URL=https://rpc.moderato.tempo.xyz
-# CHAIN_ID=42431
+# 3. Run unit tests to verify project builds
+npm run test:unit
 
-# 4. Fund wallets
-npm run fund:agents
-
-# 5. Verify everything
+# 4. Verify everything
 npm run health:check
 
-# 6. Start simulation
+# 5. Start simulation
 npm run dev
 ```
+
+No wallet generation or manual funding is needed — wallets are ephemeral and generated automatically during each preflight.
 
 ### Running tests
 
 ```bash
-# Terminal 1: start server without its own agents
+# Unit tests (no server needed)
+npm run test:unit
+
+# Terminal 1: start server
+npm run dev:server
+
+# Terminal 2: run API and WebSocket tests
+npm run test:api
+npm run test:ws
+
+# Terminal 2: full lifecycle test
+npm run test:lifecycle
+
+# Terminal 1: restart server with agents disabled for integration/load tests
 ZOO_SIMULATION_ENABLED=false npm run dev:server
 
 # Terminal 2: run integration test
@@ -289,22 +364,15 @@ npm run test:load
 # Check everything at once
 npm run health:check
 
-# Common fixes:
-npm run fund:agents          # if wallets are low
-npm run setup:wallets        # if keys are compromised/lost (then re-fund)
+# Run quick tests to isolate issues:
+npm run test:unit        # verify core logic works
+npm run test:api         # verify API endpoints respond correctly
+npm run test:ws          # verify WebSocket connectivity
 ```
 
-### Re-funding after extended simulation
+### Re-funding
 
-Agent balances decrease over time as they make purchases. The `AgentRunner` has built-in auto-refunding from Zoo Master, but if Zoo Master runs dry:
-
-```bash
-# 1. Check current balances
-npm run health:check
-
-# 2. Fund Zoo Master via faucet (done automatically by fund:agents)
-npm run fund:agents
-```
+With ephemeral wallets, funding happens automatically during preflight. If a simulation runs out of funds, simply start a new one — the preflight will generate fresh wallets and fund them from the faucet.
 
 ---
 

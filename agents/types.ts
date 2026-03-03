@@ -30,6 +30,8 @@ export interface PurchaseRecord {
   amount: string;
   tx_hash: string;
   block_number: string | undefined;
+  fee_ausd?: string;
+  fee_payer?: string;
   completed_at: Date;
   need_before: AgentNeeds;
   need_after: AgentNeeds;
@@ -208,6 +210,7 @@ export type AgentEventType =
   | 'agent_stopped'
   | 'simulation_started'
   | 'simulation_stopped'
+  | 'simulation_depleted'
   | 'needs_updated'
   | 'purchase_initiated'
   | 'purchase_completed'
@@ -215,6 +218,7 @@ export type AgentEventType =
   | 'funding_received'
   | 'funding_completed'
   | 'funding_failed'
+  | 'funding_progress'
   | 'error_occurred'
   | 'merchant_cycle_completed'
   | 'restock_initiated'
@@ -285,5 +289,7 @@ export interface RestockRecord {
   cost: string;
   tx_hash: string;
   block_number: string;
+  fee_ausd?: string;
+  fee_payer?: string;
   completed_at: Date;
 }

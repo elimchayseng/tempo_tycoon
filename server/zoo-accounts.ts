@@ -1,7 +1,7 @@
-import { privateKeyToAccount } from "viem/accounts";
 import type { ServerAccount } from "../shared/types.js";
 import { accountStore } from "./accounts.js";
 import { config } from "./config.js";
+import type { GeneratedWallet } from "../agents/wallet-generator.js";
 
 // Zoo wallet identifiers
 export const zooWallets = {
@@ -15,82 +15,31 @@ export const zooWallets = {
 export type ZooWalletId = keyof typeof zooWallets;
 export type ZooWalletLabel = typeof zooWallets[ZooWalletId];
 
-// Initialize zoo accounts in the existing account store
-export function initializeZooAccounts(): void {
-  // Only initialize if zoo simulation is enabled
-  if (!config.zoo.enabled) {
-    return;
-  }
+/**
+ * Reset zoo accounts with freshly generated wallets.
+ * Clears any existing zoo entries and inserts new ones.
+ */
+export function resetZooAccounts(wallets: GeneratedWallet[]): void {
+  // Clear existing zoo entries first
+  clearZooAccounts();
 
-  // Zoo Master - Protocol facilitator hosting merchant registry
-  if (config.wallets.zooMaster) {
-    const privateKey = config.wallets.zooMaster as `0x${string}`;
-    const account = privateKeyToAccount(privateKey);
+  for (const wallet of wallets) {
     const serverAccount: ServerAccount = {
-      label: "Zoo Master",
-      address: account.address,
-      privateKey,
+      label: wallet.label,
+      address: wallet.address,
+      privateKey: wallet.privateKey,
       balances: {},
     };
-
-    // Add to existing account store using the zoo wallet identifier
-    (accountStore as any).accounts.set(zooWallets.zooMaster, serverAccount);
+    (accountStore as any).accounts.set(wallet.storeKey, serverAccount);
   }
+}
 
-  // Merchant A - Food vendor
-  if (config.wallets.merchantA) {
-    const privateKey = config.wallets.merchantA as `0x${string}`;
-    const account = privateKeyToAccount(privateKey);
-    const serverAccount: ServerAccount = {
-      label: "Merchant A",
-      address: account.address,
-      privateKey,
-      balances: {},
-    };
-
-    (accountStore as any).accounts.set(zooWallets.merchantA, serverAccount);
-  }
-
-  // Attendee 1 - Buyer agent
-  if (config.wallets.attendee1) {
-    const privateKey = config.wallets.attendee1 as `0x${string}`;
-    const account = privateKeyToAccount(privateKey);
-    const serverAccount: ServerAccount = {
-      label: "Attendee 1",
-      address: account.address,
-      privateKey,
-      balances: {},
-    };
-
-    (accountStore as any).accounts.set(zooWallets.attendee1, serverAccount);
-  }
-
-  // Attendee 2 - Buyer agent
-  if (config.wallets.attendee2) {
-    const privateKey = config.wallets.attendee2 as `0x${string}`;
-    const account = privateKeyToAccount(privateKey);
-    const serverAccount: ServerAccount = {
-      label: "Attendee 2",
-      address: account.address,
-      privateKey,
-      balances: {},
-    };
-
-    (accountStore as any).accounts.set(zooWallets.attendee2, serverAccount);
-  }
-
-  // Attendee 3 - Buyer agent
-  if (config.wallets.attendee3) {
-    const privateKey = config.wallets.attendee3 as `0x${string}`;
-    const account = privateKeyToAccount(privateKey);
-    const serverAccount: ServerAccount = {
-      label: "Attendee 3",
-      address: account.address,
-      privateKey,
-      balances: {},
-    };
-
-    (accountStore as any).accounts.set(zooWallets.attendee3, serverAccount);
+/**
+ * Remove all zoo entries from the account store.
+ */
+export function clearZooAccounts(): void {
+  for (const storeKey of Object.values(zooWallets)) {
+    accountStore.remove(storeKey);
   }
 }
 

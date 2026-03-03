@@ -10,11 +10,14 @@
 | `npm run build` | Build frontend with Vite |
 | `npm run start` | Start production server |
 | `npm run check` | TypeScript type check (`tsc --noEmit`) |
-| `npm run setup:wallets` | Generate zoo wallet keypairs and write `.env` |
-| `npm run fund:agents` | Fund agent wallets from Zoo Master |
 | `npm run health:check` | Run health checks against running server |
-| `npm run test:integration` | Run integration tests |
-| `npm run test:load` | Run load tests |
+| `npm run test:unit` | Pure logic tests (no server needed) |
+| `npm run test:api` | API endpoint tests (requires server) |
+| `npm run test:ws` | WebSocket connectivity test (requires server) |
+| `npm run test:lifecycle` | Full simulation lifecycle test (requires server + blockchain) |
+| `npm run test:integration` | Single purchase cycle test (requires server + blockchain) |
+| `npm run test:load` | Load/performance test (requires server + blockchain) |
+| `npm run test:all` | Run unit + API + WebSocket tests |
 
 ## First-Time Setup
 
@@ -22,18 +25,14 @@
 # Install dependencies
 npm install
 
-# Generate wallets and .env
-npm run setup:wallets
-
-# Fund the agents on Tempo testnet
-npm run fund:agents
-
-# Enable zoo simulation
-echo "ZOO_SIMULATION_ENABLED=true" >> .env
+# Copy .env (included in repo with sensible defaults)
+cp .env.example .env  # if not already present
 
 # Start development
 npm run dev
 ```
+
+No wallet generation or manual funding is needed — wallets are ephemeral and generated automatically during each preflight.
 
 ## Common Workflows
 
@@ -41,21 +40,11 @@ npm run dev
 
 1. Start the server: `npm run dev`
 2. Open `http://localhost:4000`
-3. Click **Run Preflight** to verify system readiness
-4. Click **Start Simulation** to begin agent loops
+3. Click **Start Zoo** — runs preflight (generates ephemeral wallets, funds via faucet)
+4. When preflight passes, click **Open Gates** to start agents
 5. Agents will autonomously purchase food as needs decay
-
-### Re-Funding Agents
-
-If agents run out of funds:
-
-```bash
-# Manual re-fund via script
-npm run fund:agents
-
-# Or via API while server is running
-curl -X POST http://localhost:4000/api/zoo/agents/fund
-```
+6. Simulation auto-stops when all buyers deplete below $10
+7. Click **New Simulation** to start fresh (clears all state, generates new wallets)
 
 ### Forcing a Purchase (Testing)
 
@@ -96,21 +85,74 @@ curl http://localhost:4000/api/health/blockchain | jq
 
 ## Testing
 
+### Test Tiers
+
+The test suite is organized in tiers by dependency requirements:
+
+**Tier 1 — No dependencies (runs instantly):**
+```bash
+npm run test:unit       # DecisionEngine, CircuitBreaker, MerchantInventory, WalletGenerator
+```
+
+**Tier 2 — Requires running server (`npm run dev:server`):**
+```bash
+npm run test:api        # All REST endpoints: shapes, status codes, error handling
+npm run test:ws         # WebSocket connect, verify connection message, disconnect
+```
+
+**Tier 3 — Requires server + blockchain:**
+```bash
+npm run test:lifecycle  # Preflight -> start -> verify -> catalog -> stop -> verify
+npm run test:integration # Single purchase cycle with forced purchase
+npm run test:load       # Multi-agent performance test (configurable duration)
+```
+
+**Run all fast tests:**
+```bash
+npm run test:all        # unit + api + ws (no blockchain needed)
+```
+
+### Quick Start
+
+```bash
+# 1. Run unit tests immediately (no setup needed)
+npm run test:unit
+
+# 2. Start the dev server, then run server-dependent tests
+npm run dev:server
+npm run test:api
+npm run test:ws
+
+# 3. Full lifecycle (server must have blockchain access)
+npm run test:lifecycle
+```
+
 ### Integration Tests
 
 ```bash
+# Start server with agents disabled (test runs its own AgentRunner):
+ZOO_SIMULATION_ENABLED=false npm run dev:server
+
+# In another terminal:
 npm run test:integration
 ```
 
-Runs end-to-end tests against a running server: health checks, registry loading, catalog fetching, checkout flow.
+Runs a single end-to-end purchase cycle: initializes ephemeral wallets, starts agents, forces one purchase, verifies tx_hash, receipt shape, and need recovery.
 
 ### Load Tests
 
 ```bash
+# Start server with agents disabled:
+ZOO_SIMULATION_ENABLED=false npm run dev:server
+
+# Default 2 minutes:
 npm run test:load
+
+# Custom duration:
+npm run test:load -- 5
 ```
 
-Simulates concurrent agent activity to test transaction queue, circuit breakers, and nonce management under load.
+Simulates concurrent agent activity and reports purchase rate, latency, success rate, and merchant metrics (revenue, restocks).
 
 ## Project Conventions
 
