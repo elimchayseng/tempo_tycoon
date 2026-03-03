@@ -14,6 +14,7 @@ export const zooRegistryRoutes = new Hono();
 zooRegistryRoutes.post("/preflight", async (c) => {
   const checks: PreflightCheck[] = [
     { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
+    { id: "wallets", label: "Wallet initialization", status: "pending" },
     { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
     { id: "balances", label: "Wallet balances", status: "pending" },
     { id: "merchants", label: "Merchant registry", status: "pending" },
@@ -21,12 +22,16 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     { id: "funding", label: "Wallet funding strategy", status: "pending" },
   ];
 
+  function check(id: string) {
+    return checks.find((ch) => ch.id === id)!;
+  }
+
   // 1. Blockchain connectivity
   try {
     const blockNumber = await publicClient.getBlockNumber();
-    checks[0].status = "pass";
-    checks[0].detail = `Block #${blockNumber}`;
-    checks[0].metadata = {
+    check("blockchain").status = "pass";
+    check("blockchain").detail = `Block #${blockNumber}`;
+    check("blockchain").metadata = {
       chainName: config.chain.chainName,
       chainId: config.chain.chainId,
       rpcUrl: config.chain.rpcUrl,
@@ -36,40 +41,48 @@ zooRegistryRoutes.post("/preflight", async (c) => {
       tokenDecimals: 6,
     };
   } catch (e) {
-    checks[0].status = "fail";
-    checks[0].detail = e instanceof Error ? e.message : "Cannot reach chain";
+    check("blockchain").status = "fail";
+    check("blockchain").detail = e instanceof Error ? e.message : "Cannot reach chain";
   }
 
-  // 2. Zoo accounts — ephemeral wallets generated on start
+  // 2. Generate fresh ephemeral wallets & fund them
+  const runner = getAgentRunner();
+  if (runner && check("blockchain").status === "pass") {
+    try {
+      await runner.initializeWallets();
+      check("wallets").status = "pass";
+      check("wallets").detail = "5 wallets generated & funded";
+    } catch (e) {
+      check("wallets").status = "fail";
+      check("wallets").detail = e instanceof Error ? e.message : "Wallet init failed";
+    }
+  } else if (!runner) {
+    check("wallets").status = "fail";
+    check("wallets").detail = "Agent runner not initialized";
+  } else {
+    check("wallets").status = "fail";
+    check("wallets").detail = "Skipped — blockchain unreachable";
+  }
+
+  // 3. Zoo accounts
   try {
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
-      checks[1].status = "pass";
-      checks[1].detail = `${accounts.length} accounts found`;
-      checks[1].metadata = {
+      check("accounts").status = "pass";
+      check("accounts").detail = `${accounts.length} accounts found`;
+      check("accounts").metadata = {
         accounts: accounts.map((a) => ({ label: a.label, address: a.address })),
       };
     } else {
-      // No wallets yet — they'll be generated when simulation starts
-      checks[1].status = "pass";
-      checks[1].detail = "Generated on start";
-      checks[1].metadata = {
-        ephemeral: true,
-        accounts: [
-          { label: "Zoo Master", address: "Generated on start" },
-          { label: "Merchant A", address: "Generated on start" },
-          { label: "Attendee 1", address: "Generated on start" },
-          { label: "Attendee 2", address: "Generated on start" },
-          { label: "Attendee 3", address: "Generated on start" },
-        ],
-      };
+      check("accounts").status = "fail";
+      check("accounts").detail = `Only ${accounts.length} accounts found (need 5)`;
     }
   } catch (e) {
-    checks[1].status = "fail";
-    checks[1].detail = e instanceof Error ? e.message : "Account check failed";
+    check("accounts").status = "fail";
+    check("accounts").detail = e instanceof Error ? e.message : "Account check failed";
   }
 
-  // 3. Wallet balances
+  // 4. Wallet balances
   try {
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
@@ -81,8 +94,8 @@ zooRegistryRoutes.post("/preflight", async (c) => {
         getZooAccountByRole("attendee2"),
         getZooAccountByRole("attendee3"),
       ];
-      checks[2].status = "pass";
-      checks[2].detail = "Master + 3 attendees available";
+      check("balances").status = "pass";
+      check("balances").detail = "Master + 3 attendees available";
       const walletList: { label: string; address: string; balance: string }[] = [];
       if (master) {
         const bal = master.balances[config.contracts.alphaUsd]?.toString() ?? "0";
@@ -90,43 +103,37 @@ zooRegistryRoutes.post("/preflight", async (c) => {
       }
       if (merchantA) {
         const bal = merchantA.balances[config.contracts.alphaUsd]?.toString() ?? "0";
-        walletList.push({ label: "Merchant A", address: merchantA.address, balance: bal });
+        // Use merchant name from registry for display
+        const registry = loadZooRegistry();
+        const merchantName = registry.merchants?.[0]?.name ?? "Merchant";
+        walletList.push({ label: `Merchant: ${merchantName}`, address: merchantA.address, balance: bal });
       }
       attendees.forEach((a, i) => {
         if (a) {
           const bal = a.balances[config.contracts.alphaUsd]?.toString() ?? "0";
-          walletList.push({ label: `Attendee ${i + 1}`, address: a.address, balance: bal });
+          walletList.push({ label: `Guest ${i + 1}`, address: a.address, balance: bal });
         }
       });
-      checks[2].metadata = { wallets: walletList };
+      check("balances").metadata = { wallets: walletList };
     } else {
-      // No wallets yet — funded on start
-      checks[2].status = "pass";
-      checks[2].detail = "Funded on start";
-      checks[2].metadata = {
-        ephemeral: true,
-        funding: {
-          method: "Tempo Batch Payment",
-          distribution: { merchant: "$100", attendees: "$50 each" },
-          total: "$250",
-        },
-      };
+      check("balances").status = "fail";
+      check("balances").detail = "No accounts to check balances for";
     }
   } catch (e) {
-    checks[2].status = "fail";
-    checks[2].detail = e instanceof Error ? e.message : "Balance check failed";
+    check("balances").status = "fail";
+    check("balances").detail = e instanceof Error ? e.message : "Balance check failed";
   }
 
-  // 4. Merchant registry
+  // 5. Merchant registry
   try {
     const registry = loadZooRegistry();
     const merchants = registry.merchants ?? [];
     const merchantCount = merchants.length;
     if (merchantCount > 0) {
-      checks[3].status = "pass";
-      checks[3].detail = `${merchantCount} merchant(s) loaded`;
+      check("merchants").status = "pass";
+      check("merchants").detail = `${merchantCount} merchant(s) loaded`;
       const merchantAccount = getZooAccountByRole("merchantA");
-      checks[3].metadata = {
+      check("merchants").metadata = {
         merchants: merchants.map((m: any) => ({
           name: m.name,
           category: m.category ?? "general",
@@ -141,20 +148,20 @@ zooRegistryRoutes.post("/preflight", async (c) => {
         })),
       };
     } else {
-      checks[3].status = "fail";
-      checks[3].detail = "No merchants in registry";
+      check("merchants").status = "fail";
+      check("merchants").detail = "No merchants in registry";
     }
   } catch (e) {
-    checks[3].status = "fail";
-    checks[3].detail = e instanceof Error ? e.message : "Registry load failed";
+    check("merchants").status = "fail";
+    check("merchants").detail = e instanceof Error ? e.message : "Registry load failed";
   }
 
-  // 5. Agent runner
-  if (getAgentRunner()) {
+  // 6. Agent runner
+  if (runner) {
     const zooMaster = getZooAccountByRole("zooMaster");
-    checks[4].status = "pass";
-    checks[4].detail = "Agent runner ready";
-    checks[4].metadata = {
+    check("runner").status = "pass";
+    check("runner").detail = "Agent runner ready";
+    check("runner").metadata = {
       buyerAgents: {
         count: 3,
         pollingInterval: config.zoo.agentPollingInterval,
@@ -171,14 +178,14 @@ zooRegistryRoutes.post("/preflight", async (c) => {
       },
     };
   } else {
-    checks[4].status = "fail";
-    checks[4].detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";
+    check("runner").status = "fail";
+    check("runner").detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";
   }
 
-  // 6. Wallet funding strategy
-  checks[5].status = "pass";
-  checks[5].detail = "Tempo Batch Payment";
-  checks[5].metadata = {
+  // 7. Wallet funding strategy
+  check("funding").status = "pass";
+  check("funding").detail = "Tempo Batch Payment";
+  check("funding").metadata = {
     method: "Tempo Batch Payment",
     lifecycle: "Ephemeral — fresh wallets each simulation",
     distribution: { merchant: "$100", attendees: "$50 each" },

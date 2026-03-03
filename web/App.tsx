@@ -23,7 +23,7 @@ export default function App() {
     restockEvents,
     simulationComplete,
     fundingProgress,
-    resetSimulationComplete,
+    resetSimulationData,
   } = useWebSocket();
 
   const {
@@ -47,8 +47,13 @@ export default function App() {
   }, [simulationComplete, phase, markComplete]);
 
   const handleNewSimulation = () => {
-    resetSimulationComplete();
+    resetSimulationData();
     restart();
+  };
+
+  const handleStopZoo = () => {
+    resetSimulationData();
+    stopZoo();
   };
 
   const showPreflight = phase === "preflight" || phase === "ready";
@@ -64,7 +69,7 @@ export default function App() {
         error={error}
         onStartPreflight={startPreflight}
         onOpenGates={openGates}
-        onStopZoo={stopZoo}
+        onStopZoo={handleStopZoo}
         onRestart={handleNewSimulation}
         explorerOpen={explorer.isOpen}
         onToggleExplorer={explorer.toggle}
@@ -98,13 +103,35 @@ export default function App() {
 
           {/* Preflight phase */}
           {showPreflight && (
-            <PreflightPanel
-              checks={preflightChecks}
-              phase={phase}
-              error={error}
-              onOpenGates={openGates}
-              onRetry={startPreflight}
-            />
+            <>
+              {/* Wallet init progress / ready banner */}
+              {phase === "ready" ? (
+                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
+                  <div className="font-pixel text-[10px] text-[var(--zt-gold)]">
+                    Ready for business
+                  </div>
+                </div>
+              ) : fundingProgress && (
+                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
+                  <div className="font-pixel text-[8px] text-[var(--zt-gold)] mb-1">
+                    Initializing Wallets...
+                  </div>
+                  <div className="font-pixel text-[7px] text-[var(--zt-gold-light,var(--zt-gold))]">
+                    {fundingProgress.step}
+                    {fundingProgress.detail && (
+                      <span className="ml-2">{fundingProgress.detail}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <PreflightPanel
+                checks={preflightChecks}
+                phase={phase}
+                error={error}
+                onOpenGates={openGates}
+                onRetry={startPreflight}
+              />
+            </>
           )}
 
           {/* Running / Complete dashboard */}
@@ -129,26 +156,13 @@ export default function App() {
                 </div>
               )}
 
-              {/* Funding progress during starting phase */}
-              {phase === "starting" && fundingProgress && (
-                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
-                  <div className="font-pixel text-[8px] text-[var(--zt-tan)] mb-1">
-                    Initializing Wallets...
-                  </div>
-                  <div className="font-pixel text-[7px] text-[var(--zt-text-mid)]">
-                    {fundingProgress.step}
-                    {fundingProgress.detail && (
-                      <span className="text-[var(--zt-gold)] ml-2">{fundingProgress.detail}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
               <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} />
               <div className="border-b border-[var(--zt-green-mid)] shrink-0">
                 <AgentCardRow agents={zooAgents} />
               </div>
-              <ReceiptFeed receipts={receipts} />
+              <div className="shrink-0">
+                <ReceiptFeed receipts={receipts} />
+              </div>
             </>
           )}
         </div>

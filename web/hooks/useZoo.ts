@@ -16,6 +16,7 @@ export function useZoo() {
     // Initialize checks as pending
     const initialChecks: PreflightCheck[] = [
       { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
+      { id: "wallets", label: "Wallet initialization", status: "pending" },
       { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
       { id: "balances", label: "Wallet balances", status: "pending" },
       { id: "merchants", label: "Merchant registry", status: "pending" },
@@ -61,6 +62,7 @@ export function useZoo() {
     setPhase("stopping");
     try {
       await ApiService.zooStopAgents();
+      setPreflightChecks([]);
       setPhase("idle");
     } catch (e) {
       setError(formatApiError(e));

@@ -135,7 +135,16 @@ export function useWebSocket() {
 
   const clearLogs = useCallback(() => setLogs([]), []);
   const clearReceipts = useCallback(() => setReceipts([]), []);
-  const resetSimulationComplete = useCallback(() => {
+  const resetSimulationData = useCallback(() => {
+    setZooAgents([]);
+    setReceipts([]);
+    setNetworkStats(null);
+    setTxFlowEvents([]);
+    setBalanceUpdates([]);
+    setMerchantState(null);
+    setRestockEvents([]);
+    setLogs([]);
+    setAccounts([]);
     setSimulationComplete(false);
     setFundingProgress(null);
   }, []);
@@ -156,6 +165,6 @@ export function useWebSocket() {
     restockEvents,
     simulationComplete,
     fundingProgress,
-    resetSimulationComplete,
+    resetSimulationData,
   };
 }

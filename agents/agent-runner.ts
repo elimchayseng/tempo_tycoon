@@ -47,7 +47,42 @@ export class AgentRunner {
   }
 
   /**
-   * Initialize and start all agents with fresh ephemeral wallets
+   * Generate fresh ephemeral wallets and fund them.
+   * Called during preflight so balances are visible before "Open Gates".
+   */
+  async initializeWallets(): Promise<void> {
+    log.info('Initializing ephemeral wallets...');
+
+    // Clear previous agent state files
+    await this.stateManager.initialize();
+    await this.stateManager.clearAllStates();
+    log.info('Cleared previous agent states');
+
+    const progressCallback = (step: string, detail?: string) => {
+      log.info(`[Funding] ${step}${detail ? ` — ${detail}` : ''}`);
+      this.emitEvent('funding_progress', { step, detail });
+    };
+
+    progressCallback('Generating 5 ephemeral wallets...');
+    const wallets = generateAllWallets();
+    log.info(`Generated ${wallets.length} wallets`);
+    wallets.forEach(w => log.debug(`  ${w.label}: ${w.address}`));
+
+    // Register wallets in account store
+    resetZooAccounts(wallets);
+    log.info('Registered wallets in account store');
+
+    // Fund wallets via faucet + batch distribution
+    await fundZooWallets(wallets, progressCallback);
+    log.info('Wallet funding complete');
+
+    // Refresh balances from chain
+    await refreshZooBalances();
+    log.info('Wallet initialization complete');
+  }
+
+  /**
+   * Start all agents (wallets must already be initialized via initializeWallets)
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -58,33 +93,6 @@ export class AgentRunner {
     log.info('Starting Zoo Simulation Agent Runner...');
 
     try {
-      // Clear previous agent state files
-      await this.stateManager.initialize();
-      await this.stateManager.clearAllStates();
-      log.info('Cleared previous agent states');
-
-      // Generate fresh ephemeral wallets
-      const progressCallback = (step: string, detail?: string) => {
-        log.info(`[Funding] ${step}${detail ? ` — ${detail}` : ''}`);
-        this.emitEvent('funding_progress', { step, detail });
-      };
-
-      progressCallback('Generating 5 ephemeral wallets...');
-      const wallets = generateAllWallets();
-      log.info(`Generated ${wallets.length} wallets`);
-      wallets.forEach(w => log.debug(`  ${w.label}: ${w.address}`));
-
-      // Register wallets in account store
-      resetZooAccounts(wallets);
-      log.info('Registered wallets in account store');
-
-      // Fund wallets via faucet + batch distribution
-      await fundZooWallets(wallets, progressCallback);
-      log.info('Wallet funding complete');
-
-      // Refresh balances from chain
-      await refreshZooBalances();
-
       const agentConfigs = this.createAgentConfigs();
 
       if (agentConfigs.length === 0) {
@@ -133,9 +141,10 @@ export class AgentRunner {
 
       log.info(`All agents started successfully! Active buyer agents: ${this.agents.size}, merchant agent: ${this.merchantAgent ? 'active' : 'none'}`);
 
+      const allAccounts = getAllZooAccounts();
       this.emitEvent('simulation_started', {
         agent_count: this.agents.size,
-        wallets: wallets.map(w => ({ label: w.label, address: w.address })),
+        wallets: allAccounts.map(a => ({ label: a.label, address: a.address })),
       });
 
     } catch (error) {

@@ -3,7 +3,7 @@ import { createLogger } from "../../shared/logger.js";
 import { config } from "../config.js";
 import { AgentRunner } from "../../agents/agent-runner.js";
 import { emitLog, broadcast } from "../instrumented-client.js";
-import { getZooAccountByRole } from "../zoo-accounts.js";
+import { getZooAccountByRole, clearZooAccounts } from "../zoo-accounts.js";
 import { accountStore } from "../accounts.js";
 import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } from "./zoo-shared.js";
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
@@ -90,6 +90,8 @@ if (config.zoo.enabled) {
       clearInterval(networkStatsInterval);
       networkStatsInterval = null;
     }
+    // Clear ephemeral zoo accounts so next preflight starts fresh
+    clearZooAccounts();
   });
 
   // Emit tx flow events at purchase stages
@@ -370,6 +372,9 @@ zooAgentRoutes.post("/agents/stop", async (c) => {
     }
 
     await runner.stop();
+
+    // Clear ephemeral zoo accounts so next preflight starts fresh
+    clearZooAccounts();
 
     return c.json({
       success: true,

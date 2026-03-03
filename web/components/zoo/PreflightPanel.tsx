@@ -62,9 +62,9 @@ function AccountsMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 function BalancesMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   const wallets = (metadata.wallets ?? []) as { label: string; address: string; balance: string }[];
   const attendeeEmojis: Record<string, string> = {
-    "Attendee 1": ANIMAL_EMOJI.attendee_1 ?? "",
-    "Attendee 2": ANIMAL_EMOJI.attendee_2 ?? "",
-    "Attendee 3": ANIMAL_EMOJI.attendee_3 ?? "",
+    "Guest 1": ANIMAL_EMOJI.attendee_1 ?? "",
+    "Guest 2": ANIMAL_EMOJI.attendee_2 ?? "",
+    "Guest 3": ANIMAL_EMOJI.attendee_3 ?? "",
   };
   return (
     <div className="space-y-0.5">
