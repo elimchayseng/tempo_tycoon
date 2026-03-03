@@ -344,7 +344,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
           {activity.length > 0 && (
             <>
               <div className="border-t border-dashed border-[var(--zt-green-mid)] my-1" />
-              <div className="space-y-1">
+              <div className="space-y-1 max-h-[80px] overflow-y-auto">
                 {activity.map((entry) =>
                   entry.type === 'guest' ? (
                     <div
@@ -395,7 +395,7 @@ function RestockProtocolObject({ latestEvent }: { latestEvent: ZooRestockEvent }
         {expanded ? '▼' : '▶'} Last Restock Protocol Object
       </button>
       {expanded && (
-        <pre className="font-pixel text-[9px] text-amber-300 bg-black/30 rounded px-2 py-1 mt-1 overflow-x-auto">
+        <pre className="font-pixel text-[9px] text-amber-300 bg-black/30 rounded px-2 py-1 mt-1 overflow-x-auto max-h-[120px] overflow-y-auto">
 {JSON.stringify({
   action: 'restock_payment',
   sku: latestEvent.sku,

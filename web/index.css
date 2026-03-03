@@ -295,3 +295,29 @@
   border-color: var(--zt-gold) !important;
   box-shadow: 0 0 6px rgba(255,215,0,0.4);
 }
+
+/* ── Receipt Viewer entrance animation ── */
+@keyframes zt-booth-enter {
+  0%   { transform: scale(0.85) translateY(30px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.zt-booth-enter { animation: zt-booth-enter 0.25s ease-out; }
+
+/* ── Receipt chip hover effect ── */
+.zt-chip {
+  border: 2px solid;
+  border-color: var(--zt-border-light) var(--zt-border-dark) var(--zt-border-dark) var(--zt-border-light);
+  transition: filter 0.1s, transform 0.1s;
+}
+.zt-chip:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* ── Perforated ticket edge ── */
+.zt-ticket-perf {
+  background-image: radial-gradient(circle, var(--zt-parchment) 4px, transparent 4px);
+  background-size: 16px 16px;
+  background-position: -8px 0;
+  height: 16px;
+}
