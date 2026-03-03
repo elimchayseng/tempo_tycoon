@@ -171,12 +171,32 @@ function RunnerMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   );
 }
 
+function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const distribution = metadata.distribution as { merchant: string; attendees: string } | undefined;
+  return (
+    <div className="space-y-0.5">
+      <MetadataDetail label="Method" value={metadata.method as string} />
+      <MetadataDetail label="Lifecycle" value={metadata.lifecycle as string} />
+      {distribution && (
+        <>
+          <MetadataDetail label="Merchant" value={distribution.merchant} />
+          <MetadataDetail label="Attendees" value={distribution.attendees} />
+        </>
+      )}
+      <MetadataDetail label="Total" value={metadata.total as string} />
+      <MetadataDetail label="Refunding" value={metadata.refunding as string} />
+      <MetadataDetail label="Auto-stop" value={metadata.autoStop as string} />
+    </div>
+  );
+}
+
 const METADATA_RENDERERS: Record<string, React.FC<{ metadata: Record<string, unknown> }>> = {
   blockchain: BlockchainMetadata,
   accounts: AccountsMetadata,
   balances: BalancesMetadata,
   merchants: MerchantMetadata,
   runner: RunnerMetadata,
+  funding: FundingMetadata,
 };
 
 export default function PreflightPanel({

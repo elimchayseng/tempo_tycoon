@@ -16,7 +16,7 @@ import { publicClient, CHAIN_CONFIG } from "./tempo-client.js";
 import { accountStore } from "./accounts.js";
 import { config, validateConfig } from "./config.js";
 import { createLogger } from "../shared/logger.js";
-import { initializeZooAccounts, areZooAccountsInitialized, getAllZooAccounts } from "./zoo-accounts.js";
+// Zoo accounts are generated dynamically at simulation start
 import {
   validateSendRequest,
   validateBatchRequest,
@@ -34,9 +34,6 @@ const log = createLogger('server');
 
 // Validate configuration on startup
 validateConfig();
-
-// Initialize zoo accounts if enabled
-initializeZooAccounts();
 
 const app = new Hono();
 
@@ -258,15 +255,9 @@ log.debug(`Request logging: ${config.logging.enableRequestLogging ? 'enabled' : 
 
 // Zoo simulation status
 if (config.zoo.enabled) {
-  const zooAccountsInitialized = areZooAccountsInitialized();
-  log.info('Zoo simulation: enabled');
-  log.info(`Zoo accounts initialized: ${zooAccountsInitialized}`);
-  if (zooAccountsInitialized) {
-    const zooAccounts = getAllZooAccounts();
-    log.info(`Total zoo accounts: ${zooAccounts.length}`);
-    log.debug('Registry available at: /api/zoo/registry');
-    log.debug('Merchant catalog at: /api/merchant/food/catalog');
-  }
+  log.info('Zoo simulation: enabled (ephemeral wallets generated on start)');
+  log.debug('Registry available at: /api/zoo/registry');
+  log.debug('Merchant catalog at: /api/merchant/food/catalog');
 } else {
   log.info('Zoo simulation: disabled');
 }

@@ -205,7 +205,9 @@ export type WsMessage =
   | { type: "zoo_tx_flow"; event: TransactionFlowEvent }
   | { type: "zoo_balance_update"; update: BalanceUpdate }
   | { type: "zoo_merchant_state"; merchant: ZooMerchantState }
-  | { type: "zoo_restock_event"; event: ZooRestockEvent };
+  | { type: "zoo_restock_event"; event: ZooRestockEvent }
+  | { type: "zoo_simulation_complete"; data: unknown }
+  | { type: "zoo_funding_progress"; step: string; detail?: string };
 
 // API Request types for validation
 export interface SendRequest {

@@ -33,48 +33,20 @@ All configuration is managed through environment variables, loaded in `server/co
 | `AGENT_POLLING_INTERVAL` | `10000` | Agent decision cycle interval (ms). **Note:** The agent-runner currently hardcodes 3000ms for fast testing — this env var is read by `server/config.ts` and available to `decision-engine.ts` via `config.zoo.agentPollingInterval`. |
 | `NEED_DECAY_RATE` | `2` | Food need points lost per cycle. **Note:** Agent-runner hardcodes 5 for fast testing. |
 | `PURCHASE_THRESHOLD` | `30` | Purchase when food_need drops below this. **Note:** Agent-runner hardcodes 40 for fast testing. |
-| `MIN_BALANCE_THRESHOLD` | `10.0` | Minimum balance to attempt purchases (AlphaUSD) |
+| `MIN_BALANCE_THRESHOLD` | `10.0` | Minimum balance before depletion auto-stop triggers (AlphaUSD) |
 | `SESSION_TIMEOUT_MINUTES` | `5` | Checkout session expiry (minutes) |
 
-### Zoo Wallets (required when `ZOO_SIMULATION_ENABLED=true`)
-
-| Variable | Description |
-|----------|-------------|
-| `ZOO_MASTER_PRIVATE_KEY` | Zoo Master wallet — funds agents |
-| `MERCHANT_A_PRIVATE_KEY` | Merchant wallet — receives payments |
-| `ATTENDEE_1_PRIVATE_KEY` | Agent 1 wallet |
-| `ATTENDEE_2_PRIVATE_KEY` | Agent 2 wallet |
-| `ATTENDEE_3_PRIVATE_KEY` | Agent 3 wallet |
-
-All private keys must be 64-character hex strings with `0x` prefix.
+No private keys are needed in `.env` — wallets are generated automatically each simulation start.
 
 ## `.env` Setup
 
-The easiest way to set up is with the wallet setup script:
-
-```bash
-npm run setup:wallets
-```
-
-This generates a `.env` file with fresh wallet keypairs. Then fund them:
-
-```bash
-npm run fund:agents
-```
-
-You can also manually create `.env`:
+A sensible `.env` is included in the repository. The minimum required configuration:
 
 ```env
 PORT=4000
 RPC_URL=https://rpc.moderato.tempo.xyz
 ZOO_SIMULATION_ENABLED=true
 LOG_LEVEL=info
-
-ZOO_MASTER_PRIVATE_KEY=0x...
-MERCHANT_A_PRIVATE_KEY=0x...
-ATTENDEE_1_PRIVATE_KEY=0x...
-ATTENDEE_2_PRIVATE_KEY=0x...
-ATTENDEE_3_PRIVATE_KEY=0x...
 ```
 
 ## `config/zoo_map.json`
@@ -102,4 +74,4 @@ The `DecisionEngine` uses these hardcoded defaults (exported as `SIMULATION_DEFA
 | `needRecovery.dessert` | 60 | Points recovered from dessert |
 | `minBalanceThreshold` | 5.0 | Min balance to buy (AlphaUSD) |
 | `maxPurchaseFrequencyMs` | 2000 | Min gap between purchases (ms) |
-| `randomFactor` | 0.2 | ±20% randomness on decay |
+| `randomFactor` | 0.2 | +/-20% randomness on decay |

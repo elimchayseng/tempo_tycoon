@@ -10,7 +10,6 @@
  * Exit 0 on success, 1 on failure.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const TIMEOUT_MS = 60_000;
@@ -18,9 +17,7 @@ const TIMEOUT_MS = 60_000;
 async function main() {
   console.log('=== Integration Test: Single Purchase Cycle ===\n');
 
-  // Initialize zoo accounts in the account store (normally done by the dev server)
-  initializeZooAccounts();
-
+  // AgentRunner now generates ephemeral wallets internally during start()
   const runner = new AgentRunner();
   let purchaseCompleted = false;
   let purchaseError: string | null = null;

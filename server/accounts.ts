@@ -49,6 +49,11 @@ class AccountStore {
     return privateKeyToAccount(acct.privateKey);
   }
 
+  remove(label: string): boolean {
+    const normalized = label.toLowerCase();
+    return this.accounts.delete(normalized) || this.accounts.delete(normalized.replace(/ /g, '_'));
+  }
+
   updateBalance(label: string, token: string, balance: bigint) {
     const acct = this.get(label);
     if (acct) {

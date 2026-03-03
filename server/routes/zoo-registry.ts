@@ -18,6 +18,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     { id: "balances", label: "Wallet balances", status: "pending" },
     { id: "merchants", label: "Merchant registry", status: "pending" },
     { id: "runner", label: "Agent runner", status: "pending" },
+    { id: "funding", label: "Wallet funding strategy", status: "pending" },
   ];
 
   // 1. Blockchain connectivity
@@ -39,7 +40,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     checks[0].detail = e instanceof Error ? e.message : "Cannot reach chain";
   }
 
-  // 2. Zoo accounts
+  // 2. Zoo accounts — ephemeral wallets generated on start
   try {
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
@@ -49,26 +50,37 @@ zooRegistryRoutes.post("/preflight", async (c) => {
         accounts: accounts.map((a) => ({ label: a.label, address: a.address })),
       };
     } else {
-      checks[1].status = "fail";
-      checks[1].detail = `Only ${accounts.length}/5 accounts found`;
+      // No wallets yet — they'll be generated when simulation starts
+      checks[1].status = "pass";
+      checks[1].detail = "Generated on start";
+      checks[1].metadata = {
+        ephemeral: true,
+        accounts: [
+          { label: "Zoo Master", address: "Generated on start" },
+          { label: "Merchant A", address: "Generated on start" },
+          { label: "Attendee 1", address: "Generated on start" },
+          { label: "Attendee 2", address: "Generated on start" },
+          { label: "Attendee 3", address: "Generated on start" },
+        ],
+      };
     }
   } catch (e) {
     checks[1].status = "fail";
     checks[1].detail = e instanceof Error ? e.message : "Account check failed";
   }
 
-  // 3. Wallet balances — fetch live on-chain balances first
+  // 3. Wallet balances
   try {
-    await refreshZooBalances();
-    const master = getZooAccountByRole("zooMaster");
-    const merchantA = getZooAccountByRole("merchantA");
-    const attendees = [
-      getZooAccountByRole("attendee1"),
-      getZooAccountByRole("attendee2"),
-      getZooAccountByRole("attendee3"),
-    ];
-    const allFunded = master && attendees.every((a) => a !== undefined);
-    if (allFunded) {
+    const accounts = getAllZooAccounts();
+    if (accounts.length >= 5) {
+      await refreshZooBalances();
+      const master = getZooAccountByRole("zooMaster");
+      const merchantA = getZooAccountByRole("merchantA");
+      const attendees = [
+        getZooAccountByRole("attendee1"),
+        getZooAccountByRole("attendee2"),
+        getZooAccountByRole("attendee3"),
+      ];
       checks[2].status = "pass";
       checks[2].detail = "Master + 3 attendees available";
       const walletList: { label: string; address: string; balance: string }[] = [];
@@ -88,8 +100,17 @@ zooRegistryRoutes.post("/preflight", async (c) => {
       });
       checks[2].metadata = { wallets: walletList };
     } else {
-      checks[2].status = "fail";
-      checks[2].detail = "Some wallets missing";
+      // No wallets yet — funded on start
+      checks[2].status = "pass";
+      checks[2].detail = "Funded on start";
+      checks[2].metadata = {
+        ephemeral: true,
+        funding: {
+          method: "Tempo Batch Payment",
+          distribution: { merchant: "$100", attendees: "$50 each" },
+          total: "$250",
+        },
+      };
     }
   } catch (e) {
     checks[2].status = "fail";
@@ -153,6 +174,18 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     checks[4].status = "fail";
     checks[4].detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";
   }
+
+  // 6. Wallet funding strategy
+  checks[5].status = "pass";
+  checks[5].detail = "Tempo Batch Payment";
+  checks[5].metadata = {
+    method: "Tempo Batch Payment",
+    lifecycle: "Ephemeral — fresh wallets each simulation",
+    distribution: { merchant: "$100", attendees: "$50 each" },
+    total: "$250",
+    refunding: "None — agents spend until depleted",
+    autoStop: `When all buyers below $${config.zoo.minBalanceThreshold}`,
+  };
 
   const success = checks.every((ch) => ch.status === "pass");
   const result: PreflightResult = { success, checks };

@@ -55,6 +55,22 @@ if (config.zoo.enabled) {
     });
   });
 
+  // Broadcast funding progress during wallet init
+  runner.on('funding_progress' as any, (event: any) => {
+    broadcast({ type: 'zoo_funding_progress', step: event.data.step, detail: event.data.detail });
+  });
+
+  // Auto-stop on depletion — broadcast completion event
+  runner.on('simulation_depleted' as any, (event: any) => {
+    emitLog({
+      action: 'zoo_simulation',
+      type: 'info',
+      label: 'Simulation Complete — All buyers depleted',
+      data: event.data,
+    });
+    broadcast({ type: 'zoo_simulation_complete', data: event.data });
+  });
+
   // Broadcast network stats every 5 seconds while simulation is active
   let networkStatsInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -173,25 +189,6 @@ if (config.zoo.enabled) {
     }).catch((err) => {
       log.debug('Failed to refresh balances after purchase', err);
     });
-  });
-
-  // Record balance history on funding events
-  runner.on('funding_completed', async (event) => {
-    await refreshZooBalances();
-    const fundedAgents = event.data?.funded_agents ?? [];
-    for (const agentId of fundedAgents) {
-      // Map agent_id (attendee_1) → role key (attendee1) for account lookup
-      const roleKey = agentId.replace('_', '') as any;
-      const account = getZooAccountByRole(roleKey);
-      const balanceRaw = account?.balances[config.contracts.alphaUsd] ?? BigInt(0);
-      const balanceUsd = (Number(balanceRaw) / 1_000_000).toFixed(2);
-
-      balanceHistoryTracker.record(agentId, {
-        timestamp: Date.now(),
-        balance: balanceUsd,
-        event: 'funding',
-      });
-    }
   });
 
   runner.on('needs_updated', (event) => {
@@ -384,35 +381,6 @@ zooAgentRoutes.post("/agents/stop", async (c) => {
     return c.json({
       error: "Failed to stop agents",
       code: "AGENT_STOP_ERROR",
-      details: error instanceof Error ? error.message : String(error)
-    }, 500);
-  }
-});
-
-// POST /agents/fund
-zooAgentRoutes.post("/agents/fund", async (c) => {
-  try {
-    if (!config.zoo.enabled) {
-      return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
-    }
-
-    const runner = getAgentRunner();
-    if (!runner) {
-      return c.json({ error: "Agent runner not initialized", code: "RUNNER_NOT_INITIALIZED" }, 500);
-    }
-
-    await runner.checkAndRefundAgents();
-
-    return c.json({
-      success: true,
-      message: "Funding check completed",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    log.error('Agent funding error:', error);
-    return c.json({
-      error: "Failed to trigger funding",
-      code: "AGENT_FUNDING_ERROR",
       details: error instanceof Error ? error.message : String(error)
     }, 500);
   }

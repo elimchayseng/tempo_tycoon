@@ -23,7 +23,7 @@ export default function ZooHeader({
   explorerOpen,
   onToggleExplorer,
 }: ZooHeaderProps) {
-  const showDashboard = phase === "running" || phase === "starting" || phase === "stopping";
+  const showDashboard = phase === "running" || phase === "starting" || phase === "stopping" || phase === "complete";
 
   return (
     <header className="zt-statusbar flex items-center justify-between px-5 py-2.5 shrink-0">
@@ -81,6 +81,12 @@ export default function ZooHeader({
           <span className="font-pixel text-[8px] text-[var(--zt-gold)] animate-pulse">
             Stopping...
           </span>
+        )}
+
+        {phase === "complete" && (
+          <button onClick={onRestart} className="zt-btn-brown">
+            New Simulation
+          </button>
         )}
 
         {/* Control Room toggle */}

@@ -10,7 +10,6 @@
  * Exit 0 on success, 1 if success rate < 50%.
  */
 import 'dotenv/config';
-import { initializeZooAccounts } from '../server/zoo-accounts.js';
 import { AgentRunner } from '../agents/agent-runner.js';
 
 const DEFAULT_MINUTES = 2;
@@ -21,9 +20,7 @@ async function main() {
 
   console.log(`=== Load Test: ${minutes} minute(s) ===\n`);
 
-  // Initialize zoo accounts in the account store (normally done by the dev server)
-  initializeZooAccounts();
-
+  // AgentRunner now generates ephemeral wallets internally during start()
   const runner = new AgentRunner();
 
   let purchases = 0;
