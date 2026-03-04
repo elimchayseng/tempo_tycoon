@@ -61,14 +61,14 @@ export function isValidMemo(memo: string): boolean {
  * Map agent IDs to animal emojis
  */
 export const ANIMAL_EMOJI: Record<string, string> = {
-  attendee_1: "🦁",
-  attendee_2: "🐘",
-  attendee_3: "🐧",
+  guest_1: "🦁",
+  guest_2: "🐘",
+  guest_3: "🐧",
 };
 
 /**
  * Build the standardized guest label: `Guest: 0xABCD...1234 🦁`
- * @param agentId - e.g. "attendee_1"
+ * @param agentId - e.g. "guest_1"
  * @param address - optional wallet address
  */
 export function formatGuestLabel(agentId: string, address?: string): string {
@@ -77,6 +77,15 @@ export function formatGuestLabel(agentId: string, address?: string): string {
     return `Guest: ${shortAddr(address)} ${emoji}`;
   }
   return `Guest: ${agentId} ${emoji}`;
+}
+
+/**
+ * Get combined emoji string and display name from an items array
+ */
+export function cartDisplayInfo(items: Array<{ name: string; quantity: number }>): { emojis: string; displayName: string } {
+  const emojis = items.map(i => productEmoji(i.name)).join('');
+  const displayName = items.map(i => i.name).join(' + ');
+  return { emojis, displayName };
 }
 
 /**

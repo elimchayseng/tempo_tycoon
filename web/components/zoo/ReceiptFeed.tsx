@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { productEmoji } from "../../utils/formatting";
+import { cartDisplayInfo } from "../../utils/formatting";
 import ReceiptViewer from "./ReceiptViewer";
 
 interface ReceiptFeedProps {
@@ -58,7 +58,7 @@ export default function ReceiptFeed({ receipts }: ReceiptFeedProps) {
       >
         <div className="flex flex-row flex-nowrap gap-2">
           {receipts.map((receipt, i) => {
-            const emoji = productEmoji(receipt.product_name);
+            const { emojis, displayName } = cartDisplayInfo(receipt.items);
             return (
               <button
                 key={`${receipt.tx_hash}-${i}`}
@@ -66,9 +66,9 @@ export default function ReceiptFeed({ receipts }: ReceiptFeedProps) {
                 className="zt-chip zt-parchment shrink-0 px-2 py-1 cursor-pointer flex items-center gap-1"
                 style={{ minWidth: 140 }}
               >
-                <span className="text-sm">{emoji}</span>
+                <span className="text-sm">{emojis}</span>
                 <span className="font-pixel text-[9px] text-[var(--zt-text-dark)] truncate">
-                  {receipt.product_name}
+                  {displayName}
                 </span>
                 <span className="font-pixel text-[9px] text-emerald-800 ml-auto whitespace-nowrap">
                   ${receipt.amount}

@@ -1,6 +1,6 @@
 import { createLogger } from '../shared/logger.js';
 import { PaymentManager } from './payment-manager.js';
-import { BalanceSync } from './balance-sync.js';
+import { getAlphaUsdOnChainBalance, getWalletAddress } from './balance-sync.js';
 import {
   initializeInventory,
   getSkusNeedingRestock,
@@ -24,7 +24,6 @@ const log = createLogger('MerchantAgent');
 export class MerchantAgent {
   private readonly config: MerchantConfig;
   private readonly paymentManager: PaymentManager;
-  private readonly balanceSync: BalanceSync;
 
   private state: MerchantState | null = null;
   private isRunning = false;
@@ -40,7 +39,6 @@ export class MerchantAgent {
     log.info(`[${config.agent_id}] Initializing merchant agent...`);
 
     this.paymentManager = new PaymentManager(config.agent_id, 'Merchant A');
-    this.balanceSync = new BalanceSync();
 
     log.info(`[${config.agent_id}] Merchant agent initialized`);
   }
@@ -121,7 +119,7 @@ export class MerchantAgent {
       log.debug(`[${this.config.agent_id}] Merchant cycle ${this.state.cycle_count}`);
 
       // Step 1: Sync balance from chain
-      const currentBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
+      const currentBalance = await getAlphaUsdOnChainBalance(this.config.agent_id);
       this.state.balance = currentBalance.toFixed(2);
 
       // Step 2: Check for items needing restock
@@ -176,12 +174,13 @@ export class MerchantAgent {
         recipient_address: this.config.zoo_master_address,
         expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
         memo: `Restock: ${unitsNeeded}x ${item.name}`,
-        product: {
+        items: [{
           sku: item.sku,
           name: item.name,
           price: item.cost_basis,
           quantity: unitsNeeded,
-        },
+          satisfaction_value: 0,
+        }],
       };
 
       const product = {
@@ -190,6 +189,7 @@ export class MerchantAgent {
         price: item.cost_basis,
         currency: 'AlphaUSD',
         category: item.category,
+        satisfaction_value: 0,
         available: true,
       };
 
@@ -210,7 +210,7 @@ export class MerchantAgent {
       this.state.status = 'online';
 
       // Re-read balance from chain
-      const postBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
+      const postBalance = await getAlphaUsdOnChainBalance(this.config.agent_id);
       this.state.balance = postBalance.toFixed(2);
 
       const record: RestockRecord = {
@@ -330,7 +330,7 @@ export class MerchantAgent {
   getStatus(): MerchantStatus {
     const now = new Date();
     const uptimeSeconds = this.startTime ? Math.floor((now.getTime() - this.startTime.getTime()) / 1000) : 0;
-    const walletAddress = this.balanceSync.getWalletAddress(this.config.agent_id);
+    const walletAddress = getWalletAddress(this.config.agent_id);
 
     return {
       agent_id: this.config.agent_id,

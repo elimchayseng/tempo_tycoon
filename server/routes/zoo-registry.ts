@@ -14,12 +14,12 @@ export const zooRegistryRoutes = new Hono();
 zooRegistryRoutes.post("/preflight", async (c) => {
   const checks: PreflightCheck[] = [
     { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
-    { id: "wallets", label: "Wallet initialization", status: "pending" },
-    { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
+    { id: "accounts", label: "Zoo accounts (and wallets) initialized", status: "pending" },
+    { id: "funding", label: "Wallet funding strategy", status: "pending" },
     { id: "balances", label: "Wallet balances", status: "pending" },
     { id: "merchants", label: "Merchant registry", status: "pending" },
     { id: "runner", label: "Agent runner", status: "pending" },
-    { id: "funding", label: "Wallet funding strategy", status: "pending" },
+    { id: "llm", label: "LLM inference endpoint", status: "pending" },
   ];
 
   function check(id: string) {
@@ -45,31 +45,23 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     check("blockchain").detail = e instanceof Error ? e.message : "Cannot reach chain";
   }
 
-  // 2. Generate fresh ephemeral wallets & fund them
+  // 2. Zoo accounts (and wallets)
   const runner = getAgentRunner();
-  if (runner && check("blockchain").status === "pass") {
-    try {
-      await runner.initializeWallets();
-      check("wallets").status = "pass";
-      check("wallets").detail = "5 wallets generated & funded";
-    } catch (e) {
-      check("wallets").status = "fail";
-      check("wallets").detail = e instanceof Error ? e.message : "Wallet init failed";
-    }
-  } else if (!runner) {
-    check("wallets").status = "fail";
-    check("wallets").detail = "Agent runner not initialized";
-  } else {
-    check("wallets").status = "fail";
-    check("wallets").detail = "Skipped — blockchain unreachable";
-  }
-
-  // 3. Zoo accounts
   try {
+    // Initialize wallets first (requires blockchain + runner)
+    if (runner && check("blockchain").status === "pass") {
+      await runner.initializeWallets();
+    } else if (!runner) {
+      throw new Error("Agent runner not initialized");
+    } else {
+      throw new Error("Skipped — blockchain unreachable");
+    }
+
+    // Then verify accounts
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
       check("accounts").status = "pass";
-      check("accounts").detail = `${accounts.length} accounts found`;
+      check("accounts").detail = `${accounts.length} accounts, wallets funded`;
       check("accounts").metadata = {
         accounts: accounts.map((a) => ({ label: a.label, address: a.address })),
       };
@@ -79,23 +71,23 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     }
   } catch (e) {
     check("accounts").status = "fail";
-    check("accounts").detail = e instanceof Error ? e.message : "Account check failed";
+    check("accounts").detail = e instanceof Error ? e.message : "Account/wallet init failed";
   }
 
-  // 4. Wallet balances
+  // 3. Wallet balances
   try {
     const accounts = getAllZooAccounts();
     if (accounts.length >= 5) {
       await refreshZooBalances();
       const master = getZooAccountByRole("zooMaster");
       const merchantA = getZooAccountByRole("merchantA");
-      const attendees = [
-        getZooAccountByRole("attendee1"),
-        getZooAccountByRole("attendee2"),
-        getZooAccountByRole("attendee3"),
+      const guests = [
+        getZooAccountByRole("guest1"),
+        getZooAccountByRole("guest2"),
+        getZooAccountByRole("guest3"),
       ];
       check("balances").status = "pass";
-      check("balances").detail = "Master + 3 attendees available";
+      check("balances").detail = "Master + 3 guests available";
       const walletList: { label: string; address: string; balance: string }[] = [];
       if (master) {
         const bal = master.balances[config.contracts.alphaUsd]?.toString() ?? "0";
@@ -108,7 +100,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
         const merchantName = registry.merchants?.[0]?.name ?? "Merchant";
         walletList.push({ label: `Merchant: ${merchantName}`, address: merchantA.address, balance: bal });
       }
-      attendees.forEach((a, i) => {
+      guests.forEach((a, i) => {
         if (a) {
           const bal = a.balances[config.contracts.alphaUsd]?.toString() ?? "0";
           walletList.push({ label: `Guest ${i + 1}`, address: a.address, balance: bal });
@@ -124,7 +116,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     check("balances").detail = e instanceof Error ? e.message : "Balance check failed";
   }
 
-  // 5. Merchant registry
+  // 4. Merchant registry
   try {
     const registry = loadZooRegistry();
     const merchants = registry.merchants ?? [];
@@ -156,7 +148,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     check("merchants").detail = e instanceof Error ? e.message : "Registry load failed";
   }
 
-  // 6. Agent runner
+  // 5. Agent runner
   if (runner) {
     const zooMaster = getZooAccountByRole("zooMaster");
     check("runner").status = "pass";
@@ -164,9 +156,9 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     check("runner").metadata = {
       buyerAgents: {
         count: 3,
-        pollingInterval: config.zoo.agentPollingInterval,
-        needDecayRate: config.zoo.needDecayRate,
-        purchaseThreshold: config.zoo.purchaseThreshold,
+        pollingInterval: 12000,
+        needDecayRate: "1–20 (random)",
+        purchaseThreshold: 40,
       },
       merchantAgent: {
         agentId: "merchant_a",
@@ -182,13 +174,73 @@ zooRegistryRoutes.post("/preflight", async (c) => {
     check("runner").detail = "Agent runner not initialized (ZOO_SIMULATION_ENABLED?)";
   }
 
+  // 6. LLM inference endpoint
+  try {
+    if (config.llm.enabled) {
+      // Make a lightweight request to verify connectivity
+      const inferenceUrl = config.llm.inferenceUrl;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(`${inferenceUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${config.llm.inferenceKey}`,
+          },
+          body: JSON.stringify({
+            model: config.llm.model,
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 1,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (response.ok || response.status === 200) {
+          check("llm").status = "pass";
+          check("llm").detail = `Heroku Managed Inference — ${config.llm.model}`;
+        } else {
+          check("llm").status = "fail";
+          check("llm").detail = `Endpoint returned ${response.status}: ${response.statusText}`;
+        }
+      } catch (fetchErr) {
+        clearTimeout(timeout);
+        check("llm").status = "fail";
+        check("llm").detail = fetchErr instanceof Error ? fetchErr.message : "Inference endpoint unreachable";
+      }
+      // Mask the key for metadata display
+      const maskedKey = config.llm.inferenceKey
+        ? config.llm.inferenceKey.slice(0, 8) + "..." + config.llm.inferenceKey.slice(-4)
+        : "(not set)";
+      check("llm").metadata = {
+        model: config.llm.model,
+        endpoint: config.llm.inferenceUrl || "(not set)",
+        apiKey: maskedKey,
+        maxTokens: config.llm.maxTokensPerResponse,
+        callLimit: config.llm.maxCallsPerSimulation,
+      };
+    } else {
+      check("llm").status = "pass";
+      check("llm").detail = "Disabled (rule-based fallback active)";
+      check("llm").metadata = {
+        model: "N/A",
+        endpoint: "N/A",
+        maxTokens: "N/A",
+        callLimit: "N/A",
+      };
+    }
+  } catch (e) {
+    check("llm").status = "fail";
+    check("llm").detail = e instanceof Error ? e.message : "LLM check failed";
+  }
+
   // 7. Wallet funding strategy
   check("funding").status = "pass";
   check("funding").detail = "Tempo Batch Payment";
   check("funding").metadata = {
     method: "Tempo Batch Payment",
     lifecycle: "Ephemeral — fresh wallets each simulation",
-    distribution: { merchant: "$100", attendees: "$50 each" },
+    distribution: { merchant: "$100", guests: "$50 each" },
     total: "$250",
     refunding: "None — agents spend until depleted",
     autoStop: `When all buyers below $${config.zoo.minBalanceThreshold}`,
@@ -265,9 +317,9 @@ zooRegistryRoutes.get("/status", async (c) => {
         total_agents: 3,
         active_agents: 0,
         agent_states: [
-          { id: "attendee_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
-          { id: "attendee_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
-          { id: "attendee_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
+          { id: "guest_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "guest_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "guest_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
         ]
       }
     };

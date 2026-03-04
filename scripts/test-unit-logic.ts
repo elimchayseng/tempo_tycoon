@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+export {};
 /**
  * Pure logic tests — no server, no blockchain, runs instantly.
  *
@@ -42,7 +43,7 @@ async function testDecisionEngine() {
 
   const needs = { food_need: 80, fun_need: 60 };
   const degraded = engine.degradeNeeds(needs);
-  assert(degraded.food_need === 75, 'degradeNeeds reduces food_need by decay rate');
+  assert(degraded.food_need >= 60 && degraded.food_need <= 79, 'degradeNeeds reduces food_need by 1-20');
   assert(degraded.fun_need === 60, 'degradeNeeds does not touch fun_need');
 
   // Degradation clamps at 0
@@ -69,7 +70,7 @@ async function testDecisionEngine() {
   assert(tooSoon.shouldPurchase === false, 'no purchase when too soon after last');
 
   // Need recovery after purchase
-  const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', available: true };
+  const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true };
   const recovered = engine.calculateNeedRecovery({ food_need: 20, fun_need: 50 }, product);
   assert(recovered.food_need > 20, 'need recovery increases food_need');
   assert(recovered.food_need <= 100, 'need recovery clamped at 100');
@@ -235,9 +236,9 @@ async function testWalletGenerator() {
   const roles = wallets.map(w => w.role);
   assert(roles.includes('zooMaster'), 'includes zooMaster role');
   assert(roles.includes('merchantA'), 'includes merchantA role');
-  assert(roles.includes('attendee1'), 'includes attendee1 role');
-  assert(roles.includes('attendee2'), 'includes attendee2 role');
-  assert(roles.includes('attendee3'), 'includes attendee3 role');
+  assert(roles.includes('guest1'), 'includes guest1 role');
+  assert(roles.includes('guest2'), 'includes guest2 role');
+  assert(roles.includes('guest3'), 'includes guest3 role');
 }
 
 // ---------- Runner ----------

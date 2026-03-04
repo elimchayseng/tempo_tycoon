@@ -1,3 +1,5 @@
+> **Note:** This is the original specification document. For current architecture, see [docs/architecture.md](../architecture.md).
+
 # Zoo Tycoon Agentic Commerce Simulation (ACP) - Complete Specification
 
 ## Executive Summary

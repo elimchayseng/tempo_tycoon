@@ -22,4 +22,5 @@ export type {
   BalanceUpdate,
   ZooMerchantState,
   ZooRestockEvent,
+  ZooLLMDecision,
 } from '../../shared/types.js';

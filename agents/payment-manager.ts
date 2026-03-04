@@ -2,7 +2,8 @@ import { createLogger } from '../shared/logger.js';
 import { transferAlphaUsdAction } from "../server/actions/send.js";
 import { accountStore } from "../server/accounts.js";
 import { rpcCircuitBreaker } from './circuit-breaker.js';
-import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
+import type { CheckoutSession, PurchaseRecord } from './types.js';
+import type { MerchantProduct } from './types.js';
 
 const log = createLogger('PaymentManager');
 
@@ -177,7 +178,6 @@ export class PaymentManager {
    */
   createPurchaseRecord(
     session: CheckoutSession,
-    product: MerchantProduct,
     paymentResult: PaymentResult,
     needsBefore: { food_need: number; fun_need: number },
     needsAfter: { food_need: number; fun_need: number }
@@ -185,8 +185,12 @@ export class PaymentManager {
     const record: PurchaseRecord = {
       purchase_id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       session_id: session.session_id,
-      sku: product.sku,
-      name: product.name,
+      items: session.items.map(i => ({
+        sku: i.sku,
+        name: i.name,
+        quantity: i.quantity,
+        satisfaction_value: i.satisfaction_value,
+      })),
       amount: paymentResult.amount,
       tx_hash: paymentResult.tx_hash || 'unknown',
       block_number: paymentResult.block_number || 'unknown',
@@ -197,7 +201,8 @@ export class PaymentManager {
       need_after: needsAfter
     };
 
-    log.info(`[${this.agentId}] Purchase record created: ${record.purchase_id}`);
+    const itemNames = session.items.map(i => i.name).join(' + ');
+    log.info(`[${this.agentId}] Purchase record created: ${record.purchase_id} [${itemNames}]`);
     log.debug(`[${this.agentId}] Need change: food ${needsBefore.food_need} -> ${needsAfter.food_need}`);
 
     return record;
@@ -233,33 +238,4 @@ export class PaymentManager {
     return true;
   }
 
-  getStatus() {
-    return {
-      agent_id: this.agentId,
-      agent_label: this.agentLabel,
-      payment_method: 'tempo_alphausd',
-      supported_features: [
-        'tempo_transactions',
-        'memo_support',
-        'automatic_fee_calculation',
-        'balance_validation'
-      ]
-    };
-  }
-
-  estimateTransactionFee(): number {
-    return 0.01;
-  }
-
-  async checkSufficientBalance(amount: string, currentBalance: number): Promise<boolean> {
-    const paymentAmount = parseFloat(amount);
-    const estimatedFee = this.estimateTransactionFee();
-    const totalCost = paymentAmount + estimatedFee;
-
-    const hasSufficientBalance = currentBalance >= totalCost;
-
-    log.debug(`[${this.agentId}] Balance check: $${currentBalance.toFixed(2)} vs $${totalCost.toFixed(2)} needed — ${hasSufficientBalance ? 'OK' : 'INSUFFICIENT'}`);
-
-    return hasSufficientBalance;
-  }
 }

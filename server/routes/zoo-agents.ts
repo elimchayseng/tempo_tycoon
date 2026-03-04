@@ -9,6 +9,7 @@ import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } f
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
 import { balanceHistoryTracker } from "../balance-history.js";
 import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
+import type { AgentEventType } from "../../agents/types.js";
 import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
 
 const log = createLogger('zoo-agents');
@@ -57,12 +58,12 @@ if (config.zoo.enabled) {
   });
 
   // Broadcast funding progress during wallet init
-  runner.on('funding_progress' as any, (event: any) => {
+  runner.on('funding_progress' as AgentEventType, (event: any) => {
     broadcast({ type: 'zoo_funding_progress', step: event.data.step, detail: event.data.detail });
   });
 
   // Auto-stop on depletion — broadcast completion event
-  runner.on('simulation_depleted' as any, (event: any) => {
+  runner.on('simulation_depleted' as AgentEventType, (event: any) => {
     emitLog({
       action: 'zoo_simulation',
       type: 'info',
@@ -107,7 +108,7 @@ if (config.zoo.enabled) {
   });
 
   // Forward tx_flow events from buyer agents
-  runner.on('tx_flow' as any, (event: any) => {
+  runner.on('tx_flow', (event: any) => {
     const flowEvent: TransactionFlowEvent = {
       agent_id: event.agent_id,
       stage: event.data.stage,
@@ -118,15 +119,18 @@ if (config.zoo.enabled) {
   });
 
   runner.on('purchase_completed', (event) => {
+    const rec = event.data.purchase_record;
+    const itemNames = rec.items?.map((i: { name: string }) => i.name).join(' + ') ?? 'Unknown';
+
     emitLog({
       action: 'zoo_purchase',
       type: 'info',
-      label: `Purchase: ${event.data.purchase_record.name} ($${event.data.purchase_record.amount})`,
+      label: `Purchase: ${itemNames} ($${rec.amount})`,
       data: {
         agent_id: event.agent_id,
-        product: event.data.purchase_record.name,
-        amount: event.data.purchase_record.amount,
-        tx_hash: event.data.purchase_record.tx_hash,
+        items: rec.items,
+        amount: rec.amount,
+        tx_hash: rec.tx_hash,
         new_needs: event.data.new_needs
       }
     });
@@ -134,18 +138,16 @@ if (config.zoo.enabled) {
     // Increment zoo tx counter
     incrementZooTxCount();
 
-    const rec = event.data.purchase_record;
     const registry = loadZooRegistry();
     const merchantName = registry.merchants?.[0]?.name ?? 'Unknown Merchant';
     const merchantAccount = getZooAccountByRole('merchantA');
-    // Map agent_id (attendee_1) → role key (attendee1) for account lookup
+    // Map agent_id (guest_1) → role key (guest1) for account lookup
     const agentRoleKey = event.agent_id.replace('_', '') as any;
     const agentAccount = getZooAccountByRole(agentRoleKey);
     const receipt: ZooPurchaseReceipt = {
       agent_id: event.agent_id,
       agent_address: agentAccount?.address ?? '',
-      product_name: rec.name ?? rec.product_name ?? '',
-      sku: rec.sku ?? '',
+      items: rec.items ?? [],
       amount: String(rec.amount),
       merchant_name: merchantName,
       merchant_address: merchantAccount?.address ?? '',
@@ -154,7 +156,7 @@ if (config.zoo.enabled) {
       gas_used: String(rec.gas_used ?? ''),
       fee_ausd: rec.fee_ausd ?? undefined,
       fee_payer: rec.fee_payer ?? undefined,
-      need_before: event.data.need_before ?? 0,
+      need_before: rec.need_before?.food_need ?? 0,
       need_after: event.data.new_needs?.food_need ?? 0,
       timestamp: Date.now(),
     };
@@ -283,6 +285,13 @@ if (config.zoo.enabled) {
       type: 'info',
       label: `Sale: ${event.data.sku} $${event.data.amount} (profit: $${event.data.profit})`,
       data: event.data,
+    });
+  });
+
+  runner.on('llm_decision', (event) => {
+    broadcast({
+      type: 'zoo_llm_decision',
+      decision: { ...event.data, timestamp: Date.now() },
     });
   });
 

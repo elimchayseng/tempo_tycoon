@@ -62,6 +62,7 @@ Thumbs.db
 
 # Simulation state
 simulation-state/
+agent-states/
 agent-logs/
 transaction-history/
 

@@ -22,6 +22,8 @@
     "test:lifecycle": "tsx scripts/test-simulation-lifecycle.ts",
     "test:integration": "tsx scripts/integration-test.ts",
     "test:load": "tsx scripts/load-test.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:all": "npm run test:unit && npm run test:api && npm run test:ws"
   },
   "dependencies": {
@@ -45,7 +47,8 @@
     "tailwindcss": "^4",
     "tsx": "latest",
     "typescript": "^5",
-    "vite": "latest"
+    "vite": "latest",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18.0.0"

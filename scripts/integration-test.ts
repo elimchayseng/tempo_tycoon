@@ -93,12 +93,12 @@ async function main() {
     }
 
     // Verify receipt data shape
-    const receiptFields = ['product_name', 'amount', 'tx_hash', 'block_number'];
+    const receiptFields = ['items', 'amount', 'tx_hash', 'block_number'];
     const missingFields = receiptFields.filter(f => receiptData?.[f] === undefined);
     if (missingFields.length > 0) {
       console.warn(`[WARN] Receipt missing fields: ${missingFields.join(', ')}`);
     } else {
-      console.log('[TEST] Receipt shape verified (product_name, amount, tx_hash, block_number)');
+      console.log('[TEST] Receipt shape verified (items, amount, tx_hash, block_number)');
     }
 
     // Verify agent needs recovered after purchase

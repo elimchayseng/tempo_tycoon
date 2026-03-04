@@ -137,8 +137,7 @@ export interface ZooAgentState {
 export interface ZooPurchaseReceipt {
   agent_id: string;
   agent_address?: string;
-  product_name: string;
-  sku: string;
+  items: Array<{ sku: string; name: string; quantity: number; satisfaction_value: number }>;
   amount: string;
   merchant_name: string;
   merchant_address: string;
@@ -197,6 +196,22 @@ export interface ZooRestockEvent {
   timestamp: number;
 }
 
+export interface ZooLLMDecision {
+  agent_id: string;
+  toolName: string;
+  reasoning: string;
+  action: { type: 'purchase' | 'wait'; items?: Array<{ sku: string; quantity: number }>; reason: string };
+  context_summary: {
+    food_need: number;
+    balance: string;
+    catalog_size: number;
+    recent_purchases: number;
+  };
+  model?: string;
+  tokenUsage?: { promptTokens: number; completionTokens: number };
+  timestamp: number;
+}
+
 export type WsMessage =
   | { type: "log"; entry: LogEntry }
   | { type: "accounts"; accounts: AccountsState }
@@ -211,7 +226,8 @@ export type WsMessage =
   | { type: "zoo_merchant_state"; merchant: ZooMerchantState }
   | { type: "zoo_restock_event"; event: ZooRestockEvent }
   | { type: "zoo_simulation_complete"; data: unknown }
-  | { type: "zoo_funding_progress"; step: string; detail?: string };
+  | { type: "zoo_funding_progress"; step: string; detail?: string }
+  | { type: "zoo_llm_decision"; decision: ZooLLMDecision };
 
 // API Request types for validation
 export interface SendRequest {

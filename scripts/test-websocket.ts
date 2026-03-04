@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+export {};
 /**
  * WebSocket connectivity test — requires a running server (`npm run dev:server`).
  *
@@ -30,6 +31,7 @@ async function run() {
   console.log('=== WebSocket Connectivity Test ===');
   console.log(`Target: ${WS_URL}\n`);
 
+  // @ts-expect-error — ws has no type declarations
   const WebSocket = (globalThis as any).WebSocket ?? (await import('ws')).default;
 
   const result = await new Promise<{ connected: boolean; message: any; error?: string }>((resolve) => {

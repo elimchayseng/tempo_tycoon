@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+export {};
 /**
  * Full simulation lifecycle test — requires running server + blockchain access.
  *

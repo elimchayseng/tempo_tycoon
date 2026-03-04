@@ -3,6 +3,17 @@ import { join, dirname } from 'path';
 import { randomBytes } from 'crypto';
 import type { AgentState, PurchaseRecord } from './types.js';
 
+/** Singleton instance — use getStateManager() to access */
+let _instance: StateManager | null = null;
+
+/** Get (or create) the singleton StateManager instance */
+export function getStateManager(): StateManager {
+  if (!_instance) {
+    _instance = new StateManager();
+  }
+  return _instance;
+}
+
 export class StateManager {
   private readonly stateDir: string;
   private readonly stateFiles: Map<string, string> = new Map();
@@ -60,7 +71,7 @@ export class StateManager {
           agent_id: agentId,
           address: agentAddress,
           needs: {
-            food_need: 100, // Start at 100%
+            food_need: 50, // Start at 50% so agents purchase sooner
             fun_need: 100   // Future feature
           },
           balance: "0.00",
@@ -175,7 +186,8 @@ export class StateManager {
 
       await this.updateState(agentId, updates);
 
-      console.log(`[StateManager] 🛍️  Recorded purchase for ${agentId}: ${purchaseRecord.name} ($${purchaseRecord.amount})`);
+      const itemNames = purchaseRecord.items.map(i => i.name).join(' + ');
+      console.log(`[StateManager] 🛍️  Recorded purchase for ${agentId}: ${itemNames} ($${purchaseRecord.amount})`);
       console.log(`[StateManager] ${agentId} totals: ${updates.purchase_count} purchases, $${updates.total_spent} spent`);
 
     } catch (error) {

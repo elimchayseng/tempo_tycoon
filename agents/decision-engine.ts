@@ -9,7 +9,7 @@ export const SIMULATION_DEFAULTS = {
   pollingIntervalMs: 3000,
   needDecayRate: { food_need: 5, fun_need: 4 },
   purchaseThreshold: { food_need: 40, fun_need: 30 },
-  needRecovery: { main: 70, snack: 50, beverage: 30, dessert: 60 },
+  needRecovery: { main: 70, snack: 50, beverage: 30, dessert: 60 }, // legacy fallback
   minBalanceThreshold: 5.0,
   maxPurchaseFrequencyMs: 2000,
   randomFactor: 0.2,
@@ -90,12 +90,9 @@ export class DecisionEngine {
    * Degrade needs over time - this runs every polling cycle
    */
   degradeNeeds(currentNeeds: AgentNeeds): AgentNeeds {
-    // Apply base degradation
-    let newFoodNeed = currentNeeds.food_need - this.config.needDecayRate.food_need;
-
-    // Apply randomness factor (-20% to +20% variation)
-    const randomFactor = this.config.randomFactor;
-    newFoodNeed += (Math.random() - 0.5) * 2 * randomFactor * this.config.needDecayRate.food_need;
+    // Apply random degradation (1–40 per cycle) for meaningful variance
+    const decay = Math.floor(Math.random() * 40) + 1;
+    let newFoodNeed = currentNeeds.food_need - decay;
 
     // Clamp to 0-100 range
     newFoodNeed = Math.max(0, Math.min(100, newFoodNeed));
@@ -187,15 +184,14 @@ export class DecisionEngine {
   }
 
   /**
-   * Calculate need recovery after purchasing a product
+   * Calculate need recovery after purchasing a single product (uses satisfaction_value)
    */
   calculateNeedRecovery(currentNeeds: AgentNeeds, product: MerchantProduct): AgentNeeds {
-    const category = product.category.toLowerCase();
-    const recoveryAmount = this.config.needRecovery[category as keyof typeof this.config.needRecovery] || 40;
+    const baseRecovery = product.satisfaction_value ?? 40;
 
     // Add some randomness to recovery (+/- 20%)
     const randomFactor = (Math.random() - 0.5) * 0.4; // -0.2 to +0.2
-    const actualRecovery = Math.round(recoveryAmount * (1 + randomFactor));
+    const actualRecovery = Math.round(baseRecovery * (1 + randomFactor));
 
     const newFoodNeed = Math.min(100, currentNeeds.food_need + actualRecovery);
 
@@ -204,7 +200,36 @@ export class DecisionEngine {
       fun_need: currentNeeds.fun_need,
     };
 
-    log.info(`[${this.agentId}] Need recovery: ${product.name} (${category}) +${actualRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
+    log.info(`[${this.agentId}] Need recovery: ${product.name} (sat=${baseRecovery}) +${actualRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
+
+    return newNeeds;
+  }
+
+  /**
+   * Calculate need recovery from a cart of items — sums satisfaction_value with ±20% per item, caps at 100
+   */
+  calculateCartRecovery(
+    currentNeeds: AgentNeeds,
+    items: Array<{ sku: string; name: string; satisfaction_value: number; quantity: number }>,
+  ): AgentNeeds {
+    let totalRecovery = 0;
+
+    for (const item of items) {
+      for (let q = 0; q < item.quantity; q++) {
+        const randomFactor = (Math.random() - 0.5) * 0.4;
+        totalRecovery += Math.round(item.satisfaction_value * (1 + randomFactor));
+      }
+    }
+
+    const newFoodNeed = Math.min(100, currentNeeds.food_need + totalRecovery);
+
+    const newNeeds = {
+      food_need: newFoodNeed,
+      fun_need: currentNeeds.fun_need,
+    };
+
+    const itemNames = items.map(i => `${i.name}x${i.quantity}`).join(', ');
+    log.info(`[${this.agentId}] Cart recovery: [${itemNames}] +${totalRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
 
     return newNeeds;
   }
@@ -268,43 +293,4 @@ export class DecisionEngine {
     return { ...this.config };
   }
 
-  /**
-   * Update configuration dynamically
-   */
-  updateConfig(updates: Partial<DecisionEngineConfig>): void {
-    Object.assign(this.config, updates);
-    log.info(`[${this.agentId}] Configuration updated:`, updates);
-  }
-
-  /**
-   * Get expected time until next purchase (for monitoring)
-   */
-  getExpectedTimeUntilPurchase(currentNeeds: AgentNeeds): number {
-    const needsAboveThreshold = Math.max(0, currentNeeds.food_need - this.config.purchaseThreshold.food_need);
-    const cyclesUntilPurchase = Math.ceil(needsAboveThreshold / this.config.needDecayRate.food_need);
-    return cyclesUntilPurchase * this.config.pollingIntervalMs;
-  }
-
-  /**
-   * Generate status report for monitoring
-   */
-  getStatus(currentNeeds: AgentNeeds, currentBalance: number, lastPurchaseTime: Date | null) {
-    const timeUntilPurchase = this.getExpectedTimeUntilPurchase(currentNeeds);
-    const decision = this.evaluatePurchaseDecision(currentNeeds, currentBalance, lastPurchaseTime);
-
-    return {
-      agent_id: this.agentId,
-      current_needs: currentNeeds,
-      current_balance: currentBalance,
-      time_until_purchase_ms: timeUntilPurchase,
-      time_until_purchase_sec: Math.round(timeUntilPurchase / 1000),
-      purchase_decision: decision,
-      configuration: {
-        polling_interval_ms: this.config.pollingIntervalMs,
-        food_decay_rate: this.config.needDecayRate.food_need,
-        purchase_threshold: this.config.purchaseThreshold.food_need
-      },
-      last_purchase_time: lastPurchaseTime
-    };
-  }
 }

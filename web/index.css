@@ -314,6 +314,74 @@
   transform: translateY(-1px);
 }
 
+/* ── Brain Terminal ── */
+.zt-terminal {
+  background: rgba(10, 20, 8, 0.85);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  line-height: 1.8;
+  min-height: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 2px solid;
+  border-color: #0e1a08 #4a6a38 #4a6a38 #0e1a08;
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.5);
+}
+
+.zt-terminal::-webkit-scrollbar {
+  width: 8px;
+}
+.zt-terminal::-webkit-scrollbar-track {
+  background: #0a140a;
+}
+.zt-terminal::-webkit-scrollbar-thumb {
+  background: #3a5a2a;
+  border-radius: 2px;
+}
+.zt-terminal::-webkit-scrollbar-thumb:hover {
+  background: #4a7a38;
+}
+
+@keyframes zt-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.zt-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 12px;
+  background: var(--zt-gold);
+  animation: zt-cursor-blink 0.8s step-end infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+.zt-terminal-header {
+  color: var(--zt-tan);
+  text-transform: uppercase;
+  font-size: 8px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(212, 184, 122, 0.2);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  margin-top: 10px;
+}
+.zt-terminal-header:first-child {
+  margin-top: 0;
+}
+
+.zt-step-done {
+  color: #4caf50;
+}
+.zt-step-active {
+  color: var(--zt-gold);
+  animation: zt-tx-pulse 1.5s ease-in-out infinite;
+}
+.zt-step-pending {
+  color: #555;
+}
+
 /* ── Perforated ticket edge ── */
 .zt-ticket-perf {
   background-image: radial-gradient(circle, var(--zt-parchment) 4px, transparent 4px);

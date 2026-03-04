@@ -16,11 +16,12 @@ export function useZoo() {
     // Initialize checks as pending
     const initialChecks: PreflightCheck[] = [
       { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
-      { id: "wallets", label: "Wallet initialization", status: "pending" },
-      { id: "accounts", label: "Zoo accounts initialized", status: "pending" },
+      { id: "accounts", label: "Zoo accounts (and wallets) initialized", status: "pending" },
+      { id: "funding", label: "Wallet funding strategy", status: "pending" },
       { id: "balances", label: "Wallet balances", status: "pending" },
       { id: "merchants", label: "Merchant registry", status: "pending" },
       { id: "runner", label: "Agent runner", status: "pending" },
+      { id: "llm", label: "LLM inference endpoint", status: "pending" },
     ];
     setPreflightChecks(initialChecks);
 

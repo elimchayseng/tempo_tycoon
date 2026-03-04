@@ -1,5 +1,5 @@
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, productEmoji, formatGuestLabel } from "../../utils/formatting";
+import { shortAddr, cartDisplayInfo, formatGuestLabel } from "../../utils/formatting";
 
 interface ReceiptCardProps {
   receipt: ZooPurchaseReceipt;
@@ -10,14 +10,14 @@ const EXPLORER_URL = "https://explore.moderato.tempo.xyz";
 export default function ReceiptCard({ receipt }: ReceiptCardProps) {
   const explorerUrl = `${EXPLORER_URL}/tx/${receipt.tx_hash}`;
   const time = new Date(receipt.timestamp).toLocaleTimeString();
-  const emoji = productEmoji(receipt.product_name);
+  const { emojis, displayName } = cartDisplayInfo(receipt.items);
 
   return (
     <div className="zt-bevel overflow-hidden shrink-0" style={{ width: 220 }}>
       {/* Title bar */}
       <div className="zt-titlebar flex items-center justify-between text-[8px] px-2 py-0.5">
         <span className="truncate">
-          {emoji} {receipt.product_name}
+          {emojis} {displayName}
         </span>
         <span className="text-[var(--zt-gold)] ml-1 whitespace-nowrap">${receipt.amount}</span>
       </div>

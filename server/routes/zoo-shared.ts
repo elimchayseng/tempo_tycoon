@@ -13,10 +13,15 @@ const __dirname = dirname(__filename);
 
 const log = createLogger('zoo-shared');
 
-/** Refresh on-chain balances for all zoo accounts into the account store */
+/** Refresh on-chain balances for all zoo accounts into the account store.
+ *  NOTE: Tempo Moderato Testnet does not deploy the multicall3 contract,
+ *  so we use parallel individual reads. If migrating to a chain that supports
+ *  multicall3, replace with `publicClient.multicall()` for a single RPC round-trip. */
 export async function refreshZooBalances() {
   const zooAccounts = getAllZooAccounts();
-  for (const acct of zooAccounts) {
+  if (zooAccounts.length === 0) return;
+
+  await Promise.all(zooAccounts.map(async (acct) => {
     try {
       const raw = await publicClient.readContract({
         address: ALPHA_USD,
@@ -28,15 +33,24 @@ export async function refreshZooBalances() {
     } catch (err) {
       log.warn(`Failed to fetch balance for ${acct.label}:`, err);
     }
-  }
+  }));
 }
+
+/** Cached zoo registry — the static zoo_map.json is read once, then wallet addresses are patched on each call */
+let _cachedZooMap: any = null;
 
 /** Load and process zoo registry from config/zoo_map.json */
 export function loadZooRegistry() {
   try {
-    const zooMapPath = join(__dirname, '../../config/zoo_map.json');
-    const zooMapContent = readFileSync(zooMapPath, 'utf-8');
-    const zooMap = JSON.parse(zooMapContent);
+    // Read and parse the static JSON file only once
+    if (!_cachedZooMap) {
+      const zooMapPath = join(__dirname, '../../config/zoo_map.json');
+      const zooMapContent = readFileSync(zooMapPath, 'utf-8');
+      _cachedZooMap = JSON.parse(zooMapContent);
+    }
+
+    // Deep clone to avoid mutating the cache
+    const zooMap = JSON.parse(JSON.stringify(_cachedZooMap));
 
     const zooMasterAccount = getZooAccountByRole('zooMaster');
     const merchantAccount = getZooAccountByRole('merchantA');

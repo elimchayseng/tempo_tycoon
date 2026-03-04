@@ -9,7 +9,6 @@ import { isAvailable, decrementStock, getInventorySnapshot } from "../../agents/
 const log = createLogger('zoo-merchant');
 
 const SESSION_CLEANUP_INTERVAL_MS = 30_000;
-const SESSION_EXPIRY_FORMAT = 'minutes'; // config.zoo.sessionTimeoutMinutes
 
 export const zooMerchantRoutes = new Hono();
 
@@ -18,8 +17,7 @@ interface CheckoutSession {
   session_id: string;
   buyer_address: string;
   merchant_address: string;
-  sku: string;
-  quantity: number;
+  items: Array<{ sku: string; name: string; price: string; quantity: number; satisfaction_value: number }>;
   amount: string;
   currency: string;
   created_at: Date;
@@ -64,7 +62,7 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
       merchant_name: merchant.name,
       category: merchant.category,
       description: merchant.description,
-      products: merchant.menu.map((item: { sku: string; name: string; description?: string; price: string; category: string; available: boolean }) => {
+      products: merchant.menu.map((item: { sku: string; name: string; description?: string; price: string; category: string; satisfaction_value?: number; available: boolean }) => {
         const live = liveStockMap.get(item.sku);
         return {
           sku: item.sku,
@@ -73,6 +71,7 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
           price: item.price,
           currency: "AlphaUSD",
           category: item.category,
+          satisfaction_value: live?.satisfaction_value ?? item.satisfaction_value ?? 40,
           available: live ? live.available : item.available,
           stock: live?.stock,
           max_stock: live?.max_stock,
@@ -94,6 +93,7 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
 });
 
 // POST /food/checkout/create - Creates a purchase session with payment details
+// Accepts either { items: [{sku, quantity}], buyer_address } (cart) or legacy { sku, quantity, buyer_address }
 zooMerchantRoutes.post("/food/checkout/create", async (c) => {
   try {
     if (!config.zoo.enabled) {
@@ -101,21 +101,35 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
     }
 
     const body = await c.req.json();
-    const { sku, quantity = 1, buyer_address } = body;
+    const { buyer_address } = body;
 
-    if (!sku || !buyer_address) {
+    if (!buyer_address) {
       return c.json({
         error: "Missing required fields",
         code: "VALIDATION_ERROR",
-        details: "sku and buyer_address are required"
+        details: "buyer_address is required"
       }, 400);
     }
 
-    if (typeof quantity !== 'number' || quantity <= 0) {
+    // Normalize to items array (support legacy single-item format)
+    let requestedItems: Array<{ sku: string; quantity: number }>;
+    if (body.items && Array.isArray(body.items)) {
+      requestedItems = body.items;
+    } else if (body.sku) {
+      requestedItems = [{ sku: body.sku, quantity: body.quantity ?? 1 }];
+    } else {
       return c.json({
-        error: "Invalid quantity",
+        error: "Missing required fields",
         code: "VALIDATION_ERROR",
-        details: "quantity must be a positive number"
+        details: "items array or sku is required"
+      }, 400);
+    }
+
+    if (requestedItems.length === 0 || requestedItems.length > 3) {
+      return c.json({
+        error: "Invalid cart size",
+        code: "VALIDATION_ERROR",
+        details: "Cart must contain 1-3 items"
       }, 400);
     }
 
@@ -126,17 +140,39 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
       return c.json({ error: "Food merchant not found", code: "MERCHANT_NOT_FOUND" }, 404);
     }
 
-    const product = merchant.menu.find((item: { sku: string }) => item.sku === sku);
-    if (!product) {
-      return c.json({ error: "Product not found", code: "PRODUCT_NOT_FOUND" }, 404);
-    }
+    // Validate ALL items exist and are available
+    const resolvedItems: Array<{ sku: string; name: string; price: string; quantity: number; satisfaction_value: number }> = [];
+    let totalAmount = 0;
 
-    if (!product.available || !isAvailable(sku)) {
-      return c.json({ error: "Product not available", code: "PRODUCT_UNAVAILABLE" }, 400);
-    }
+    for (const reqItem of requestedItems) {
+      if (!reqItem.sku || typeof reqItem.quantity !== 'number' || reqItem.quantity <= 0) {
+        return c.json({
+          error: "Invalid item",
+          code: "VALIDATION_ERROR",
+          details: `Invalid sku or quantity for item: ${reqItem.sku}`
+        }, 400);
+      }
 
-    const unitPrice = parseFloat(product.price);
-    const totalAmount = (unitPrice * quantity).toFixed(2);
+      const product = merchant.menu.find((item: { sku: string }) => item.sku === reqItem.sku);
+      if (!product) {
+        return c.json({ error: `Product not found: ${reqItem.sku}`, code: "PRODUCT_NOT_FOUND" }, 404);
+      }
+
+      if (!product.available || !isAvailable(reqItem.sku)) {
+        return c.json({ error: `Product not available: ${reqItem.sku}`, code: "PRODUCT_UNAVAILABLE" }, 400);
+      }
+
+      const unitPrice = parseFloat(product.price);
+      totalAmount += unitPrice * reqItem.quantity;
+
+      resolvedItems.push({
+        sku: product.sku,
+        name: product.name,
+        price: product.price,
+        quantity: reqItem.quantity,
+        satisfaction_value: product.satisfaction_value ?? 40,
+      });
+    }
 
     const sessionId = `sess_${crypto.randomUUID()}`;
     const now = new Date();
@@ -151,9 +187,8 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
       session_id: sessionId,
       buyer_address: buyer_address.toLowerCase(),
       merchant_address: merchantAccount.address,
-      sku,
-      quantity,
-      amount: totalAmount,
+      items: resolvedItems,
+      amount: totalAmount.toFixed(2),
       currency: "AlphaUSD",
       created_at: now,
       expires_at: expiresAt,
@@ -162,22 +197,18 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
 
     activeSessions.set(sessionId, session);
 
+    const itemNames = resolvedItems.map(i => i.name).join(' + ');
     const response = {
       session_id: sessionId,
-      amount: totalAmount,
+      amount: totalAmount.toFixed(2),
       currency: "AlphaUSD",
       recipient_address: merchantAccount.address,
       expires_at: expiresAt.toISOString(),
-      memo: `Zoo Purchase: ${product.name}`,
-      product: {
-        sku: product.sku,
-        name: product.name,
-        price: product.price,
-        quantity
-      }
+      memo: `Zoo Purchase: ${itemNames}`,
+      items: resolvedItems,
     };
 
-    log.info(`Created checkout session ${sessionId} for ${sku} (${totalAmount} AlphaUSD)`);
+    log.info(`Created checkout session ${sessionId} for [${itemNames}] (${totalAmount.toFixed(2)} AlphaUSD)`);
 
     return c.json(response);
   } catch (error) {
@@ -266,14 +297,18 @@ zooMerchantRoutes.post("/food/checkout/complete", async (c) => {
     session.status = 'completed';
     activeSessions.delete(session_id);
 
-    // Decrement inventory stock
-    decrementStock(session.sku);
+    // Decrement inventory stock for all items in the cart
+    for (const item of session.items) {
+      for (let q = 0; q < item.quantity; q++) {
+        decrementStock(item.sku);
+      }
+    }
 
     // Record sale on the merchant agent
     const runner = getAgentRunner();
     const merchantAgent = runner?.getMerchantAgent?.();
     if (merchantAgent) {
-      merchantAgent.recordSale(session.sku, session.amount);
+      merchantAgent.recordSale(session.items[0].sku, session.amount);
     }
 
     const purchaseId = `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -286,10 +321,7 @@ zooMerchantRoutes.post("/food/checkout/complete", async (c) => {
       verified: true,
       purchase_id: purchaseId,
       session_id: session_id,
-      product: {
-        sku: session.sku,
-        quantity: session.quantity
-      },
+      items: session.items.map(i => ({ sku: i.sku, quantity: i.quantity })),
       payment: {
         amount: session.amount,
         currency: session.currency,

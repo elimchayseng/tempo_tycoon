@@ -15,27 +15,39 @@ const BUYER_ACP_TOOLS: Tool[] = [
   {
     type: 'function',
     function: {
-      name: 'acp_select_and_purchase',
+      name: 'acp_purchase_cart',
       description:
-        'Select a product from the merchant catalog and initiate an ACP purchase. ' +
+        'Purchase a cart of 1-3 items from the merchant catalog via ACP. ' +
         'This triggers: checkout session creation → on-chain AlphaUSD payment → merchant verification.',
       parameters: {
         type: 'object',
         properties: {
-          merchant_category: {
-            type: 'string',
-            description: 'Merchant category (e.g. "food")',
-          },
-          sku: {
-            type: 'string',
-            description: 'Product SKU to purchase',
+          items: {
+            type: 'array',
+            description: 'Array of items to purchase (1-3 items)',
+            items: {
+              type: 'object',
+              properties: {
+                sku: {
+                  type: 'string',
+                  description: 'Product SKU to purchase',
+                },
+                quantity: {
+                  type: 'number',
+                  description: 'Quantity of this item (usually 1)',
+                },
+              },
+              required: ['sku', 'quantity'],
+            },
+            minItems: 1,
+            maxItems: 3,
           },
           reasoning: {
             type: 'string',
-            description: 'Step-by-step reasoning for this choice (shown in UI)',
+            description: 'Step-by-step reasoning for this choice, keep it very short, and pretend you are a guest visiting a zoo, use language like internal human thoughts about the purchase you will make (shown in UI)',
           },
         },
-        required: ['merchant_category', 'sku', 'reasoning'],
+        required: ['items', 'reasoning'],
       },
     },
   },
@@ -49,7 +61,7 @@ const BUYER_ACP_TOOLS: Tool[] = [
         properties: {
           reasoning: {
             type: 'string',
-            description: 'Why no purchase is needed right now (shown in UI)',
+            description: 'Why no purchase is needed right now, keep it at short as possible (shown in UI)',
           },
         },
         required: ['reasoning'],
@@ -99,8 +111,8 @@ export class BuyerBrain {
         ? { promptTokens: response.usage.prompt_tokens, completionTokens: response.usage.completion_tokens }
         : undefined;
 
-      if (toolName === 'acp_select_and_purchase') {
-        return this.handlePurchaseCall(args, context, tokenUsage);
+      if (toolName === 'acp_purchase_cart') {
+        return this.handleCartCall(args, context, tokenUsage);
       }
 
       if (toolName === 'acp_skip_cycle') {
@@ -108,6 +120,7 @@ export class BuyerBrain {
           action: { type: 'wait', reason: args.reasoning || 'LLM chose to skip' },
           reasoning: args.reasoning || 'No purchase needed',
           toolName,
+          model: this.llmClient.model,
           tokenUsage,
         };
       }
@@ -143,11 +156,19 @@ export class BuyerBrain {
         name: p.name,
         price: p.price,
         category: p.category,
+        satisfaction_value: p.satisfaction_value,
       }));
+
+    // Pre-compute the hunger gap so the LLM doesn't have to do subtraction
+    const foodNeed = context.needs.food_need;
+    const hungerGap = Math.max(0, 80 - foodNeed);       // how much satisfaction to reach ~80
+    const maxUsefulGap = Math.max(0, 100 - foodNeed);    // anything beyond this is wasted
 
     return JSON.stringify({
       agent_id: context.agent_id,
-      food_need: context.needs.food_need,
+      food_need: foodNeed,
+      hunger_gap: hungerGap,
+      max_useful_satisfaction: maxUsefulGap,
       balance: context.balance,
       cycle: context.cycle_count,
       catalog: catalogSummary,
@@ -155,39 +176,58 @@ export class BuyerBrain {
     });
   }
 
-  private handlePurchaseCall(
-    args: { merchant_category?: string; sku?: string; reasoning?: string },
+  private handleCartCall(
+    args: { items?: Array<{ sku: string; quantity: number }>; reasoning?: string },
     context: BuyerLLMContext,
     tokenUsage?: { promptTokens: number; completionTokens: number },
   ): BuyerDecision {
-    const sku = args.sku;
+    const items = args.items;
     const reasoning = args.reasoning || 'No reasoning provided';
 
-    if (!sku) {
-      throw new Error('LLM tool call missing required sku parameter');
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new Error('LLM tool call missing required items parameter');
     }
 
-    // Validate SKU exists and is available
-    const product = context.catalog.find((p) => p.sku === sku && p.available);
-    if (!product) {
-      log.warn(`[${context.agent_id}] LLM selected invalid/unavailable SKU: ${sku}`);
-      throw new Error(`Invalid or unavailable SKU: ${sku}`);
+    if (items.length > 3) {
+      throw new Error('Cart cannot exceed 3 items');
     }
 
-    // Validate agent can afford the item
-    const price = parseFloat(product.price);
+    let totalCost = 0;
     const balance = parseFloat(context.balance);
-    if (price > balance) {
-      log.warn(`[${context.agent_id}] LLM selected item beyond budget: $${product.price} > $${context.balance}`);
-      throw new Error(`Product price $${product.price} exceeds balance $${context.balance}`);
+
+    // Validate all items exist and are available
+    for (const item of items) {
+      if (!item.sku) {
+        throw new Error('LLM tool call missing required sku in item');
+      }
+
+      const product = context.catalog.find((p) => p.sku === item.sku && p.available);
+      if (!product) {
+        log.warn(`[${context.agent_id}] LLM selected invalid/unavailable SKU: ${item.sku}`);
+        throw new Error(`Invalid or unavailable SKU: ${item.sku}`);
+      }
+
+      totalCost += parseFloat(product.price) * (item.quantity || 1);
     }
 
-    log.info(`[${context.agent_id}] LLM chose: ${product.name} ($${product.price}) — ${reasoning}`);
+    // Validate agent can afford the cart
+    if (totalCost > balance) {
+      log.warn(`[${context.agent_id}] LLM cart total $${totalCost.toFixed(2)} exceeds balance $${context.balance}`);
+      throw new Error(`Cart total $${totalCost.toFixed(2)} exceeds balance $${context.balance}`);
+    }
+
+    const itemSummary = items.map(i => `${i.sku}x${i.quantity || 1}`).join(', ');
+    log.info(`[${context.agent_id}] LLM chose cart: [${itemSummary}] ($${totalCost.toFixed(2)}) — ${reasoning}`);
 
     return {
-      action: { type: 'purchase', sku, reason: reasoning },
+      action: {
+        type: 'purchase',
+        items: items.map(i => ({ sku: i.sku, quantity: i.quantity || 1 })),
+        reason: reasoning,
+      },
       reasoning,
-      toolName: 'acp_select_and_purchase',
+      toolName: 'acp_purchase_cart',
+      model: this.llmClient.model,
       tokenUsage,
     };
   }

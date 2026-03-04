@@ -8,6 +8,7 @@ export interface InventoryItem {
   price: string;
   cost_basis: string;
   category: string;
+  satisfaction_value: number;
   stock: number;
   max_stock: number;
   restock_threshold: number;
@@ -16,7 +17,7 @@ export interface InventoryItem {
 // Module-level singleton — safe because Node modules are singletons, single-threaded
 const inventory: Map<string, InventoryItem> = new Map();
 
-export function initializeInventory(menuItems: Array<{ sku: string; name: string; price: string; category: string }>): void {
+export function initializeInventory(menuItems: Array<{ sku: string; name: string; price: string; category: string; satisfaction_value?: number }>): void {
   inventory.clear();
 
   for (const item of menuItems) {
@@ -29,6 +30,7 @@ export function initializeInventory(menuItems: Array<{ sku: string; name: string
       price: item.price,
       cost_basis: costBasis.toFixed(2),
       category: item.category,
+      satisfaction_value: item.satisfaction_value ?? 40,
       stock: 5,
       max_stock: 5,
       restock_threshold: 1,
@@ -93,6 +95,7 @@ export function getInventorySnapshot(): Array<{
   sku: string;
   name: string;
   price: string;
+  satisfaction_value: number;
   stock: number;
   max_stock: number;
   available: boolean;
@@ -101,6 +104,7 @@ export function getInventorySnapshot(): Array<{
     sku: item.sku,
     name: item.name,
     price: item.price,
+    satisfaction_value: item.satisfaction_value,
     stock: item.stock,
     max_stock: item.max_stock,
     available: item.stock > 0,
