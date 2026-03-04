@@ -4,7 +4,7 @@ import { config } from "../config.js";
 import { getZooAccountByRole } from "../zoo-accounts.js";
 import { SessionVerifier } from "../middleware/session-verifier.js";
 import { loadZooRegistry, getAgentRunner } from "./zoo-shared.js";
-import { isAvailable, decrementStock, getInventorySnapshot } from "../../agents/merchant-inventory.js";
+import { isAvailable, decrementStock, getInventorySnapshot, getInventoryItem } from "../../agents/merchant-inventory.js";
 
 const log = createLogger('zoo-merchant');
 
@@ -68,7 +68,7 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
           sku: item.sku,
           name: item.name,
           description: item.description,
-          price: item.price,
+          price: live?.price ?? item.price,
           currency: "AlphaUSD",
           category: item.category,
           satisfaction_value: live?.satisfaction_value ?? item.satisfaction_value ?? 40,
@@ -162,15 +162,19 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
         return c.json({ error: `Product not available: ${reqItem.sku}`, code: "PRODUCT_UNAVAILABLE" }, 400);
       }
 
-      const unitPrice = parseFloat(product.price);
+      // Use live inventory price (may have been adjusted by merchant brain)
+      const liveItem = getInventoryItem(reqItem.sku);
+      const currentPrice = liveItem?.price ?? product.price;
+
+      const unitPrice = parseFloat(currentPrice);
       totalAmount += unitPrice * reqItem.quantity;
 
       resolvedItems.push({
         sku: product.sku,
         name: product.name,
-        price: product.price,
+        price: currentPrice,
         quantity: reqItem.quantity,
-        satisfaction_value: product.satisfaction_value ?? 40,
+        satisfaction_value: liveItem?.satisfaction_value ?? product.satisfaction_value ?? 40,
       });
     }
 
