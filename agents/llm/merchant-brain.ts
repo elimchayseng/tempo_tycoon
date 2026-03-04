@@ -132,6 +132,12 @@ export class MerchantBrain {
       const toolName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
 
+      // Fallback: some models (e.g. Haiku) put reasoning in message content instead of tool args
+      const contentFallback = typeof choice.message.content === 'string' ? choice.message.content.trim() : '';
+      if (!args.reasoning && contentFallback) {
+        args.reasoning = contentFallback;
+      }
+
       const tokenUsage = response.usage
         ? { promptTokens: response.usage.prompt_tokens, completionTokens: response.usage.completion_tokens }
         : undefined;

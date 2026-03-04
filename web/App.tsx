@@ -23,6 +23,7 @@ export default function App() {
     balanceUpdates,
     merchantState,
     restockEvents,
+    priceAdjustments,
     simulationComplete,
     fundingProgress,
     resetSimulationData,
@@ -159,7 +160,7 @@ export default function App() {
                 </div>
               )}
 
-              <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} />
+              <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} merchantDecision={llmDecisions['merchant_a'] ?? null} priceAdjustments={priceAdjustments} />
               <div className="border-b border-[var(--zt-green-mid)] shrink-0 overflow-y-auto" style={{ maxHeight: "60vh" }}>
                 <AgentBrainRow agents={zooAgents} llmDecisions={llmDecisions} txFlowEvents={txFlowEvents} />
               </div>

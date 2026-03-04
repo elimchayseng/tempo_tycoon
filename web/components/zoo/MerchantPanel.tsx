@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent } from "../../lib/types";
+import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, ZooLLMDecision, ZooPriceAdjustment } from "../../lib/types";
 import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
+import MerchantBrainTerminal from "./MerchantBrainTerminal";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
   latestReceipt: ZooPurchaseReceipt | null;
   merchantState: ZooMerchantState | null;
   restockEvents: ZooRestockEvent[];
+  merchantDecision: ZooLLMDecision | null;
+  priceAdjustments: ZooPriceAdjustment[];
 }
 
 interface AnimState {
@@ -80,7 +83,7 @@ function StockBar({ stock, maxStock }: { stock: number; maxStock: number }) {
   return <div className="flex gap-0.5">{cells}</div>;
 }
 
-export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents }: MerchantPanelProps) {
+export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments }: MerchantPanelProps) {
   const lastTxRef = useRef<string | null>(null);
   const lastRestockRef = useRef<string | null>(null);
   const [anim, setAnim] = useState<AnimState | null>(null);
@@ -90,6 +93,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
   const [protocolStep, setProtocolStep] = useState<string | null>(null);
   const [restockProtocolStep, setRestockProtocolStep] = useState<string | null>(null);
   const [showRestockProtocol, setShowRestockProtocol] = useState(false);
+  const [flashingSkus, setFlashingSkus] = useState<Set<string>>(new Set());
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPriceAdjRef = useRef<number>(0);
   const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const restockTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -235,6 +241,24 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     };
   }, [restockEvents]);
 
+  // Price flash animation when new price adjustments arrive
+  useEffect(() => {
+    if (priceAdjustments.length === 0) return;
+    const latestTs = priceAdjustments[0]?.timestamp ?? 0;
+    if (latestTs === lastPriceAdjRef.current) return;
+    lastPriceAdjRef.current = latestTs;
+
+    const skus = new Set(priceAdjustments.filter((pa) => pa.timestamp === latestTs).map((pa) => pa.sku));
+    setFlashingSkus(skus);
+
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setFlashingSkus(new Set()), 1500);
+
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, [priceAdjustments]);
+
   if (!merchant) return null;
 
   const rawBalance = merchant.balances[ALPHA_USD] ?? "0";
@@ -337,22 +361,44 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             {inventory.length > 0 && (
               <div className="shrink-0 space-y-0.5 flex flex-col justify-center">
                 <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider text-right mb-0.5">Stock</div>
-                {inventory.map((item) => (
-                  <div key={item.sku} className="flex items-center gap-1 font-pixel text-[9px]">
-                    <span className="text-xs">{productEmoji(item.name)}</span>
-                    <StockBar stock={item.stock} maxStock={item.max_stock} />
-                    <span className={`w-5 text-right ${
-                      item.stock === 0 ? 'text-red-500 font-bold' :
-                      item.stock <= 1 ? 'text-amber-400' :
-                      'text-gray-500'
-                    }`}>
-                      {item.stock === 0 ? '!' : item.stock}
-                    </span>
-                  </div>
-                ))}
+                {inventory.map((item) => {
+                  const price = parseFloat(item.price);
+                  const basePrice = parseFloat(item.base_price || item.price);
+                  const pctDiff = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+                  const pctColor = pctDiff > 0 ? "text-green-400" : pctDiff < 0 ? "text-red-400" : "text-gray-500";
+                  const pctSign = pctDiff > 0 ? "+" : "";
+                  const isFlashing = flashingSkus.has(item.sku);
+
+                  return (
+                    <div key={item.sku} className="flex items-center gap-1 font-pixel text-[9px]">
+                      <span className={`w-10 text-right ${isFlashing ? "zt-price-flash" : "text-[var(--zt-gold)]"}`}>
+                        ${price.toFixed(2)}
+                      </span>
+                      <span className={`w-8 text-right ${pctColor}`} style={{ fontSize: "7px" }}>
+                        {pctDiff !== 0 ? `${pctSign}${pctDiff.toFixed(0)}%` : ""}
+                      </span>
+                      <span className="text-xs">{productEmoji(item.name)}</span>
+                      <StockBar stock={item.stock} maxStock={item.max_stock} />
+                      <span className={`w-5 text-right ${
+                        item.stock === 0 ? 'text-red-500 font-bold' :
+                        item.stock <= 1 ? 'text-amber-400' :
+                        'text-gray-500'
+                      }`}>
+                        {item.stock === 0 ? '!' : item.stock}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
+
+          {/* Merchant Brain Terminal */}
+          <MerchantBrainTerminal
+            decision={merchantDecision}
+            priceAdjustments={priceAdjustments}
+            restockEvents={restockEvents}
+          />
 
           {/* Protocol step text (purchases) — left-aligned, gold */}
           {protocolStep && (

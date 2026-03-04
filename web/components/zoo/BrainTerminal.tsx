@@ -1,35 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import type { ZooLLMDecision, TransactionFlowEvent, TxFlowStage } from "../../lib/types";
+import { useTypewriter } from "../../hooks/useTypewriter";
 
 interface BrainTerminalProps {
   decision: ZooLLMDecision | null;
   txFlowEvents: TransactionFlowEvent[];
   agentId: string;
-}
-
-function useTypewriter(text: string, speed: number = 30) {
-  const [displayed, setDisplayed] = useState("");
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    setDisplayed("");
-    setDone(false);
-    if (!text) { setDone(true); return; }
-
-    let i = 0;
-    const timer = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(timer);
-        setDone(true);
-      }
-    }, speed);
-
-    return () => clearInterval(timer);
-  }, [text, speed]);
-
-  return { displayed, done };
 }
 
 // Only the 4 stages the server actually emits

@@ -170,6 +170,7 @@ export interface ZooMerchantState {
     sku: string;
     name: string;
     price: string;
+    base_price: string;
     stock: number;
     max_stock: number;
     available: boolean;
