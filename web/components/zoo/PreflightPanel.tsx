@@ -138,7 +138,7 @@ function MerchantMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function RunnerMetadata({ metadata }: { metadata: Record<string, unknown> }) {
-  const buyer = metadata.buyerAgents as { count: number; pollingInterval: number; needDecayRate: number; purchaseThreshold: number } | undefined;
+  const buyer = metadata.buyerAgents as { count: number; pollingInterval: number; needDecayRate: string | number; purchaseThreshold: number } | undefined;
   const merchant = metadata.merchantAgent as { agentId: string; pollingInterval: number; restockThreshold: number; maxStock: number; supplierAddress: string; initialFunding: string } | undefined;
 
   return (
@@ -190,12 +190,23 @@ function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   );
 }
 
+function LLMMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  return (
+    <div className="space-y-0.5">
+      <MetadataDetail label="Model" value={String(metadata.model)} />
+      <MetadataDetail label="Endpoint" value={String(metadata.endpoint)} />
+      <MetadataDetail label="Call limit" value={`${metadata.callLimit}/simulation`} />
+    </div>
+  );
+}
+
 const METADATA_RENDERERS: Record<string, React.FC<{ metadata: Record<string, unknown> }>> = {
   blockchain: BlockchainMetadata,
   accounts: AccountsMetadata,
   balances: BalancesMetadata,
   merchants: MerchantMetadata,
   runner: RunnerMetadata,
+  llm: LLMMetadata,
   funding: FundingMetadata,
 };
 
