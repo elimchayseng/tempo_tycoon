@@ -219,7 +219,8 @@ export type AgentEventType =
   | 'restock_failed'
   | 'sale_recorded'
   | 'llm_decision'
-  | 'tx_flow';
+  | 'tx_flow'
+  | 'price_adjusted';
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -236,6 +237,7 @@ export interface MerchantConfig {
   address: string;
   polling_interval_ms: number;
   zoo_master_address: string;
+  brain_interval_ms?: number;
 }
 
 export interface MerchantState {
@@ -249,6 +251,7 @@ export interface MerchantState {
   restock_count: number;
   sale_count: number;
   cycle_count: number;
+  brain_cycle_count: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -310,4 +313,65 @@ export interface RestockRecord {
   fee_ausd?: string;
   fee_payer?: string;
   completed_at: Date;
+}
+
+// ── Merchant Brain types ────────────────────────────────────────────
+
+export interface SaleRecord {
+  sku: string;
+  name: string;
+  amount: string;
+  timestamp: number;
+}
+
+export interface SkuDemandSummary {
+  sku: string;
+  name: string;
+  sales_count: number;
+  total_revenue: number;
+  velocity_per_minute: number;
+  last_sale_ms_ago: number;
+}
+
+export interface MerchantLLMContext {
+  agent_id: string;
+  balance: string;
+  total_revenue: string;
+  total_cost: string;
+  profit: string;
+  inventory: Array<{
+    sku: string;
+    name: string;
+    current_price: string;
+    cost_basis: string;
+    base_price: string;
+    stock: number;
+    max_stock: number;
+    satisfaction_value: number;
+  }>;
+  demand_summaries: SkuDemandSummary[];
+  guardrails: {
+    max_change_pct: number;
+    price_floor_margin: number;
+    price_ceiling_multiplier: number;
+  };
+  brain_cycle: number;
+}
+
+export interface MerchantPriceUpdate {
+  sku: string;
+  new_price: string;
+}
+
+export type MerchantAction =
+  | { type: 'adjust_prices'; updates: MerchantPriceUpdate[]; reason: string }
+  | { type: 'restock'; skus: string[]; reason: string }
+  | { type: 'wait'; reason: string };
+
+export interface MerchantDecision {
+  action: MerchantAction;
+  reasoning: string;
+  toolName: string;
+  model?: string;
+  tokenUsage?: { promptTokens: number; completionTokens: number };
 }

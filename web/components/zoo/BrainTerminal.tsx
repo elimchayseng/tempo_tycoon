@@ -122,6 +122,8 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
   }, [typedReasoning, visibleStages]);
 
   const isPurchasing = decision?.action.type === "purchase";
+  const isPriceAdjust = decision?.action.type === "adjust_prices";
+  const isRestock = decision?.action.type === "restock";
 
   if (!decision) {
     return (
@@ -138,13 +140,29 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
       {/* Context Section */}
       <div className="zt-terminal-header">{"> CONTEXT ──────────────────────────"}</div>
       <div className="text-gray-400">
-        <span>food_need: {decision.context_summary.food_need}</span>
-        <span className="mx-2">|</span>
-        <span>balance: ${decision.context_summary.balance}</span>
-        <br />
-        <span>catalog: {decision.context_summary.catalog_size} items</span>
-        <span className="mx-2">|</span>
-        <span>recent: {decision.context_summary.recent_purchases} purchases</span>
+        {agentId === 'merchant_a' ? (
+          <>
+            <span>balance: ${String(decision.context_summary?.balance ?? '?')}</span>
+            <span className="mx-2">|</span>
+            <span>profit: ${String(decision.context_summary?.profit ?? '?')}</span>
+            <br />
+            <span>stock: {String(decision.context_summary?.total_stock ?? '?')}</span>
+            <span className="mx-2">|</span>
+            <span>low: {String(decision.context_summary?.low_stock_items ?? '?')}</span>
+            <span className="mx-2">|</span>
+            <span>velocity: {String(decision.context_summary?.total_velocity ?? '?')}/min</span>
+          </>
+        ) : (
+          <>
+            <span>food_need: {String(decision.context_summary?.food_need ?? '?')}</span>
+            <span className="mx-2">|</span>
+            <span>balance: ${String(decision.context_summary?.balance ?? '?')}</span>
+            <br />
+            <span>catalog: {String(decision.context_summary?.catalog_size ?? '?')} items</span>
+            <span className="mx-2">|</span>
+            <span>recent: {String(decision.context_summary?.recent_purchases ?? '?')} purchases</span>
+          </>
+        )}
       </div>
 
       {/* LLM Tool Call Section */}
@@ -213,8 +231,40 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
         </>
       )}
 
+      {/* Price adjustments section — merchant only */}
+      {isPriceAdjust && decision.action.updates && (
+        <>
+          <div className="zt-terminal-header" style={{ color: "#4caf50" }}>
+            {"> PRICE UPDATES ─────────────────"}
+          </div>
+          <div>
+            {decision.action.updates.map((u) => (
+              <div key={u.sku} className="zt-step-done zt-step-fade">
+                <span>{"  "}{"\u2713"} {u.sku} {"\u2192"} ${u.new_price}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Restock section — merchant only */}
+      {isRestock && decision.action.skus && (
+        <>
+          <div className="zt-terminal-header" style={{ color: "#4caf50" }}>
+            {"> \u26D3\uFE0F ACP RESTOCK \u00D7 TEMPO ──────────"}
+          </div>
+          <div>
+            {decision.action.skus.map((sku) => (
+              <div key={sku} className="zt-step-active zt-step-fade">
+                <span>{"  "}{"\u25CF"} restock: {sku}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* Idle cursor after everything is done */}
-      {reasoningDone && !isPurchasing && (
+      {reasoningDone && !isPurchasing && !isPriceAdjust && !isRestock && (
         <div className="mt-2 text-gray-500">
           <span className="zt-cursor" />
         </div>

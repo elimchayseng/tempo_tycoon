@@ -6,6 +6,7 @@ export interface InventoryItem {
   sku: string;
   name: string;
   price: string;
+  base_price: string;
   cost_basis: string;
   category: string;
   satisfaction_value: number;
@@ -28,6 +29,7 @@ export function initializeInventory(menuItems: Array<{ sku: string; name: string
       sku: item.sku,
       name: item.name,
       price: item.price,
+      base_price: item.price,
       cost_basis: costBasis.toFixed(2),
       category: item.category,
       satisfaction_value: item.satisfaction_value ?? 40,
@@ -91,10 +93,24 @@ export function getInventoryItem(sku: string): InventoryItem | undefined {
   return inventory.get(sku);
 }
 
+export function updatePrice(sku: string, newPrice: string): string | null {
+  const item = inventory.get(sku);
+  if (!item) {
+    log.warn(`Cannot update price for ${sku}: not found`);
+    return null;
+  }
+
+  const oldPrice = item.price;
+  item.price = newPrice;
+  log.info(`${item.name} price updated: $${oldPrice} → $${newPrice}`);
+  return oldPrice;
+}
+
 export function getInventorySnapshot(): Array<{
   sku: string;
   name: string;
   price: string;
+  base_price: string;
   satisfaction_value: number;
   stock: number;
   max_stock: number;
@@ -104,6 +120,7 @@ export function getInventorySnapshot(): Array<{
     sku: item.sku,
     name: item.name,
     price: item.price,
+    base_price: item.base_price,
     satisfaction_value: item.satisfaction_value,
     stock: item.stock,
     max_stock: item.max_stock,

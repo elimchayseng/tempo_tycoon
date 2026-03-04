@@ -12,6 +12,8 @@ import { ALPHA_USD } from '../server/tempo-client.js';
 import { config } from '../server/config.js';
 import { LLMClient } from './llm/llm-client.js';
 import { BuyerBrain } from './llm/buyer-brain.js';
+import { MerchantBrain } from './llm/merchant-brain.js';
+import { resetDemandTracker } from './demand-tracker.js';
 import type {
   AgentConfig,
   AgentStatus,
@@ -28,6 +30,8 @@ export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
   private merchantAgent: MerchantAgent | null = null;
   private buyerBrain: BuyerBrain | null = null;
+  private merchantBrain: MerchantBrain | null = null;
+  private llmClient: LLMClient | null = null;
   private isRunning = false;
   private depletionCheckInterval: NodeJS.Timeout | null = null;
   private startTime: Date | null = null;
@@ -99,20 +103,24 @@ export class AgentRunner {
         throw new Error('No valid guest accounts found for agent creation');
       }
 
-      // Conditionally create LLM BuyerBrain when inference env vars are present
+      // Conditionally create LLM brains when inference env vars are present
       if (config.llm.enabled && config.llm.inferenceUrl && config.llm.inferenceKey) {
-        const llmClient = new LLMClient({
+        this.llmClient = new LLMClient({
           inferenceUrl: config.llm.inferenceUrl,
           inferenceKey: config.llm.inferenceKey,
           model: config.llm.model,
           maxTokensPerResponse: config.llm.maxTokensPerResponse,
           maxCallsPerSimulation: config.llm.maxCallsPerSimulation,
         });
-        this.buyerBrain = new BuyerBrain(llmClient);
+        this.buyerBrain = new BuyerBrain(this.llmClient);
+        this.merchantBrain = new MerchantBrain(this.llmClient);
         log.info('LLM buyer brain enabled via Heroku Managed Inference');
+        log.info('LLM merchant brain enabled - cycle interval: 30s');
       } else {
         this.buyerBrain = null;
-        log.info('LLM buyer brain disabled (LLM_ENABLED not set or missing credentials)');
+        this.merchantBrain = null;
+        this.llmClient = null;
+        log.info('LLM brains disabled (LLM_ENABLED not set or missing credentials)');
       }
 
       log.info(`Creating ${agentConfigs.length} buyer agents...`);
@@ -134,8 +142,9 @@ export class AgentRunner {
           address: merchantAccount.address,
           polling_interval_ms: 5000,
           zoo_master_address: zooMasterAccount.address,
+          brain_interval_ms: 30_000,
         };
-        this.merchantAgent = new MerchantAgent(merchantConfig);
+        this.merchantAgent = new MerchantAgent(merchantConfig, this.merchantBrain ?? undefined);
         this.subscribeMerchantEvents(this.merchantAgent);
         log.info('Merchant agent created');
       } else {
@@ -198,10 +207,13 @@ export class AgentRunner {
     rpcCircuitBreaker.reset();
     merchantCircuitBreaker.reset();
 
-    // Reset LLM call counter
-    if (this.buyerBrain) {
-      this.buyerBrain.resetCallCount();
+    // Reset LLM call counter (shared client — only reset once)
+    if (this.llmClient) {
+      this.llmClient.resetCallCount();
     }
+
+    // Reset demand tracker
+    resetDemandTracker();
 
     // Clear agent maps for fresh start next time
     this.agents.clear();
@@ -411,6 +423,7 @@ export class AgentRunner {
       'agent_started', 'agent_stopped', 'error_occurred',
       'merchant_cycle_completed', 'restock_initiated', 'restock_completed',
       'restock_failed', 'sale_recorded',
+      'llm_decision', 'tx_flow', 'price_adjusted',
     ];
 
     for (const eventType of merchantEventTypes) {

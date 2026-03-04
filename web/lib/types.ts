@@ -23,4 +23,5 @@ export type {
   ZooMerchantState,
   ZooRestockEvent,
   ZooLLMDecision,
+  ZooPriceAdjustment,
 } from '../../shared/types.js';

@@ -8,7 +8,7 @@ import { accountStore } from "../accounts.js";
 import { refreshZooBalances, loadZooRegistry, getAgentRunner, setAgentRunner } from "./zoo-shared.js";
 import { fetchNetworkStats, incrementZooTxCount } from "./zoo-blockchain.js";
 import { balanceHistoryTracker } from "../balance-history.js";
-import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
+import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent, ZooPriceAdjustment } from "../../shared/types.js";
 import type { AgentEventType } from "../../agents/types.js";
 import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
@@ -294,6 +294,25 @@ if (config.zoo.enabled) {
     broadcast({
       type: 'zoo_llm_decision',
       decision: { ...event.data, timestamp: Date.now() },
+    });
+  });
+
+  runner.on('price_adjusted', (event) => {
+    const priceEvent: ZooPriceAdjustment = {
+      sku: event.data.sku,
+      name: event.data.name,
+      old_price: event.data.old_price,
+      new_price: event.data.new_price,
+      pct_change: event.data.pct_change,
+      timestamp: Date.now(),
+    };
+    broadcast({ type: 'zoo_price_adjustment', event: priceEvent });
+
+    emitLog({
+      action: 'zoo_merchant',
+      type: 'info',
+      label: `Price adjusted: ${event.data.name} $${event.data.old_price} → $${event.data.new_price} (${event.data.pct_change}%)`,
+      data: event.data,
     });
   });
 

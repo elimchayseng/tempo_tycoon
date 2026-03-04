@@ -84,6 +84,35 @@ When `LLM_ENABLED=true` and Heroku inference credentials are configured, buyer a
 | `INFERENCE_KEY` | Heroku addon-scoped API key |
 | `LLM_MODEL` | Model ID (default: `claude-4-5-haiku`) |
 
+## Merchant Brain Layer
+
+When `LLM_ENABLED=true`, the merchant agent also receives a `MerchantBrain` powered by the same LLM endpoint (shared `LLMClient` instance). The merchant brain runs on a separate 30-second cycle and makes strategic decisions about pricing and restocking.
+
+**Key components:**
+
+| File | Purpose |
+|------|---------|
+| `agents/llm/merchant-brain.ts` | Orchestrates LLM calls with merchant ACP tools |
+| `agents/llm/prompts/merchant-system.ts` | Merchant system prompt with pricing strategy guidance |
+| `agents/demand-tracker.ts` | Rolling 5-minute sales window for demand analysis |
+
+**Decision flow:**
+
+1. Every 30s, `MerchantAgent.runBrainCycle()` builds context (inventory + demand + guardrails)
+2. `MerchantBrain.decide()` sends context to Claude
+3. LLM calls `acp_adjust_prices`, `acp_restock_inventory`, or `acp_skip_cycle`
+4. Price changes are clamped to guardrail bounds (not rejected)
+5. Restocks use existing `executeRestock()` flow (on-chain payment)
+
+**Price guardrails:**
+
+- Max change per cycle: +/-30% of current price
+- Price floor: cost_basis + $0.25 (minimum margin)
+- Price ceiling: 3x base_price (original zoo_map.json price)
+- LLM proposals outside bounds are clamped with a warning log
+
+**Note:** Merchant and buyer LLM calls share the same `maxCallsPerSimulation` cap.
+
 ## Agent-to-Agent Commerce
 
 The zoo simulation implements true **agent-to-agent commerce** — not just agent-to-API:

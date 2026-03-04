@@ -76,3 +76,11 @@ The `DecisionEngine` uses these hardcoded defaults (exported as `SIMULATION_DEFA
 | `minBalanceThreshold` | 5.0 | Min balance to buy (AlphaUSD) |
 | `maxPurchaseFrequencyMs` | 2000 | Min gap between purchases (ms) |
 | `randomFactor` | 0.2 | +/-20% randomness on decay |
+
+### Merchant Brain Config
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `brain_interval_ms` | 30000 | Merchant LLM decision cycle interval (ms) |
+
+**Note:** With the merchant brain enabled, 3 buyers + 1 merchant share the same inference endpoint and `maxCallsPerSimulation` cap. You may need to increase `maxCallsPerSimulation` from 100 to accommodate longer simulations.
