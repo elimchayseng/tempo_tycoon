@@ -190,7 +190,7 @@ export default function App() {
         )}
       </div>
 
-      {showDashboard && <ZooFooter zooMaster={zooMaster} />}
+      {(showPreflight || showDashboard) && <ZooFooter zooMaster={zooMaster} />}
     </div>
   );
 }

@@ -258,7 +258,15 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
           {/* Wallet + Financials row */}
           <div className="flex items-center justify-between">
             <div className="font-pixel text-[10px] text-gray-500">
-              Wallet: {shortAddr(merchant.address)}
+              Wallet:{" "}
+              <a
+                href={`https://explore.moderato.tempo.xyz/address/${merchant.address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--zt-gold)] transition-colors"
+              >
+                {shortAddr(merchant.address)}
+              </a>
             </div>
             {merchantState && (
               <div className="flex gap-3 font-pixel text-[10px]">
