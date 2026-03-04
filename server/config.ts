@@ -44,6 +44,19 @@ export const config = {
     sessionTimeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES || '5'),
   },
 
+  // Admin authentication
+  auth: {
+    adminToken: process.env.ADMIN_TOKEN || '',
+  },
+
+  // CORS configuration
+  cors: {
+    allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  },
+
   // LLM inference configuration (Heroku Managed Inference)
   llm: {
     enabled: process.env.LLM_ENABLED === 'true',
@@ -68,6 +81,14 @@ export function validateConfig(): void {
 
   if (config.limits.maxWebSocketConnections < 1 || config.limits.maxWebSocketConnections > 1000) {
     throw new Error('maxWebSocketConnections must be between 1 and 1000');
+  }
+
+  // Auth validation
+  if (!config.auth.adminToken) {
+    if (isProduction()) {
+      throw new Error('ADMIN_TOKEN must be set in production');
+    }
+    console.warn('[config] WARNING: ADMIN_TOKEN is not set — admin endpoints are unprotected');
   }
 
   // Zoo-specific validation (only when zoo simulation is enabled)

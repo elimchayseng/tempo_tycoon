@@ -5,13 +5,15 @@ import { config } from "../config.js";
 import { publicClient } from "../tempo-client.js";
 import type { PreflightCheck, PreflightResult } from "../../shared/types.js";
 import { loadZooRegistry, getAgentRunner, refreshZooBalances } from "./zoo-shared.js";
+import { requireAdmin } from "../middleware/admin-auth.js";
+import { createRateLimit } from "../middleware/rate-limit.js";
 
 const log = createLogger('zoo-registry');
 
 export const zooRegistryRoutes = new Hono();
 
 // POST /preflight
-zooRegistryRoutes.post("/preflight", async (c) => {
+zooRegistryRoutes.post("/preflight", requireAdmin, createRateLimit(10, 60_000), async (c) => {
   const checks: PreflightCheck[] = [
     { id: "blockchain", label: "Blockchain connectivity", status: "checking" },
     { id: "accounts", label: "Zoo accounts (and wallets) initialized", status: "pending" },

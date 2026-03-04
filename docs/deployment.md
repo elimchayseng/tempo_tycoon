@@ -16,12 +16,13 @@ The project is deployed on Railway with the following setup:
 ```
 PORT=4000
 NODE_ENV=production
+ADMIN_TOKEN=<strong-random-token>
 RPC_URL=https://rpc.moderato.tempo.xyz
 ZOO_SIMULATION_ENABLED=true
 LOG_LEVEL=info
 ```
 
-> **Note:** No private keys are needed — wallets are generated automatically each simulation run. The old `*_PRIVATE_KEY` variables have been removed.
+> **Note:** `ADMIN_TOKEN` is required in production — the server will refuse to start without it. No private keys are needed — wallets are generated automatically each simulation run. See [Security](./security.md) for the full security posture.
 
 ### Health Checks
 
@@ -45,8 +46,9 @@ curl https://your-app.railway.app/api/health/blockchain
 # Zoo status
 curl https://your-app.railway.app/api/zoo/status
 
-# Pre-flight checks
-curl -X POST https://your-app.railway.app/api/zoo/preflight
+# Pre-flight checks (requires auth in production)
+curl -X POST https://your-app.railway.app/api/zoo/preflight \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 ### Notes

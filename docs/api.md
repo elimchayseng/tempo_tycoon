@@ -2,6 +2,10 @@
 
 Base URL: `http://localhost:4000`
 
+## Authentication & Rate Limiting
+
+All `POST` endpoints that mutate simulation state require a Bearer token. Rate limiting is applied to expensive endpoints in production. See [Security](./security.md) for details.
+
 ## Health
 
 ### `GET /api/health`
@@ -56,7 +60,7 @@ Zoo-specific health check.
 **Response:** `{ "status": "ok", "zoo_enabled": true, "zoo_accounts": { "total": 5, "initialized": true } }`
 
 ### `POST /api/zoo/preflight`
-Runs pre-flight checks before starting the zoo simulation.
+Runs pre-flight checks before starting the zoo simulation. Requires auth; rate limited to 10 req/min in production.
 
 **Response:**
 ```json
@@ -154,13 +158,13 @@ Aggregate metrics.
 ```
 
 ### `POST /api/zoo/agents/start`
-Start all agents. Creates agents using already-funded wallets from preflight, then starts autonomous loops. No initial funding occurs at start — wallets are funded during the preflight phase.
+Start all agents. Creates agents using already-funded wallets from preflight, then starts autonomous loops. No initial funding occurs at start — wallets are funded during the preflight phase. Requires auth; rate limited to 10 req/min.
 
 ### `POST /api/zoo/agents/stop`
-Stop all agents.
+Stop all agents. Requires auth; rate limited to 10 req/min.
 
 ### `POST /api/zoo/agents/:agentId/purchase`
-Force a specific agent to make an immediate purchase (for testing).
+Force a specific agent to make an immediate purchase (for testing). Requires auth; rate limited to 30 req/min.
 
 **Request (optional):**
 ```json

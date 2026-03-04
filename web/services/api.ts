@@ -13,6 +13,7 @@ import type {
 // Configuration for API calls
 const API_BASE_URL = '/api';
 const DEFAULT_TIMEOUT = 60000; // 60 seconds (accommodates faucet + distribution during start)
+const ADMIN_TOKEN = (import.meta as any).env?.VITE_ADMIN_TOKEN as string | undefined;
 
 // Custom error class for API errors
 export class ApiError extends Error {
@@ -35,10 +36,17 @@ async function apiRequest<T = unknown>(
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (ADMIN_TOKEN) {
+      headers['Authorization'] = `Bearer ${ADMIN_TOKEN}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...headers,
         ...options.headers,
       },
       signal: controller.signal,

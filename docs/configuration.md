@@ -10,6 +10,7 @@ All configuration is managed through environment variables, loaded in `server/co
 |----------|---------|-------------|
 | `PORT` | `4000` | HTTP server port |
 | `NODE_ENV` | `development` | Environment (`development` / `production`) |
+| `ADMIN_TOKEN` | *(none)* | Bearer token for protected endpoints. **Required in production.** See [Security](./security.md) |
 
 ### Blockchain
 

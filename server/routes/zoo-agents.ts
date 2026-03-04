@@ -11,6 +11,8 @@ import { balanceHistoryTracker } from "../balance-history.js";
 import type { ZooAgentState, ZooPurchaseReceipt, TransactionFlowEvent, BalanceUpdate, ZooMerchantState, ZooRestockEvent } from "../../shared/types.js";
 import type { AgentEventType } from "../../agents/types.js";
 import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
+import { requireAdmin } from "../middleware/admin-auth.js";
+import { createRateLimit } from "../middleware/rate-limit.js";
 
 const log = createLogger('zoo-agents');
 
@@ -345,7 +347,7 @@ zooAgentRoutes.get("/agents/metrics", async (c) => {
 });
 
 // POST /agents/start
-zooAgentRoutes.post("/agents/start", async (c) => {
+zooAgentRoutes.post("/agents/start", requireAdmin, createRateLimit(10, 60_000), async (c) => {
   try {
     if (!config.zoo.enabled) {
       return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
@@ -388,7 +390,7 @@ zooAgentRoutes.post("/agents/start", async (c) => {
 });
 
 // POST /agents/stop
-zooAgentRoutes.post("/agents/stop", async (c) => {
+zooAgentRoutes.post("/agents/stop", requireAdmin, createRateLimit(10, 60_000), async (c) => {
   try {
     if (!config.zoo.enabled) {
       return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
@@ -420,7 +422,7 @@ zooAgentRoutes.post("/agents/stop", async (c) => {
 });
 
 // POST /agents/:agentId/purchase
-zooAgentRoutes.post("/agents/:agentId/purchase", async (c) => {
+zooAgentRoutes.post("/agents/:agentId/purchase", requireAdmin, createRateLimit(30, 60_000), async (c) => {
   try {
     if (!config.zoo.enabled) {
       return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);

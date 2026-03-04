@@ -29,7 +29,7 @@ The dashboard is available at `http://localhost:5173` (dev) or `http://localhost
 ```
 server/           Hono API server + WebSocket
   routes/         Zoo route modules (registry, merchant, agents)
-  middleware/     Transaction verification
+  middleware/     Auth, rate limiting, tx verification
   actions/        Blockchain operations (send, batch, etc.)
   config.ts       Centralized configuration
 agents/           Autonomous buyer agents
@@ -51,6 +51,7 @@ docs/             Documentation
 
 - [Architecture](./architecture.md) — system design and data flow
 - [API Reference](./api.md) — all HTTP and WebSocket endpoints
+- [Security](./security.md) — authentication, rate limiting, and CORS
 - [Configuration](./configuration.md) — environment variables and config
 - [Deployment](./deployment.md) — Railway deployment guide
 - [Development](./development.md) — dev workflows and testing

@@ -40,7 +40,12 @@ const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 // Middleware
-app.use("/*", cors());
+app.use("/*", cors({
+  origin: config.cors.allowedOrigins,
+  allowHeaders: ['Content-Type', 'Authorization'],
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  maxAge: 3600,
+}));
 
 // Request logging middleware (if enabled)
 if (config.logging.enableRequestLogging) {
