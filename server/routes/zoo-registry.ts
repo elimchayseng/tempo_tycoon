@@ -81,13 +81,13 @@ zooRegistryRoutes.post("/preflight", async (c) => {
       await refreshZooBalances();
       const master = getZooAccountByRole("zooMaster");
       const merchantA = getZooAccountByRole("merchantA");
-      const attendees = [
-        getZooAccountByRole("attendee1"),
-        getZooAccountByRole("attendee2"),
-        getZooAccountByRole("attendee3"),
+      const guests = [
+        getZooAccountByRole("guest1"),
+        getZooAccountByRole("guest2"),
+        getZooAccountByRole("guest3"),
       ];
       check("balances").status = "pass";
-      check("balances").detail = "Master + 3 attendees available";
+      check("balances").detail = "Master + 3 guests available";
       const walletList: { label: string; address: string; balance: string }[] = [];
       if (master) {
         const bal = master.balances[config.contracts.alphaUsd]?.toString() ?? "0";
@@ -100,7 +100,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
         const merchantName = registry.merchants?.[0]?.name ?? "Merchant";
         walletList.push({ label: `Merchant: ${merchantName}`, address: merchantA.address, balance: bal });
       }
-      attendees.forEach((a, i) => {
+      guests.forEach((a, i) => {
         if (a) {
           const bal = a.balances[config.contracts.alphaUsd]?.toString() ?? "0";
           walletList.push({ label: `Guest ${i + 1}`, address: a.address, balance: bal });
@@ -240,7 +240,7 @@ zooRegistryRoutes.post("/preflight", async (c) => {
   check("funding").metadata = {
     method: "Tempo Batch Payment",
     lifecycle: "Ephemeral — fresh wallets each simulation",
-    distribution: { merchant: "$100", attendees: "$50 each" },
+    distribution: { merchant: "$100", guests: "$50 each" },
     total: "$250",
     refunding: "None — agents spend until depleted",
     autoStop: `When all buyers below $${config.zoo.minBalanceThreshold}`,
@@ -317,9 +317,9 @@ zooRegistryRoutes.get("/status", async (c) => {
         total_agents: 3,
         active_agents: 0,
         agent_states: [
-          { id: "attendee_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
-          { id: "attendee_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
-          { id: "attendee_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
+          { id: "guest_1", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "guest_2", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" },
+          { id: "guest_3", status: "offline", needs: { food_need: 100, fun_need: 100 }, last_purchase: null, balance: "0.00" }
         ]
       }
     };

@@ -265,43 +265,4 @@ export class DecisionEngine {
     return { ...this.config };
   }
 
-  /**
-   * Update configuration dynamically
-   */
-  updateConfig(updates: Partial<DecisionEngineConfig>): void {
-    Object.assign(this.config, updates);
-    log.info(`[${this.agentId}] Configuration updated:`, updates);
-  }
-
-  /**
-   * Get expected time until next purchase (for monitoring)
-   */
-  getExpectedTimeUntilPurchase(currentNeeds: AgentNeeds): number {
-    const needsAboveThreshold = Math.max(0, currentNeeds.food_need - this.config.purchaseThreshold.food_need);
-    const cyclesUntilPurchase = Math.ceil(needsAboveThreshold / this.config.needDecayRate.food_need);
-    return cyclesUntilPurchase * this.config.pollingIntervalMs;
-  }
-
-  /**
-   * Generate status report for monitoring
-   */
-  getStatus(currentNeeds: AgentNeeds, currentBalance: number, lastPurchaseTime: Date | null) {
-    const timeUntilPurchase = this.getExpectedTimeUntilPurchase(currentNeeds);
-    const decision = this.evaluatePurchaseDecision(currentNeeds, currentBalance, lastPurchaseTime);
-
-    return {
-      agent_id: this.agentId,
-      current_needs: currentNeeds,
-      current_balance: currentBalance,
-      time_until_purchase_ms: timeUntilPurchase,
-      time_until_purchase_sec: Math.round(timeUntilPurchase / 1000),
-      purchase_decision: decision,
-      configuration: {
-        polling_interval_ms: this.config.pollingIntervalMs,
-        food_decay_rate: this.config.needDecayRate.food_need,
-        purchase_threshold: this.config.purchaseThreshold.food_need
-      },
-      last_purchase_time: lastPurchaseTime
-    };
-  }
 }

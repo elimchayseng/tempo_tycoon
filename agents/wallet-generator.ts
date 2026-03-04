@@ -13,9 +13,9 @@ export interface GeneratedWallet {
 const WALLET_ROLES = [
   { label: 'Zoo Master', role: 'zooMaster', storeKey: zooWallets.zooMaster },
   { label: 'Merchant A', role: 'merchantA', storeKey: zooWallets.merchantA },
-  { label: 'Attendee 1', role: 'attendee1', storeKey: zooWallets.attendee1 },
-  { label: 'Attendee 2', role: 'attendee2', storeKey: zooWallets.attendee2 },
-  { label: 'Attendee 3', role: 'attendee3', storeKey: zooWallets.attendee3 },
+  { label: 'Guest 1', role: 'guest1', storeKey: zooWallets.guest1 },
+  { label: 'Guest 2', role: 'guest2', storeKey: zooWallets.guest2 },
+  { label: 'Guest 3', role: 'guest3', storeKey: zooWallets.guest3 },
 ] as const;
 
 export function generateAllWallets(): GeneratedWallet[] {

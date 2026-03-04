@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+export {};
 /**
  * LLM Inference tests — validates Heroku Managed Inference connectivity
  * and BuyerBrain decision logic without running the full simulation.
@@ -248,9 +249,10 @@ async function testBuyerBrainDecide() {
     assert(!!decision.toolName, `Decision includes toolName (got: ${decision.toolName})`);
 
     if (decision.action.type === 'purchase') {
+      const purchaseAction = decision.action;
       const validSkus = MOCK_CATALOG.filter(p => p.available).map(p => p.sku);
-      assert(validSkus.includes(decision.action.sku), `Selected SKU is valid and available (got: ${decision.action.sku})`);
-      console.log(`  Decision: BUY ${decision.action.sku} — "${decision.reasoning}"`);
+      assert(validSkus.includes(purchaseAction.sku), `Selected SKU is valid and available (got: ${purchaseAction.sku})`);
+      console.log(`  Decision: BUY ${purchaseAction.sku} — "${decision.reasoning}"`);
     } else {
       console.log(`  Decision: WAIT — "${decision.reasoning}"`);
     }
@@ -284,8 +286,9 @@ async function testBuyerBrainVeryHungry() {
     assert(decision.action.type === 'purchase', 'Very hungry agent should purchase');
 
     if (decision.action.type === 'purchase') {
-      const product = MOCK_CATALOG.find(p => p.sku === decision.action.sku);
-      console.log(`  Decision: BUY ${decision.action.sku} (${product?.category}) — "${decision.reasoning}"`);
+      const action = decision.action;
+      const product = MOCK_CATALOG.find(p => p.sku === action.sku);
+      console.log(`  Decision: BUY ${action.sku} (${product?.category}) — "${decision.reasoning}"`);
 
       // We expect a main course when very hungry, but don't hard-fail if LLM picks something else
       if (product?.category === 'main') {
@@ -296,7 +299,7 @@ async function testBuyerBrainVeryHungry() {
       }
 
       // Should not pick the same item as recent purchase
-      if (decision.action.sku !== 'fries-regular') {
+      if (action.sku !== 'fries-regular') {
         assert(true, 'LLM avoided recently purchased item');
       } else {
         console.log('  Note: LLM repeated a recent purchase — acceptable but not ideal');

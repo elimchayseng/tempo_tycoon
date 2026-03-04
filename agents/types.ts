@@ -225,7 +225,8 @@ export type AgentEventType =
   | 'restock_completed'
   | 'restock_failed'
   | 'sale_recorded'
-  | 'llm_decision';
+  | 'llm_decision'
+  | 'tx_flow';
 
 export interface AgentEvent {
   type: AgentEventType;

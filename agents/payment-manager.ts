@@ -233,33 +233,4 @@ export class PaymentManager {
     return true;
   }
 
-  getStatus() {
-    return {
-      agent_id: this.agentId,
-      agent_label: this.agentLabel,
-      payment_method: 'tempo_alphausd',
-      supported_features: [
-        'tempo_transactions',
-        'memo_support',
-        'automatic_fee_calculation',
-        'balance_validation'
-      ]
-    };
-  }
-
-  estimateTransactionFee(): number {
-    return 0.01;
-  }
-
-  async checkSufficientBalance(amount: string, currentBalance: number): Promise<boolean> {
-    const paymentAmount = parseFloat(amount);
-    const estimatedFee = this.estimateTransactionFee();
-    const totalCost = paymentAmount + estimatedFee;
-
-    const hasSufficientBalance = currentBalance >= totalCost;
-
-    log.debug(`[${this.agentId}] Balance check: $${currentBalance.toFixed(2)} vs $${totalCost.toFixed(2)} needed — ${hasSufficientBalance ? 'OK' : 'INSUFFICIENT'}`);
-
-    return hasSufficientBalance;
-  }
 }

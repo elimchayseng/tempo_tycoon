@@ -1,9 +1,10 @@
 import { createLogger } from '../shared/logger.js';
-import { StateManager } from './state-manager.js';
+import { getStateManager } from './state-manager.js';
+import type { StateManager } from './state-manager.js';
 import { DecisionEngine } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
 import { PaymentManager } from './payment-manager.js';
-import { BalanceSync } from './balance-sync.js';
+import { getAlphaUsdOnChainBalance, getWalletAddress } from './balance-sync.js';
 import type {
   AgentConfig,
   AgentState,
@@ -17,13 +18,13 @@ import type { TxFlowStage } from '../shared/types.js';
 
 const log = createLogger('BuyerAgent');
 
+
 export class BuyerAgent {
   private readonly config: AgentConfig;
   private readonly stateManager: StateManager;
   private readonly decisionEngine: DecisionEngine;
   private readonly acpClient: ACPClient;
   private readonly paymentManager: PaymentManager;
-  private readonly balanceSync: BalanceSync;
   private readonly brain?: BuyerBrain;
 
   private state: AgentState | null = null;
@@ -44,8 +45,8 @@ export class BuyerAgent {
 
     log.info(`[${config.agent_id}] Initializing buyer agent...`);
 
-    // Initialize components
-    this.stateManager = new StateManager();
+    // Initialize components — use shared singleton
+    this.stateManager = getStateManager();
     this.decisionEngine = new DecisionEngine(config.agent_id, {
       pollingIntervalMs: config.polling_interval_ms,
       needDecayRate: config.need_decay_rate,
@@ -55,7 +56,6 @@ export class BuyerAgent {
     });
     this.acpClient = new ACPClient(`http://localhost:${process.env.PORT || 4000}`);
     this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
-    this.balanceSync = new BalanceSync();
 
     log.info(`[${config.agent_id}] All components initialized`);
   }
@@ -147,7 +147,7 @@ export class BuyerAgent {
       });
 
       // Step 2: Get current balance from blockchain
-      const currentBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
+      const currentBalance = await getAlphaUsdOnChainBalance(this.config.agent_id);
 
       // Update local state balance to match blockchain
       const balanceStr = currentBalance.toFixed(2);
@@ -193,7 +193,7 @@ export class BuyerAgent {
   }
 
   /**
-   * Execute a purchase transaction
+   * Execute a deterministic purchase: randomly select a product and create session.
    */
   private async executePurchase(maxBudget: number, preferredCategory?: string): Promise<void> {
     if (!this.state) return;
@@ -211,7 +211,7 @@ export class BuyerAgent {
         current_needs: this.state.needs
       });
 
-      // Step 1: Initiate ACP purchase flow
+      // Step 1: Initiate ACP purchase flow (random product selection)
       this.emitTxFlow('checkout_created', { preferred_category: preferredCategory });
       const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory);
 
@@ -226,68 +226,8 @@ export class BuyerAgent {
         throw new Error(`Product price ($${session.amount}) exceeds budget ($${maxBudget.toFixed(2)})`);
       }
 
-      // Step 3: Execute payment
-      log.info(`[${this.config.agent_id}] Making payment for ${product.name}...`);
-      this.emitTxFlow('signing', { product: product.name, amount: session.amount });
-
-      const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, product);
-
-      if (!paymentResult.success) {
-        throw new Error(paymentResult.error || 'Payment failed');
-      }
-
-      log.info(`[${this.config.agent_id}] Payment successful: ${paymentResult.tx_hash}`);
-      this.emitTxFlow('block_inclusion', { tx_hash: paymentResult.tx_hash, block_number: paymentResult.block_number });
-
-      // Step 4: Complete checkout with merchant
-      this.emitTxFlow('merchant_verified', { session_id: session.session_id });
-      const checkoutResult = await this.acpClient.completeCheckout(
-        merchantCategory,
-        session.session_id,
-        paymentResult.tx_hash!
-      );
-
-      if (!checkoutResult.success || !checkoutResult.verified) {
-        log.warn(`[${this.config.agent_id}] Checkout verification failed:`, checkoutResult.error);
-        // Note: Payment already went through, so we continue with need recovery
-      }
-
-      // Step 5: Update needs based on purchase
-      const needsBefore = { ...this.state.needs };
-      this.state.needs = this.decisionEngine.calculateNeedRecovery(this.state.needs, product);
-
-      // Step 6: Create purchase record
-      const purchaseRecord = this.paymentManager.createPurchaseRecord(
-        session,
-        product,
-        paymentResult,
-        needsBefore,
-        this.state.needs
-      );
-
-      // Step 7: Update state
-      await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
-
-      // Step 7b: Sync in-memory state with persisted purchase data
-      this.state.purchase_count = (this.state.purchase_count || 0) + 1;
-      this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
-      this.state.last_purchase_time = purchaseRecord.completed_at;
-
-      // Step 8: Re-read authoritative balance from chain instead of
-      // speculatively subtracting (avoids floating-point vs fixed-point
-      // rounding mismatch that caused persistent $0.01 drift).
-      const postPurchaseBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
-      this.state.balance = postPurchaseBalance.toFixed(2);
-      this.state.status = 'online';
-
-      log.info(`[${this.config.agent_id}] Purchase completed successfully!`);
-      log.debug(`[${this.config.agent_id}] Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
-
-      this.emitEvent('purchase_completed', {
-        purchase_record: purchaseRecord,
-        new_needs: this.state.needs,
-        new_balance: this.state.balance
-      });
+      // Step 3: Execute shared ACP payment → checkout → state update
+      await this.executeACPPurchase(session, product, merchantCategory);
 
     } catch (error) {
       log.error(`[${this.config.agent_id}] Purchase failed:`, error);
@@ -364,7 +304,6 @@ export class BuyerAgent {
       return false;
     }
 
-    // Execute the purchase using the existing ACP flow
     log.info(`[${this.config.agent_id}] LLM purchasing: ${product.name} ($${product.price})`);
 
     this.state.status = 'purchasing';
@@ -377,7 +316,7 @@ export class BuyerAgent {
       llm_selected: true,
     });
 
-    // Create checkout for the specific product
+    // Create checkout for the LLM-selected product
     this.emitTxFlow('checkout_created', { preferred_category: product.category });
     const session = await this.acpClient.createCheckoutSession('food', sku, 1, this.config.address);
 
@@ -387,6 +326,23 @@ export class BuyerAgent {
     if (price > balance) {
       throw new Error(`LLM-selected product price ($${session.amount}) exceeds balance ($${balanceStr})`);
     }
+
+    // Execute shared ACP payment → checkout → state update
+    await this.executeACPPurchase(session, product, 'food');
+
+    return true;
+  }
+
+  /**
+   * Shared ACP purchase execution: payment → merchant checkout → need recovery → state update → events.
+   * Called by both deterministic and LLM purchase paths after session + product are resolved.
+   */
+  private async executeACPPurchase(
+    session: import('./types.js').CheckoutSession,
+    product: import('./types.js').MerchantProduct,
+    merchantCategory: string,
+  ): Promise<void> {
+    if (!this.state) return;
 
     // Execute payment
     this.emitTxFlow('signing', { product: product.name, amount: session.amount });
@@ -399,25 +355,32 @@ export class BuyerAgent {
     log.info(`[${this.config.agent_id}] Payment successful: ${paymentResult.tx_hash}`);
     this.emitTxFlow('block_inclusion', { tx_hash: paymentResult.tx_hash, block_number: paymentResult.block_number });
 
-    // Complete checkout
+    // Complete checkout with merchant
     this.emitTxFlow('merchant_verified', { session_id: session.session_id });
-    const checkoutResult = await this.acpClient.completeCheckout('food', session.session_id, paymentResult.tx_hash!);
+    const checkoutResult = await this.acpClient.completeCheckout(
+      merchantCategory,
+      session.session_id,
+      paymentResult.tx_hash!,
+    );
 
     if (!checkoutResult.success || !checkoutResult.verified) {
       log.warn(`[${this.config.agent_id}] Checkout verification failed:`, checkoutResult.error);
+      // Payment already went through, so we continue with need recovery
     }
 
-    // Update needs
+    // Update needs based on purchase
     const needsBefore = { ...this.state.needs };
     this.state.needs = this.decisionEngine.calculateNeedRecovery(this.state.needs, product);
 
-    // Record purchase
+    // Create purchase record
     const purchaseRecord = this.paymentManager.createPurchaseRecord(
       session, product, paymentResult, needsBefore, this.state.needs,
     );
+
+    // Persist purchase
     await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
 
-    // Update in-memory state
+    // Sync in-memory state
     this.state.purchase_count = (this.state.purchase_count || 0) + 1;
     this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
     this.state.last_purchase_time = purchaseRecord.completed_at;
@@ -433,20 +396,19 @@ export class BuyerAgent {
       this.recentPurchases.shift();
     }
 
-    // Re-read balance from chain
-    const postPurchaseBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
+    // Re-read authoritative balance from chain
+    const postPurchaseBalance = await getAlphaUsdOnChainBalance(this.config.agent_id);
     this.state.balance = postPurchaseBalance.toFixed(2);
     this.state.status = 'online';
 
-    log.info(`[${this.config.agent_id}] LLM purchase completed: ${product.name}`);
+    log.info(`[${this.config.agent_id}] Purchase completed: ${product.name}`);
+    log.debug(`[${this.config.agent_id}] Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
 
     this.emitEvent('purchase_completed', {
       purchase_record: purchaseRecord,
       new_needs: this.state.needs,
       new_balance: this.state.balance,
     });
-
-    return true;
   }
 
   /**
@@ -526,7 +488,7 @@ export class BuyerAgent {
     const uptimeSeconds = this.startTime ? Math.floor((now.getTime() - this.startTime.getTime()) / 1000) : 0;
 
     // Get wallet address for reporting
-    const walletAddress = this.balanceSync.getWalletAddress(this.config.agent_id);
+    const walletAddress = getWalletAddress(this.config.agent_id);
 
     return {
       agent_id: this.config.agent_id,
@@ -584,7 +546,7 @@ export class BuyerAgent {
    * Emit a transaction flow event for real-time visualization
    */
   private emitTxFlow(stage: TxFlowStage, data: Record<string, unknown> = {}): void {
-    this.emitEvent('tx_flow' as AgentEventType, {
+    this.emitEvent('tx_flow', {
       stage,
       timestamp: Date.now(),
       data,

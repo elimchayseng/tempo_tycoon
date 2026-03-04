@@ -3,6 +3,17 @@ import { join, dirname } from 'path';
 import { randomBytes } from 'crypto';
 import type { AgentState, PurchaseRecord } from './types.js';
 
+/** Singleton instance — use getStateManager() to access */
+let _instance: StateManager | null = null;
+
+/** Get (or create) the singleton StateManager instance */
+export function getStateManager(): StateManager {
+  if (!_instance) {
+    _instance = new StateManager();
+  }
+  return _instance;
+}
+
 export class StateManager {
   private readonly stateDir: string;
   private readonly stateFiles: Map<string, string> = new Map();

@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+export {};
 /**
  * API endpoint tests — requires a running server (`npm run dev:server`).
  *

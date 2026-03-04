@@ -1,7 +1,7 @@
 import { createLogger } from '../shared/logger.js';
 import { BuyerAgent } from './buyer-agent.js';
 import { MerchantAgent } from './merchant-agent.js';
-import { StateManager } from './state-manager.js';
+import { getStateManager } from './state-manager.js';
 import { generateAllWallets } from './wallet-generator.js';
 import { fundZooWallets } from './wallet-funder.js';
 import { resetZooAccounts } from '../server/zoo-accounts.js';
@@ -28,8 +28,6 @@ export class AgentRunner {
   private readonly agents: Map<string, BuyerAgent> = new Map();
   private merchantAgent: MerchantAgent | null = null;
   private buyerBrain: BuyerBrain | null = null;
-  private readonly stateManager: StateManager;
-
   private isRunning = false;
   private depletionCheckInterval: NodeJS.Timeout | null = null;
   private startTime: Date | null = null;
@@ -44,8 +42,6 @@ export class AgentRunner {
   private readonly maxMetricPoints = 1000;
 
   constructor() {
-    log.info('Initializing Agent Runner...');
-    this.stateManager = new StateManager();
     log.info('Agent Runner initialized');
   }
 
@@ -57,8 +53,9 @@ export class AgentRunner {
     log.info('Initializing ephemeral wallets...');
 
     // Clear previous agent state files
-    await this.stateManager.initialize();
-    await this.stateManager.clearAllStates();
+    const stateManager = getStateManager();
+    await stateManager.initialize();
+    await stateManager.clearAllStates();
     log.info('Cleared previous agent states');
 
     const progressCallback = (step: string, detail?: string) => {
@@ -99,7 +96,7 @@ export class AgentRunner {
       const agentConfigs = this.createAgentConfigs();
 
       if (agentConfigs.length === 0) {
-        throw new Error('No valid attendee accounts found for agent creation');
+        throw new Error('No valid guest accounts found for agent creation');
       }
 
       // Conditionally create LLM BuyerBrain when inference env vars are present
@@ -321,13 +318,13 @@ export class AgentRunner {
   private createAgentConfigs(): AgentConfig[] {
     const configs: AgentConfig[] = [];
 
-    const attendeeAccounts = [
-      { id: 'attendee_1', role: 'attendee1' as const },
-      { id: 'attendee_2', role: 'attendee2' as const },
-      { id: 'attendee_3', role: 'attendee3' as const }
+    const guestAccounts = [
+      { id: 'guest_1', role: 'guest1' as const },
+      { id: 'guest_2', role: 'guest2' as const },
+      { id: 'guest_3', role: 'guest3' as const }
     ];
 
-    for (const { id, role } of attendeeAccounts) {
+    for (const { id, role } of guestAccounts) {
       const account = getZooAccountByRole(role);
 
       if (!account) {
@@ -392,7 +389,7 @@ export class AgentRunner {
     const eventTypes: AgentEventType[] = [
       'agent_started', 'agent_stopped', 'needs_updated', 'purchase_initiated',
       'purchase_completed', 'purchase_failed', 'funding_received', 'funding_failed', 'error_occurred',
-      'tx_flow' as AgentEventType,
+      'tx_flow',
       'llm_decision',
     ];
 
@@ -427,15 +424,27 @@ export class AgentRunner {
    * Monitor for depletion — checks every 10s if ALL buyer agents are below threshold.
    * When depleted, emits simulation_depleted and auto-stops.
    */
+  /**
+   * Monitor for depletion — checks every 10s using the in-memory accountStore cache
+   * (which is kept fresh by agents' post-purchase balance re-reads).
+   * Refreshes from chain every 30s as a fallback to catch drift.
+   */
   private startDepletionMonitor(): void {
     const threshold = config.zoo.minBalanceThreshold;
+    let checkCount = 0;
 
     this.depletionCheckInterval = setInterval(async () => {
       if (!this.isRunning) return;
+      checkCount++;
 
       try {
-        await refreshZooBalances();
-        const buyerRoles = ['attendee1', 'attendee2', 'attendee3'] as const;
+        // Refresh from chain every 3rd check (30s) to catch drift
+        if (checkCount % 3 === 0) {
+          await refreshZooBalances();
+        }
+
+        // Read from in-memory cache (fast, no RPC)
+        const buyerRoles = ['guest1', 'guest2', 'guest3'] as const;
         const allDepleted = buyerRoles.every(role => {
           const account = getZooAccountByRole(role);
           if (!account) return true;
@@ -457,7 +466,7 @@ export class AgentRunner {
       }
     }, 10_000);
 
-    log.info(`Depletion monitor started (10s intervals, threshold: $${threshold})`);
+    log.info(`Depletion monitor started (10s intervals, chain refresh every 30s, threshold: $${threshold})`);
   }
 
   on(eventType: AgentEventType, handler: (event: AgentEvent) => void): void {

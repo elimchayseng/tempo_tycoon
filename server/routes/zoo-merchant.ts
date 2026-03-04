@@ -9,7 +9,6 @@ import { isAvailable, decrementStock, getInventorySnapshot } from "../../agents/
 const log = createLogger('zoo-merchant');
 
 const SESSION_CLEANUP_INTERVAL_MS = 30_000;
-const SESSION_EXPIRY_FORMAT = 'minutes'; // config.zoo.sessionTimeoutMinutes
 
 export const zooMerchantRoutes = new Hono();
 

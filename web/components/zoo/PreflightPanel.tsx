@@ -61,15 +61,15 @@ function AccountsMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 
 function BalancesMetadata({ metadata }: { metadata: Record<string, unknown> }) {
   const wallets = (metadata.wallets ?? []) as { label: string; address: string; balance: string }[];
-  const attendeeEmojis: Record<string, string> = {
-    "Guest 1": ANIMAL_EMOJI.attendee_1 ?? "",
-    "Guest 2": ANIMAL_EMOJI.attendee_2 ?? "",
-    "Guest 3": ANIMAL_EMOJI.attendee_3 ?? "",
+  const guestEmojis: Record<string, string> = {
+    "Guest 1": ANIMAL_EMOJI.guest_1 ?? "",
+    "Guest 2": ANIMAL_EMOJI.guest_2 ?? "",
+    "Guest 3": ANIMAL_EMOJI.guest_3 ?? "",
   };
   return (
     <div className="space-y-0.5">
       {wallets.map((w) => {
-        const emoji = attendeeEmojis[w.label] ?? "";
+        const emoji = guestEmojis[w.label] ?? "";
         const balDisplay = formatAlphaUsdBalance(w.balance);
         return (
           <div key={w.address} className="flex gap-2 items-center">
@@ -172,7 +172,7 @@ function RunnerMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
-  const distribution = metadata.distribution as { merchant: string; attendees: string } | undefined;
+  const distribution = metadata.distribution as { merchant: string; guests: string } | undefined;
   return (
     <div className="space-y-0.5">
       <MetadataDetail label="Method" value={metadata.method as string} />
@@ -180,7 +180,7 @@ function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
       {distribution && (
         <>
           <MetadataDetail label="Merchant" value={distribution.merchant} />
-          <MetadataDetail label="Attendees" value={distribution.attendees} />
+          <MetadataDetail label="Guests" value={distribution.guests} />
         </>
       )}
       <MetadataDetail label="Total" value={metadata.total as string} />

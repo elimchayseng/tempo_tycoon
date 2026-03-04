@@ -11,9 +11,9 @@ export type ProgressCallback = (step: string, detail?: string) => void;
 
 const FUNDING_AMOUNTS: Record<string, string> = {
   merchant_a: '100.00',
-  attendee_1: '50.00',
-  attendee_2: '50.00',
-  attendee_3: '50.00',
+  guest_1: '50.00',
+  guest_2: '50.00',
+  guest_3: '50.00',
 };
 
 const FAUCET_POLL_TIMEOUT_MS = 30_000;

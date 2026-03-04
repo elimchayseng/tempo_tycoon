@@ -7,9 +7,9 @@ import type { GeneratedWallet } from "../agents/wallet-generator.js";
 export const zooWallets = {
   zooMaster: "zoo_master",
   merchantA: "merchant_a",
-  attendee1: "attendee_1",
-  attendee2: "attendee_2",
-  attendee3: "attendee_3"
+  guest1: "guest_1",
+  guest2: "guest_2",
+  guest3: "guest_3"
 } as const;
 
 export type ZooWalletId = keyof typeof zooWallets;
