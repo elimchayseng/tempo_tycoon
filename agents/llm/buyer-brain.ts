@@ -88,7 +88,7 @@ export class BuyerBrain {
    *
    * On any error the caller falls back to the deterministic DecisionEngine.
    */
-  async decide(context: BuyerLLMContext): Promise<BuyerDecision> {
+  async decide(context: BuyerLLMContext, signal?: AbortSignal): Promise<BuyerDecision> {
     const userMessage = this.buildUserMessage(context);
 
     try {
@@ -96,6 +96,7 @@ export class BuyerBrain {
         this.systemPrompt,
         userMessage,
         BUYER_ACP_TOOLS,
+        signal,
       );
 
       const choice = response.choices[0];

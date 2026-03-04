@@ -74,6 +74,7 @@ export class LLMClient {
     systemPrompt: string,
     userMessage: string,
     tools: Tool[],
+    signal?: AbortSignal,
   ): Promise<ChatCompletionResponse> {
     if (this.callCount >= this.config.maxCallsPerSimulation) {
       throw new Error(
@@ -94,8 +95,13 @@ export class LLMClient {
       tool_choice: 'required' as const,
     };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), 10_000);
+
+    // Combine the 10s timeout with the optional shutdown signal
+    const combinedSignal = signal
+      ? AbortSignal.any([timeoutController.signal, signal])
+      : timeoutController.signal;
 
     try {
       log.debug(`LLM request #${this.callCount + 1} → ${this.config.model}`);
@@ -107,7 +113,7 @@ export class LLMClient {
           Authorization: `Bearer ${this.config.inferenceKey}`,
         },
         body: JSON.stringify(body),
-        signal: controller.signal,
+        signal: combinedSignal,
       });
 
       if (!response.ok) {

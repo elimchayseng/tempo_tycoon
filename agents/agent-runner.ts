@@ -187,7 +187,16 @@ export class AgentRunner {
     if (this.merchantAgent) {
       stopPromises.push(this.merchantAgent.stop());
     }
-    await Promise.all(stopPromises);
+
+    // Give agents up to 3s to drain; don't let stop() hang indefinitely
+    await Promise.race([
+      Promise.all(stopPromises),
+      new Promise<void>(resolve => setTimeout(resolve, 3000)),
+    ]);
+
+    // Reset circuit breakers so the next run starts with a clean slate
+    rpcCircuitBreaker.reset();
+    merchantCircuitBreaker.reset();
 
     // Reset LLM call counter
     if (this.buyerBrain) {
