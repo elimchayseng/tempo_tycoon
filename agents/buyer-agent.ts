@@ -9,8 +9,10 @@ import type {
   AgentState,
   AgentStatus,
   AgentEvent,
-  AgentEventType
+  AgentEventType,
+  BuyerLLMContext,
 } from './types.js';
+import type { BuyerBrain } from './llm/buyer-brain.js';
 import type { TxFlowStage } from '../shared/types.js';
 
 const log = createLogger('BuyerAgent');
@@ -22,6 +24,7 @@ export class BuyerAgent {
   private readonly acpClient: ACPClient;
   private readonly paymentManager: PaymentManager;
   private readonly balanceSync: BalanceSync;
+  private readonly brain?: BuyerBrain;
 
   private state: AgentState | null = null;
   private isRunning = false;
@@ -29,11 +32,15 @@ export class BuyerAgent {
   private errorCount = 0;
   private startTime: Date | null = null;
 
+  /** In-memory rolling window of recent purchases (for LLM context). */
+  private recentPurchases: Array<{ sku: string; name: string; amount: string; completedAt: Date }> = [];
+
   // Event handlers
   private eventHandlers: Map<AgentEventType, Array<(event: AgentEvent) => void>> = new Map();
 
-  constructor(config: AgentConfig) {
+  constructor(config: AgentConfig, brain?: BuyerBrain) {
     this.config = config;
+    this.brain = brain;
 
     log.info(`[${config.agent_id}] Initializing buyer agent...`);
 
@@ -157,7 +164,21 @@ export class BuyerAgent {
 
       // Step 4: Execute purchase if needed
       if (decision.shouldPurchase) {
-        await this.executePurchase(decision.maxBudget, decision.preferredCategory);
+        let handledByLLM = false;
+
+        // Try LLM-powered decision if brain is available
+        if (this.brain) {
+          try {
+            handledByLLM = await this.executeLLMPurchase(balanceStr);
+          } catch (llmError) {
+            log.warn(`[${this.config.agent_id}] LLM decision failed, falling back to deterministic:`, llmError);
+          }
+        }
+
+        // Deterministic fallback
+        if (!handledByLLM) {
+          await this.executePurchase(decision.maxBudget, decision.preferredCategory);
+        }
       }
 
       // Step 5: Save updated state
@@ -285,6 +306,159 @@ export class BuyerAgent {
 
       // Don't throw - we want the agent to continue running
     }
+  }
+
+  /**
+   * Execute an LLM-powered purchase: ask BuyerBrain which specific product to buy.
+   * Returns true if a purchase was made (or brain chose to wait), false if caller should fallback.
+   */
+  private async executeLLMPurchase(balanceStr: string): Promise<boolean> {
+    if (!this.brain || !this.state) return false;
+
+    // Fetch catalog for context
+    const catalog = await this.acpClient.getMerchantCatalog('food');
+
+    const context: BuyerLLMContext = {
+      agent_id: this.config.agent_id,
+      needs: { ...this.state.needs },
+      balance: balanceStr,
+      catalog: catalog.products,
+      purchase_history: this.getRecentPurchaseHistory(),
+      cycle_count: this.state.cycle_count,
+    };
+
+    const decision = await this.brain.decide(context);
+
+    // Emit LLM decision event for UI
+    this.emitEvent('llm_decision', {
+      agent_id: this.config.agent_id,
+      toolName: decision.toolName,
+      reasoning: decision.reasoning,
+      action: decision.action,
+      context_summary: {
+        food_need: context.needs.food_need,
+        balance: context.balance,
+        catalog_size: context.catalog.length,
+        recent_purchases: context.purchase_history.length,
+      },
+      tokenUsage: decision.tokenUsage,
+    });
+
+    // If brain returned fallback sentinel, let the caller fall back
+    if (decision.toolName === 'fallback') {
+      return false;
+    }
+
+    // Brain decided to wait
+    if (decision.action.type === 'wait') {
+      log.info(`[${this.config.agent_id}] LLM chose to wait: ${decision.reasoning}`);
+      return true;
+    }
+
+    // Brain decided to purchase a specific SKU
+    const { sku } = decision.action;
+    const product = catalog.products.find((p) => p.sku === sku && p.available);
+    if (!product) {
+      log.warn(`[${this.config.agent_id}] LLM selected unavailable SKU ${sku}, falling back`);
+      return false;
+    }
+
+    // Execute the purchase using the existing ACP flow
+    log.info(`[${this.config.agent_id}] LLM purchasing: ${product.name} ($${product.price})`);
+
+    this.state.status = 'purchasing';
+    await this.stateManager.saveState(this.state);
+
+    this.emitEvent('purchase_initiated', {
+      max_budget: parseFloat(balanceStr),
+      preferred_category: product.category,
+      current_needs: this.state.needs,
+      llm_selected: true,
+    });
+
+    // Create checkout for the specific product
+    this.emitTxFlow('checkout_created', { preferred_category: product.category });
+    const session = await this.acpClient.createCheckoutSession('food', sku, 1, this.config.address);
+
+    // Validate price
+    const price = parseFloat(session.amount);
+    const balance = parseFloat(balanceStr);
+    if (price > balance) {
+      throw new Error(`LLM-selected product price ($${session.amount}) exceeds balance ($${balanceStr})`);
+    }
+
+    // Execute payment
+    this.emitTxFlow('signing', { product: product.name, amount: session.amount });
+    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, product);
+
+    if (!paymentResult.success) {
+      throw new Error(paymentResult.error || 'Payment failed');
+    }
+
+    log.info(`[${this.config.agent_id}] Payment successful: ${paymentResult.tx_hash}`);
+    this.emitTxFlow('block_inclusion', { tx_hash: paymentResult.tx_hash, block_number: paymentResult.block_number });
+
+    // Complete checkout
+    this.emitTxFlow('merchant_verified', { session_id: session.session_id });
+    const checkoutResult = await this.acpClient.completeCheckout('food', session.session_id, paymentResult.tx_hash!);
+
+    if (!checkoutResult.success || !checkoutResult.verified) {
+      log.warn(`[${this.config.agent_id}] Checkout verification failed:`, checkoutResult.error);
+    }
+
+    // Update needs
+    const needsBefore = { ...this.state.needs };
+    this.state.needs = this.decisionEngine.calculateNeedRecovery(this.state.needs, product);
+
+    // Record purchase
+    const purchaseRecord = this.paymentManager.createPurchaseRecord(
+      session, product, paymentResult, needsBefore, this.state.needs,
+    );
+    await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
+
+    // Update in-memory state
+    this.state.purchase_count = (this.state.purchase_count || 0) + 1;
+    this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
+    this.state.last_purchase_time = purchaseRecord.completed_at;
+
+    // Track for LLM context
+    this.recentPurchases.push({
+      sku: product.sku,
+      name: product.name,
+      amount: product.price,
+      completedAt: purchaseRecord.completed_at,
+    });
+    if (this.recentPurchases.length > 10) {
+      this.recentPurchases.shift();
+    }
+
+    // Re-read balance from chain
+    const postPurchaseBalance = await this.balanceSync.getAlphaUsdOnChainBalance(this.config.agent_id);
+    this.state.balance = postPurchaseBalance.toFixed(2);
+    this.state.status = 'online';
+
+    log.info(`[${this.config.agent_id}] LLM purchase completed: ${product.name}`);
+
+    this.emitEvent('purchase_completed', {
+      purchase_record: purchaseRecord,
+      new_needs: this.state.needs,
+      new_balance: this.state.balance,
+    });
+
+    return true;
+  }
+
+  /**
+   * Build recent purchase history for LLM context.
+   */
+  private getRecentPurchaseHistory(): BuyerLLMContext['purchase_history'] {
+    const now = Date.now();
+    return this.recentPurchases.slice(-5).map((p) => ({
+      sku: p.sku,
+      name: p.name,
+      amount: p.amount,
+      time_ago_seconds: Math.round((now - p.completedAt.getTime()) / 1000),
+    }));
   }
 
   /**

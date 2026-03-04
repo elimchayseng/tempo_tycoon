@@ -224,7 +224,8 @@ export type AgentEventType =
   | 'restock_initiated'
   | 'restock_completed'
   | 'restock_failed'
-  | 'sale_recorded';
+  | 'sale_recorded'
+  | 'llm_decision';
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -279,6 +280,28 @@ export interface MerchantStatus {
     max_stock: number;
     available: boolean;
   }>;
+}
+
+// LLM Buyer Brain types
+
+export type BuyerAction =
+  | { type: 'purchase'; sku: string; reason: string }
+  | { type: 'wait'; reason: string };
+
+export interface BuyerDecision {
+  action: BuyerAction;
+  reasoning: string;
+  toolName: string;
+  tokenUsage?: { promptTokens: number; completionTokens: number };
+}
+
+export interface BuyerLLMContext {
+  agent_id: string;
+  needs: AgentNeeds;
+  balance: string;
+  catalog: MerchantProduct[];
+  purchase_history: Array<{ sku: string; name: string; amount: string; time_ago_seconds: number }>;
+  cycle_count: number;
 }
 
 export interface RestockRecord {
