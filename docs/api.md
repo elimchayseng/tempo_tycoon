@@ -84,7 +84,7 @@ Returns recent transaction history. **Note:** Currently returns empty — not fu
 ## Merchant (Food)
 
 ### `GET /api/merchant/food/catalog`
-Returns available products with pricing.
+Returns available products with pricing. **Note:** When the merchant brain is enabled, prices are dynamic and may differ from the original `zoo_map.json` values after LLM-driven price adjustments.
 
 **Response:**
 ```json

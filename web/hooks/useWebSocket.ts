@@ -11,6 +11,7 @@ import type {
   ZooMerchantState,
   ZooRestockEvent,
   ZooLLMDecision,
+  ZooPriceAdjustment,
 } from "../lib/types";
 
 const RECONNECT_DELAYS = [500, 1000, 2000, 4000];
@@ -28,6 +29,7 @@ export function useWebSocket() {
   const [merchantState, setMerchantState] = useState<ZooMerchantState | null>(null);
   const [restockEvents, setRestockEvents] = useState<ZooRestockEvent[]>([]);
   const [llmDecisions, setLlmDecisions] = useState<Record<string, ZooLLMDecision>>({});
+  const [priceAdjustments, setPriceAdjustments] = useState<ZooPriceAdjustment[]>([]);
   const [simulationComplete, setSimulationComplete] = useState(false);
   const [fundingProgress, setFundingProgress] = useState<{ step: string; detail?: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -120,6 +122,9 @@ export function useWebSocket() {
           case "zoo_llm_decision":
             setLlmDecisions((prev) => ({ ...prev, [msg.decision.agent_id]: msg.decision }));
             break;
+          case "zoo_price_adjustment":
+            setPriceAdjustments((prev) => [msg.event, ...prev].slice(0, 50));
+            break;
           case "zoo_simulation_complete":
             setSimulationComplete(true);
             break;
@@ -151,6 +156,7 @@ export function useWebSocket() {
     setLogs([]);
     setAccounts([]);
     setLlmDecisions({});
+    setPriceAdjustments([]);
     setSimulationComplete(false);
     setFundingProgress(null);
   }, []);
@@ -170,6 +176,7 @@ export function useWebSocket() {
     merchantState,
     restockEvents,
     llmDecisions,
+    priceAdjustments,
     simulationComplete,
     fundingProgress,
     resetSimulationData,

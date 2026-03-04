@@ -200,15 +200,25 @@ export interface ZooLLMDecision {
   agent_id: string;
   toolName: string;
   reasoning: string;
-  action: { type: 'purchase' | 'wait'; items?: Array<{ sku: string; quantity: number }>; reason: string };
-  context_summary: {
-    food_need: number;
-    balance: string;
-    catalog_size: number;
-    recent_purchases: number;
+  action: {
+    type: 'purchase' | 'wait' | 'adjust_prices' | 'restock';
+    items?: Array<{ sku: string; quantity: number }>;
+    updates?: Array<{ sku: string; new_price: string }>;
+    skus?: string[];
+    reason: string;
   };
+  context_summary: Record<string, unknown>;
   model?: string;
   tokenUsage?: { promptTokens: number; completionTokens: number };
+  timestamp: number;
+}
+
+export interface ZooPriceAdjustment {
+  sku: string;
+  name: string;
+  old_price: string;
+  new_price: string;
+  pct_change: string;
   timestamp: number;
 }
 
@@ -227,7 +237,8 @@ export type WsMessage =
   | { type: "zoo_restock_event"; event: ZooRestockEvent }
   | { type: "zoo_simulation_complete"; data: unknown }
   | { type: "zoo_funding_progress"; step: string; detail?: string }
-  | { type: "zoo_llm_decision"; decision: ZooLLMDecision };
+  | { type: "zoo_llm_decision"; decision: ZooLLMDecision }
+  | { type: "zoo_price_adjustment"; event: ZooPriceAdjustment };
 
 // API Request types for validation
 export interface SendRequest {

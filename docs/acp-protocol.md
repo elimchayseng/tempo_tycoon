@@ -90,6 +90,18 @@ Buyer Agent              Zoo Server (Registry + Merchant)        Tempo Blockchai
 4. On LLM error → falls back to deterministic path
 5. `executeACPPurchase()` handles payment → checkout → state update
 
+## Merchant ACP Tools
+
+The merchant agent is also an ACP participant — it uses LLM-powered tools to manage pricing and inventory:
+
+| Tool | Description |
+|------|-------------|
+| `acp_adjust_prices` | Set new prices for 1-5 SKUs (clamped to guardrail bounds) |
+| `acp_restock_inventory` | Buy stock from Zoo Master supplier (triggers on-chain payment) |
+| `acp_skip_cycle` | No action this cycle |
+
+The merchant acts as both a **server** (serving catalog/checkout to buyers) and a **client** (paying the supplier for restocks).
+
 ## Key Files
 
 | File | Role |
@@ -99,6 +111,8 @@ Buyer Agent              Zoo Server (Registry + Merchant)        Tempo Blockchai
 | `agents/payment-manager.ts` | Transaction execution with queue + retry + circuit breaker |
 | `agents/decision-engine.ts` | Need-based purchase decision logic |
 | `agents/llm/buyer-brain.ts` | LLM-powered product selection |
+| `agents/llm/merchant-brain.ts` | LLM-powered pricing and restocking decisions |
+| `agents/demand-tracker.ts` | Rolling 5-minute sales window for demand analysis |
 | `server/routes/zoo-merchant.ts` | Merchant ACP endpoints (catalog, checkout) |
 | `server/routes/zoo-registry.ts` | Registry + preflight endpoints |
 | `server/middleware/session-verifier.ts` | On-chain payment verification |

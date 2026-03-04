@@ -45,7 +45,8 @@ Defined in `shared/types.ts`. These are the actual messages sent over the WebSoc
 | `zoo_restock_event` | `{ event: ZooRestockEvent }` | On restock_completed — SKU, quantity, cost, tx_hash |
 | `zoo_simulation_complete` | `{ data: unknown }` | On simulation_depleted — all buyers out of funds |
 | `zoo_funding_progress` | `{ step: string, detail?: string }` | During wallet initialization — progress updates |
-| `zoo_llm_decision` | `{ decision: ZooLLMDecision }` | On llm_decision — reasoning, action, token usage |
+| `zoo_llm_decision` | `{ decision: ZooLLMDecision }` | On llm_decision — reasoning, action, token usage (buyer + merchant) |
+| `zoo_price_adjustment` | `{ event: ZooPriceAdjustment }` | On price_adjusted — SKU, old/new price, % change |
 | `log` | `{ entry: LogEntry }` | General log entries for the activity feed |
 | `accounts` | `{ accounts: AccountsState }` | After balance refreshes — all account balances |
 

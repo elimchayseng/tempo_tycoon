@@ -1,6 +1,7 @@
-# Draft Plan: LLM-Powered Merchant Agent
+# Plan: LLM-Powered Merchant Agent
 
-> Saved for future reference. Not yet implemented.
+> **Status: Implemented** in `feature/merchant-brain` branch.
+> See `agents/llm/merchant-brain.ts`, `agents/demand-tracker.ts`, and the Merchant Brain Layer section in `docs/architecture.md`.
 
 ## Overview
 
