@@ -2,6 +2,7 @@ import { createLogger } from '../shared/logger.js';
 import { transferAlphaUsdAction } from "../server/actions/send.js";
 import { accountStore } from "../server/accounts.js";
 import { rpcCircuitBreaker } from './circuit-breaker.js';
+import { interruptibleDelay } from './acp-client.js';
 import type { CheckoutSession, PurchaseRecord } from './types.js';
 import type { MerchantProduct } from './types.js';
 
@@ -128,11 +129,16 @@ export class PaymentManager {
   /**
    * Execute payment with retry logic and circuit breaker protection.
    */
-  async executeAlphaUsdTransferWithRetry(session: CheckoutSession, product: MerchantProduct): Promise<PaymentResult> {
+  async executeAlphaUsdTransferWithRetry(session: CheckoutSession, product: MerchantProduct, signal?: AbortSignal): Promise<PaymentResult> {
     const maxRetries = 3;
     const baseDelayMs = 2000;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Bail out early if shutdown was requested
+      if (signal?.aborted) {
+        return { success: false, amount: session.amount, error: 'Aborted' };
+      }
+
       try {
         const result = await rpcCircuitBreaker.execute(() =>
           txQueue.enqueue(() => this.executeAlphaUsdTransfer(session, product))
@@ -149,11 +155,19 @@ export class PaymentManager {
         if (attempt < maxRetries) {
           const delay = baseDelayMs * Math.pow(2, attempt - 1);
           log.warn(`[${this.agentId}] Payment attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`);
-          await new Promise(r => setTimeout(r, delay));
+          try {
+            await interruptibleDelay(delay, signal);
+          } catch {
+            return { success: false, amount: session.amount, error: 'Aborted' };
+          }
         } else {
           return result;
         }
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return { success: false, amount: session.amount, error: 'Aborted' };
+        }
+
         const msg = error instanceof Error ? error.message : String(error);
 
         if (NON_RECOVERABLE_PATTERNS.some(p => msg.toLowerCase().includes(p))) {
@@ -163,7 +177,11 @@ export class PaymentManager {
         if (attempt < maxRetries) {
           const delay = baseDelayMs * Math.pow(2, attempt - 1);
           log.warn(`[${this.agentId}] Payment attempt ${attempt}/${maxRetries} threw, retrying in ${delay}ms: ${msg}`);
-          await new Promise(r => setTimeout(r, delay));
+          try {
+            await interruptibleDelay(delay, signal);
+          } catch {
+            return { success: false, amount: session.amount, error: 'Aborted' };
+          }
         } else {
           return { success: false, amount: session.amount, error: msg };
         }

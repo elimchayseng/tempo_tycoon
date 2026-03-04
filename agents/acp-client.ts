@@ -12,6 +12,27 @@ const log = createLogger('ACPClient');
 
 const CACHE_TTL_MS = 60_000; // 60s cache TTL
 
+/** Delay that resolves early (with rejection) when the signal is aborted. */
+function interruptibleDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  if (!signal) return new Promise(resolve => setTimeout(resolve, ms));
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      reject(signal!.reason ?? new DOMException('Aborted', 'AbortError'));
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+export { interruptibleDelay };
+
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
@@ -36,7 +57,7 @@ export class ACPClient {
   /**
    * Fetch the zoo registry to discover available merchants
    */
-  async fetchZooRegistry(): Promise<ZooRegistry> {
+  async fetchZooRegistry(signal?: AbortSignal): Promise<ZooRegistry> {
     if (this.registryCache && Date.now() < this.registryCache.expiresAt) {
       log.debug('Cache hit: zoo registry');
       return this.registryCache.data;
@@ -47,7 +68,7 @@ export class ACPClient {
 
     try {
       const registry = await merchantCircuitBreaker.execute(() =>
-        this.makeRequest<ZooRegistry>('GET', url)
+        this.makeRequest<ZooRegistry>('GET', url, undefined, signal)
       );
 
       this.registryCache = { data: registry, expiresAt: Date.now() + CACHE_TTL_MS };
@@ -63,7 +84,7 @@ export class ACPClient {
   /**
    * Get merchant catalog for a specific category (e.g., 'food')
    */
-  async getMerchantCatalog(category: string): Promise<MerchantCatalog> {
+  async getMerchantCatalog(category: string, signal?: AbortSignal): Promise<MerchantCatalog> {
     const cached = this.catalogCache.get(category);
     if (cached && Date.now() < cached.expiresAt) {
       log.debug(`Cache hit: ${category} catalog`);
@@ -75,7 +96,7 @@ export class ACPClient {
 
     try {
       const catalog = await merchantCircuitBreaker.execute(() =>
-        this.makeRequest<MerchantCatalog>('GET', url)
+        this.makeRequest<MerchantCatalog>('GET', url, undefined, signal)
       );
 
       this.catalogCache.set(category, { data: catalog, expiresAt: Date.now() + CACHE_TTL_MS });
@@ -96,7 +117,8 @@ export class ACPClient {
     category: string,
     sku: string,
     quantity: number,
-    buyerAddress: string
+    buyerAddress: string,
+    signal?: AbortSignal
   ): Promise<CheckoutSession> {
     const url = `${this.baseUrl}/api/merchant/${category}/checkout/create`;
 
@@ -110,7 +132,7 @@ export class ACPClient {
     log.debug('Request:', requestBody);
 
     try {
-      const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody);
+      const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody, signal);
 
       log.info(`Checkout session created: ${session.session_id}`);
       log.debug(`Payment required: $${session.amount} -> ${session.recipient_address}`);
@@ -129,7 +151,8 @@ export class ACPClient {
   async createCartCheckoutSession(
     category: string,
     items: Array<{ sku: string; quantity: number }>,
-    buyerAddress: string
+    buyerAddress: string,
+    signal?: AbortSignal
   ): Promise<CheckoutSession> {
     const url = `${this.baseUrl}/api/merchant/${category}/checkout/create`;
 
@@ -143,7 +166,7 @@ export class ACPClient {
     log.debug('Request:', requestBody);
 
     try {
-      const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody);
+      const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody, signal);
 
       log.info(`Cart checkout session created: ${session.session_id}`);
       log.debug(`Payment required: $${session.amount} -> ${session.recipient_address}`);
@@ -162,7 +185,8 @@ export class ACPClient {
   async completeCheckout(
     category: string,
     sessionId: string,
-    txHash: string
+    txHash: string,
+    signal?: AbortSignal
   ): Promise<CheckoutResult> {
     const url = `${this.baseUrl}/api/merchant/${category}/checkout/complete`;
 
@@ -175,7 +199,7 @@ export class ACPClient {
     log.debug(`Transaction hash: ${txHash}`);
 
     try {
-      const result = await this.makeRequest<CheckoutResult>('POST', url, requestBody);
+      const result = await this.makeRequest<CheckoutResult>('POST', url, requestBody, signal);
 
       if (result.success && result.verified) {
         log.info(`Checkout completed successfully! Purchase ID: ${result.purchase_id}`);
@@ -223,12 +247,13 @@ export class ACPClient {
    */
   async initiatePurchase(
     agentAddress: string,
-    preferredCategory?: string
+    preferredCategory?: string,
+    signal?: AbortSignal
   ): Promise<{ session: CheckoutSession; product: MerchantProduct; merchantCategory: string } | null> {
     try {
       log.info(`Initiating ACP purchase flow for ${agentAddress}`);
 
-      const registry = await this.fetchZooRegistry();
+      const registry = await this.fetchZooRegistry(signal);
 
       const foodMerchants = registry.merchants.filter(m => m.category === 'food');
       if (foodMerchants.length === 0) {
@@ -236,7 +261,7 @@ export class ACPClient {
         return null;
       }
 
-      const catalog = await this.getMerchantCatalog('food');
+      const catalog = await this.getMerchantCatalog('food', signal);
 
       const product = this.findRandomProduct(catalog, preferredCategory);
       if (!product) {
@@ -244,7 +269,7 @@ export class ACPClient {
         return null;
       }
 
-      const session = await this.createCheckoutSession('food', product.sku, 1, agentAddress);
+      const session = await this.createCheckoutSession('food', product.sku, 1, agentAddress, signal);
 
       log.info(`Purchase flow initiated: ${product.name} ($${product.price}) -> Session ${session.session_id}`);
 
@@ -266,11 +291,17 @@ export class ACPClient {
   private async makeRequest<T>(
     method: 'GET' | 'POST',
     url: string,
-    body?: unknown
+    body?: unknown,
+    signal?: AbortSignal
   ): Promise<T> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      // Bail out early if shutdown was requested
+      if (signal?.aborted) {
+        throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+      }
+
       try {
         log.debug(`${method} ${url}${attempt > 1 ? ` (attempt ${attempt}/${this.maxRetries})` : ''}`);
 
@@ -279,7 +310,8 @@ export class ACPClient {
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'ZooAgent/1.0 (ACP Client)'
-          }
+          },
+          signal
         };
 
         if (body && method === 'POST') {
@@ -299,22 +331,21 @@ export class ACPClient {
         return data as T;
 
       } catch (error) {
+        // Re-throw abort errors immediately — no retry
+        if (error instanceof Error && error.name === 'AbortError') throw error;
+
         lastError = error instanceof Error ? error : new Error(String(error));
         log.warn(`Attempt ${attempt}/${this.maxRetries} failed: ${lastError.message}`);
 
         if (attempt < this.maxRetries) {
           const delayMs = this.retryDelayMs * Math.pow(2, attempt - 1);
           log.debug(`Retrying in ${delayMs}ms...`);
-          await this.delay(delayMs);
+          await interruptibleDelay(delayMs, signal);
         }
       }
     }
 
     throw lastError || new Error('Request failed after all retries');
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

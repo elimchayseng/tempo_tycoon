@@ -30,6 +30,7 @@ export class BuyerAgent {
   private state: AgentState | null = null;
   private isRunning = false;
   private loopInterval: NodeJS.Timeout | null = null;
+  private abortController: AbortController | null = null;
   private errorCount = 0;
   private startTime: Date | null = null;
 
@@ -83,6 +84,7 @@ export class BuyerAgent {
 
       // Start the autonomous loop
       this.isRunning = true;
+      this.abortController = new AbortController();
       this.startTime = new Date();
       this.scheduleNextCycle();
 
@@ -105,6 +107,12 @@ export class BuyerAgent {
     log.info(`[${this.config.agent_id}] Stopping agent...`);
 
     this.isRunning = false;
+
+    // Abort all in-flight HTTP requests and interruptible delays
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
 
     // Clear the loop timer
     if (this.loopInterval) {
@@ -211,8 +219,9 @@ export class BuyerAgent {
       });
 
       // Step 1: Initiate ACP purchase flow (random product selection)
+      const signal = this.abortController?.signal;
       this.emitTxFlow('checkout_created', { preferred_category: preferredCategory });
-      const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory);
+      const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory, signal);
 
       if (!purchaseFlow) {
         throw new Error('Failed to initiate ACP purchase flow');
@@ -226,7 +235,7 @@ export class BuyerAgent {
       }
 
       // Step 3: Execute shared ACP payment → checkout → state update
-      await this.executeACPPurchase(session, product, merchantCategory);
+      await this.executeACPPurchase(session, product, merchantCategory, signal);
 
     } catch (error) {
       log.error(`[${this.config.agent_id}] Purchase failed:`, error);
@@ -254,8 +263,10 @@ export class BuyerAgent {
   private async executeLLMPurchase(balanceStr: string): Promise<boolean> {
     if (!this.brain || !this.state) return false;
 
+    const signal = this.abortController?.signal;
+
     // Fetch catalog for context
-    const catalog = await this.acpClient.getMerchantCatalog('food');
+    const catalog = await this.acpClient.getMerchantCatalog('food', signal);
 
     const context: BuyerLLMContext = {
       agent_id: this.config.agent_id,
@@ -266,7 +277,7 @@ export class BuyerAgent {
       cycle_count: this.state.cycle_count,
     };
 
-    const decision = await this.brain.decide(context);
+    const decision = await this.brain.decide(context, signal);
 
     // Emit LLM decision event for UI
     this.emitEvent('llm_decision', {
@@ -321,7 +332,7 @@ export class BuyerAgent {
 
     // Create cart checkout session
     this.emitTxFlow('checkout_created', { items });
-    const session = await this.acpClient.createCartCheckoutSession('food', items, this.config.address);
+    const session = await this.acpClient.createCartCheckoutSession('food', items, this.config.address, signal);
 
     // Validate total price
     const totalPrice = parseFloat(session.amount);
@@ -331,7 +342,7 @@ export class BuyerAgent {
     }
 
     // Execute cart ACP payment → checkout → state update
-    await this.executeACPCartPurchase(session, 'food');
+    await this.executeACPCartPurchase(session, 'food', signal);
 
     return true;
   }
@@ -342,6 +353,7 @@ export class BuyerAgent {
   private async executeACPCartPurchase(
     session: import('./types.js').CheckoutSession,
     merchantCategory: string,
+    signal?: AbortSignal,
   ): Promise<void> {
     if (!this.state) return;
 
@@ -362,7 +374,7 @@ export class BuyerAgent {
       available: true,
     } as import('./types.js').MerchantProduct;
 
-    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, dummyProduct);
+    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, dummyProduct, signal);
 
     if (!paymentResult.success) {
       throw new Error(paymentResult.error || 'Payment failed');
@@ -377,6 +389,7 @@ export class BuyerAgent {
       merchantCategory,
       session.session_id,
       paymentResult.tx_hash!,
+      signal,
     );
 
     if (!checkoutResult.success || !checkoutResult.verified) {
@@ -441,12 +454,13 @@ export class BuyerAgent {
     session: import('./types.js').CheckoutSession,
     product: import('./types.js').MerchantProduct,
     merchantCategory: string,
+    signal?: AbortSignal,
   ): Promise<void> {
     if (!this.state) return;
 
     // Execute payment
     this.emitTxFlow('signing', { product: product.name, amount: session.amount });
-    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, product);
+    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, product, signal);
 
     if (!paymentResult.success) {
       throw new Error(paymentResult.error || 'Payment failed');
@@ -461,6 +475,7 @@ export class BuyerAgent {
       merchantCategory,
       session.session_id,
       paymentResult.tx_hash!,
+      signal,
     );
 
     if (!checkoutResult.success || !checkoutResult.verified) {
