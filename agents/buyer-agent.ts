@@ -531,7 +531,7 @@ export class BuyerAgent {
     return {
       agent_id: this.config.agent_id,
       status: this.state?.status || 'offline',
-      needs: this.state?.needs || { food_need: 100, fun_need: 100 },
+      needs: this.state?.needs || { food_need: 50, fun_need: 100 },
       balance: this.state?.balance || '0.00',
       wallet_address: walletAddress,
       last_purchase_time: this.state?.last_purchase_time || null,

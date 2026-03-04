@@ -90,8 +90,8 @@ export class DecisionEngine {
    * Degrade needs over time - this runs every polling cycle
    */
   degradeNeeds(currentNeeds: AgentNeeds): AgentNeeds {
-    // Apply random degradation (1–10 per cycle) for visual variety
-    const decay = Math.floor(Math.random() * 10) + 1;
+    // Apply random degradation (1–20 per cycle) for visual variety
+    const decay = Math.floor(Math.random() * 20) + 1;
     let newFoodNeed = currentNeeds.food_need - decay;
 
     // Clamp to 0-100 range

@@ -32,7 +32,7 @@ const BUYER_ACP_TOOLS: Tool[] = [
           },
           reasoning: {
             type: 'string',
-            description: 'Step-by-step reasoning for this choice (shown in UI)',
+            description: 'Step-by-step reasoning for this choice, keep it very short, and pretend you are a guest visting a zoo, use language like internal human thoughts about the purchase you will make (shown in UI)',
           },
         },
         required: ['merchant_category', 'sku', 'reasoning'],
@@ -49,7 +49,7 @@ const BUYER_ACP_TOOLS: Tool[] = [
         properties: {
           reasoning: {
             type: 'string',
-            description: 'Why no purchase is needed right now (shown in UI)',
+            description: 'Why no purchase is needed right now, keep it at short as possible (shown in UI)',
           },
         },
         required: ['reasoning'],

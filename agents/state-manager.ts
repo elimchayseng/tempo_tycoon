@@ -60,7 +60,7 @@ export class StateManager {
           agent_id: agentId,
           address: agentAddress,
           needs: {
-            food_need: 100, // Start at 100%
+            food_need: 50, // Start at 50% so agents purchase sooner
             fun_need: 100   // Future feature
           },
           balance: "0.00",
