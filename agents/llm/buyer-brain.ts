@@ -108,6 +108,7 @@ export class BuyerBrain {
           action: { type: 'wait', reason: args.reasoning || 'LLM chose to skip' },
           reasoning: args.reasoning || 'No purchase needed',
           toolName,
+          model: this.llmClient.model,
           tokenUsage,
         };
       }
@@ -188,6 +189,7 @@ export class BuyerBrain {
       action: { type: 'purchase', sku, reason: reasoning },
       reasoning,
       toolName: 'acp_select_and_purchase',
+      model: this.llmClient.model,
       tokenUsage,
     };
   }

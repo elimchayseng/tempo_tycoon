@@ -286,6 +286,13 @@ if (config.zoo.enabled) {
     });
   });
 
+  runner.on('llm_decision', (event) => {
+    broadcast({
+      type: 'zoo_llm_decision',
+      decision: { ...event.data, timestamp: Date.now() },
+    });
+  });
+
   log.info('AgentRunner initialized and ready');
 }
 

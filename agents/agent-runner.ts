@@ -342,7 +342,7 @@ export class AgentRunner {
         initial_funding_amount: "50.00",
         refund_threshold: "10.00",
         refund_amount: "30.00",
-        polling_interval_ms: 3000,
+        polling_interval_ms: 12000,
         need_decay_rate: {
           food_need: 5,
           fun_need: 4

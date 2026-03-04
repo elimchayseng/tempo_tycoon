@@ -90,12 +90,9 @@ export class DecisionEngine {
    * Degrade needs over time - this runs every polling cycle
    */
   degradeNeeds(currentNeeds: AgentNeeds): AgentNeeds {
-    // Apply base degradation
-    let newFoodNeed = currentNeeds.food_need - this.config.needDecayRate.food_need;
-
-    // Apply randomness factor (-20% to +20% variation)
-    const randomFactor = this.config.randomFactor;
-    newFoodNeed += (Math.random() - 0.5) * 2 * randomFactor * this.config.needDecayRate.food_need;
+    // Apply random degradation (1–10 per cycle) for visual variety
+    const decay = Math.floor(Math.random() * 10) + 1;
+    let newFoodNeed = currentNeeds.food_need - decay;
 
     // Clamp to 0-100 range
     newFoodNeed = Math.max(0, Math.min(100, newFoodNeed));

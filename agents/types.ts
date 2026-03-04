@@ -292,6 +292,7 @@ export interface BuyerDecision {
   action: BuyerAction;
   reasoning: string;
   toolName: string;
+  model?: string;
   tokenUsage?: { promptTokens: number; completionTokens: number };
 }
 

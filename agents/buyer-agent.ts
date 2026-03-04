@@ -341,6 +341,7 @@ export class BuyerAgent {
         catalog_size: context.catalog.length,
         recent_purchases: context.purchase_history.length,
       },
+      model: decision.model,
       tokenUsage: decision.tokenUsage,
     });
 

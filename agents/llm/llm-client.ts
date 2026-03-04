@@ -62,6 +62,10 @@ export class LLMClient {
     log.info(`LLM client initialized (model: ${config.model}, max calls: ${config.maxCallsPerSimulation})`);
   }
 
+  get model(): string {
+    return this.config.model;
+  }
+
   /**
    * Send a chat completion request to Heroku Managed Inference.
    * Throws on HTTP error, timeout, or safety cap exceeded — caller must handle fallback.

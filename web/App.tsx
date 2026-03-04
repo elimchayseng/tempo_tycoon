@@ -6,7 +6,7 @@ import { useBlockchainExplorer } from "./hooks/useBlockchainExplorer";
 import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
 import MerchantPanel from "./components/zoo/MerchantPanel";
-import AgentCardRow from "./components/zoo/AgentCardRow";
+import AgentBrainRow from "./components/zoo/AgentBrainRow";
 import ReceiptFeed from "./components/zoo/ReceiptFeed";
 import ZooFooter from "./components/zoo/ZooFooter";
 import BlockchainExplorer from "./components/zoo/BlockchainExplorer";
@@ -19,6 +19,7 @@ export default function App() {
     receipts,
     networkStats,
     txFlowEvents,
+    llmDecisions,
     balanceUpdates,
     merchantState,
     restockEvents,
@@ -159,8 +160,8 @@ export default function App() {
               )}
 
               <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} />
-              <div className="border-b border-[var(--zt-green-mid)] shrink-0">
-                <AgentCardRow agents={zooAgents} />
+              <div className="border-b border-[var(--zt-green-mid)] shrink-0 overflow-y-auto" style={{ maxHeight: "60vh" }}>
+                <AgentBrainRow agents={zooAgents} llmDecisions={llmDecisions} txFlowEvents={txFlowEvents} />
               </div>
               <div className="shrink-0">
                 <ReceiptFeed receipts={receipts} />
