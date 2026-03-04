@@ -11,9 +11,15 @@ function buildApp(maxRequests: number, windowMs: number) {
 
 describe("rate-limit middleware", () => {
   const originalEnv = process.env.NODE_ENV;
+  const originalRailway = process.env.RAILWAY_ENVIRONMENT_NAME;
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
+    if (originalRailway === undefined) {
+      delete process.env.RAILWAY_ENVIRONMENT_NAME;
+    } else {
+      process.env.RAILWAY_ENVIRONMENT_NAME = originalRailway;
+    }
   });
 
   it("allows requests within the limit", async () => {
@@ -107,6 +113,40 @@ describe("rate-limit middleware", () => {
       const res = await app.request("/test", {
         method: "POST",
         headers: { "x-forwarded-for": "11.11.11.11" },
+      });
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it("enforces rate limiting on Railway (RAILWAY_ENVIRONMENT_NAME set, no NODE_ENV)", async () => {
+    delete process.env.NODE_ENV;
+    process.env.RAILWAY_ENVIRONMENT_NAME = "production";
+    const app = buildApp(2, 60_000);
+
+    for (let i = 0; i < 2; i++) {
+      const res = await app.request("/test", {
+        method: "POST",
+        headers: { "x-forwarded-for": "12.12.12.12" },
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: { "x-forwarded-for": "12.12.12.12" },
+    });
+    expect(res.status).toBe(429);
+  });
+
+  it("skips rate limiting when no NODE_ENV and no RAILWAY_ENVIRONMENT_NAME", async () => {
+    delete process.env.NODE_ENV;
+    delete process.env.RAILWAY_ENVIRONMENT_NAME;
+    const app = buildApp(1, 60_000);
+
+    for (let i = 0; i < 5; i++) {
+      const res = await app.request("/test", {
+        method: "POST",
+        headers: { "x-forwarded-for": "13.13.13.13" },
       });
       expect(res.status).toBe(200);
     }

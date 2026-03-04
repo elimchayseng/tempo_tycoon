@@ -5,7 +5,7 @@ export const config = {
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 4000,
     // Railway handles host binding automatically, we just need the port
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV || (process.env.RAILWAY_ENVIRONMENT_NAME ? 'production' : 'development'),
   },
 
   chain: {

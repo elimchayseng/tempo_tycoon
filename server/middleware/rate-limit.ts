@@ -29,8 +29,10 @@ export function createRateLimit(maxRequests: number, windowMs: number) {
   }
 
   return createMiddleware(async (c, next) => {
-    // Skip rate limiting in development
-    if (process.env.NODE_ENV === "development") {
+    // Skip rate limiting in development (no Railway env = local dev)
+    const isDev = process.env.NODE_ENV === "development" ||
+                  (!process.env.NODE_ENV && !process.env.RAILWAY_ENVIRONMENT_NAME);
+    if (isDev) {
       await next();
       return;
     }
