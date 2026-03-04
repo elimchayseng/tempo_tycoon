@@ -348,12 +348,6 @@ export class AgentRunner {
           food_need: 40,
           fun_need: 30
         },
-        need_recovery: {
-          main: 70,
-          snack: 50,
-          beverage: 30,
-          dessert: 60
-        }
       };
 
       configs.push(agentConfig);

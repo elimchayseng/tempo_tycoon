@@ -124,6 +124,39 @@ export class ACPClient {
   }
 
   /**
+   * Create a cart checkout session for multiple items
+   */
+  async createCartCheckoutSession(
+    category: string,
+    items: Array<{ sku: string; quantity: number }>,
+    buyerAddress: string
+  ): Promise<CheckoutSession> {
+    const url = `${this.baseUrl}/api/merchant/${category}/checkout/create`;
+
+    const requestBody = {
+      items,
+      buyer_address: buyerAddress
+    };
+
+    const itemSummary = items.map(i => `${i.sku}x${i.quantity}`).join(', ');
+    log.info(`Creating cart checkout session for [${itemSummary}]`);
+    log.debug('Request:', requestBody);
+
+    try {
+      const session = await this.makeRequest<CheckoutSession>('POST', url, requestBody);
+
+      log.info(`Cart checkout session created: ${session.session_id}`);
+      log.debug(`Payment required: $${session.amount} -> ${session.recipient_address}`);
+
+      return session;
+
+    } catch (error) {
+      log.error(`Failed to create cart checkout session:`, error);
+      throw new Error(`Failed to create cart checkout session: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Complete checkout session with transaction hash
    */
   async completeCheckout(

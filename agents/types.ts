@@ -25,8 +25,7 @@ export interface AgentState {
 export interface PurchaseRecord {
   purchase_id: string;
   session_id: string;
-  sku: string;
-  name: string;
+  items: Array<{ sku: string; name: string; quantity: number; satisfaction_value: number }>;
   amount: string;
   tx_hash: string;
   block_number: string | undefined;
@@ -53,12 +52,6 @@ export interface AgentConfig {
     food_need: number;     // Trigger purchase when need below this
     fun_need: number;      // Trigger purchase when need below this (future)
   };
-  need_recovery: {
-    main: number;          // Points gained from main course
-    snack: number;         // Points gained from snack
-    beverage: number;      // Points gained from beverage
-    dessert: number;       // Points gained from dessert
-  };
 }
 
 export interface MerchantProduct {
@@ -68,6 +61,7 @@ export interface MerchantProduct {
   price: string;
   currency: string;
   category: string;
+  satisfaction_value: number;
   available: boolean;
 }
 
@@ -86,12 +80,13 @@ export interface CheckoutSession {
   recipient_address: string;
   expires_at: string;
   memo: string;
-  product: {
+  items: Array<{
     sku: string;
     name: string;
     price: string;
     quantity: number;
-  };
+    satisfaction_value: number;
+  }>;
 }
 
 export interface CheckoutResult {
@@ -99,10 +94,7 @@ export interface CheckoutResult {
   verified: boolean;
   purchase_id?: string;
   session_id?: string;
-  product?: {
-    sku: string;
-    quantity: number;
-  };
+  items?: Array<{ sku: string; quantity: number }>;
   payment?: {
     amount: string;
     currency: string;
@@ -170,6 +162,7 @@ export interface ZooRegistry {
       name: string;
       price: string;
       category: string;
+      satisfaction_value: number;
       available: boolean;
     }>;
   }>;
@@ -286,7 +279,7 @@ export interface MerchantStatus {
 // LLM Buyer Brain types
 
 export type BuyerAction =
-  | { type: 'purchase'; sku: string; reason: string }
+  | { type: 'purchase'; items: Array<{ sku: string; quantity: number }>; reason: string }
   | { type: 'wait'; reason: string };
 
 export interface BuyerDecision {
@@ -302,7 +295,7 @@ export interface BuyerLLMContext {
   needs: AgentNeeds;
   balance: string;
   catalog: MerchantProduct[];
-  purchase_history: Array<{ sku: string; name: string; amount: string; time_ago_seconds: number }>;
+  purchase_history: Array<{ items: Array<{ sku: string; name: string }>; amount: string; time_ago_seconds: number }>;
   cycle_count: number;
 }
 

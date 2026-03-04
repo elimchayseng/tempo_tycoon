@@ -80,8 +80,7 @@ describe('StateManager', () => {
     await manager.recordPurchase('buyer_1', {
       purchase_id: 'p1',
       session_id: 's1',
-      sku: 'burger-1',
-      name: 'Burger',
+      items: [{ sku: 'burger-1', name: 'Burger', quantity: 1, satisfaction_value: 70 }],
       amount: '5.00',
       tx_hash: '0xaaa',
       block_number: '123',

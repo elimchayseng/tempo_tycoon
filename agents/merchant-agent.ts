@@ -174,12 +174,13 @@ export class MerchantAgent {
         recipient_address: this.config.zoo_master_address,
         expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
         memo: `Restock: ${unitsNeeded}x ${item.name}`,
-        product: {
+        items: [{
           sku: item.sku,
           name: item.name,
           price: item.cost_basis,
           quantity: unitsNeeded,
-        },
+          satisfaction_value: 0,
+        }],
       };
 
       const product = {
@@ -188,6 +189,7 @@ export class MerchantAgent {
         price: item.cost_basis,
         currency: 'AlphaUSD',
         category: item.category,
+        satisfaction_value: 0,
         available: true,
       };
 

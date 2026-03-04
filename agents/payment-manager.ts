@@ -2,7 +2,8 @@ import { createLogger } from '../shared/logger.js';
 import { transferAlphaUsdAction } from "../server/actions/send.js";
 import { accountStore } from "../server/accounts.js";
 import { rpcCircuitBreaker } from './circuit-breaker.js';
-import type { CheckoutSession, PurchaseRecord, MerchantProduct } from './types.js';
+import type { CheckoutSession, PurchaseRecord } from './types.js';
+import type { MerchantProduct } from './types.js';
 
 const log = createLogger('PaymentManager');
 
@@ -177,7 +178,6 @@ export class PaymentManager {
    */
   createPurchaseRecord(
     session: CheckoutSession,
-    product: MerchantProduct,
     paymentResult: PaymentResult,
     needsBefore: { food_need: number; fun_need: number },
     needsAfter: { food_need: number; fun_need: number }
@@ -185,8 +185,12 @@ export class PaymentManager {
     const record: PurchaseRecord = {
       purchase_id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       session_id: session.session_id,
-      sku: product.sku,
-      name: product.name,
+      items: session.items.map(i => ({
+        sku: i.sku,
+        name: i.name,
+        quantity: i.quantity,
+        satisfaction_value: i.satisfaction_value,
+      })),
       amount: paymentResult.amount,
       tx_hash: paymentResult.tx_hash || 'unknown',
       block_number: paymentResult.block_number || 'unknown',
@@ -197,7 +201,8 @@ export class PaymentManager {
       need_after: needsAfter
     };
 
-    log.info(`[${this.agentId}] Purchase record created: ${record.purchase_id}`);
+    const itemNames = session.items.map(i => i.name).join(' + ');
+    log.info(`[${this.agentId}] Purchase record created: ${record.purchase_id} [${itemNames}]`);
     log.debug(`[${this.agentId}] Need change: food ${needsBefore.food_need} -> ${needsAfter.food_need}`);
 
     return record;

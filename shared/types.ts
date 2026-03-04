@@ -137,8 +137,7 @@ export interface ZooAgentState {
 export interface ZooPurchaseReceipt {
   agent_id: string;
   agent_address?: string;
-  product_name: string;
-  sku: string;
+  items: Array<{ sku: string; name: string; quantity: number; satisfaction_value: number }>;
   amount: string;
   merchant_name: string;
   merchant_address: string;
@@ -201,7 +200,7 @@ export interface ZooLLMDecision {
   agent_id: string;
   toolName: string;
   reasoning: string;
-  action: { type: 'purchase' | 'wait'; sku?: string; reason: string };
+  action: { type: 'purchase' | 'wait'; items?: Array<{ sku: string; quantity: number }>; reason: string };
   context_summary: {
     food_need: number;
     balance: string;

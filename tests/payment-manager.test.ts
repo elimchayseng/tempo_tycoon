@@ -42,7 +42,7 @@ const session: CheckoutSession = {
   recipient_address: '0xMerchant',
   expires_at: new Date(Date.now() + 60000).toISOString(),
   memo: 'Test purchase',
-  product: { sku: 'burger-1', name: 'Burger', price: '5.00', quantity: 1 },
+  items: [{ sku: 'burger-1', name: 'Burger', price: '5.00', quantity: 1, satisfaction_value: 70 }],
 };
 
 const product: MerchantProduct = {
@@ -51,6 +51,7 @@ const product: MerchantProduct = {
   price: '5.00',
   currency: 'AlphaUSD',
   category: 'main',
+  satisfaction_value: 70,
   available: true,
 };
 
@@ -103,9 +104,10 @@ describe('PaymentManager', () => {
       const needsBefore = { food_need: 20, fun_need: 100 };
       const needsAfter = { food_need: 80, fun_need: 100 };
 
-      const record = pm.createPurchaseRecord(session, product, paymentResult, needsBefore, needsAfter);
+      const record = pm.createPurchaseRecord(session, paymentResult, needsBefore, needsAfter);
       expect(record.session_id).toBe('sess_1');
-      expect(record.sku).toBe('burger-1');
+      expect(record.items).toHaveLength(1);
+      expect(record.items[0].sku).toBe('burger-1');
       expect(record.amount).toBe('5.00');
       expect(record.tx_hash).toBe('0xabc');
       expect(record.need_before).toEqual(needsBefore);

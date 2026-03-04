@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent } from "../../lib/types";
-import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji } from "../../utils/formatting";
+import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
@@ -36,12 +36,12 @@ interface RestockAnimState {
 }
 
 function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestLabel: string): { text: string; delay: number }[] {
-  const prodEm = productEmoji(receipt.product_name);
+  const { emojis, displayName } = cartDisplayInfo(receipt.items);
   return [
     { text: `${guestLabel} evaluating purchase decision...`, delay: 0 },
     { text: `Discovering merchants via /api/zoo/registry`, delay: 600 },
     { text: `Browsing merchant catalog...`, delay: 1200 },
-    { text: `Found ${prodEm} ${receipt.product_name} — $${receipt.amount} AUSD`, delay: 1800 },
+    { text: `Found ${emojis} ${displayName} — $${receipt.amount} AUSD`, delay: 1800 },
     { text: `Creating checkout session...`, delay: 2400 },
     { text: `🔐 Signing transferWithMemo tx...`, delay: 3000 },
     { text: `📡 Broadcasting to Tempo Moderato...`, delay: 3600 },
@@ -113,12 +113,12 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🦊";
     const guestAddr = latestReceipt.agent_address ? shortAddr(latestReceipt.agent_address) : latestReceipt.agent_id;
     const guestLabel = formatGuestLabel(latestReceipt.agent_id, latestReceipt.agent_address);
-    const productEm = productEmoji(latestReceipt.product_name);
+    const { emojis: cartEmojis, displayName: cartName } = cartDisplayInfo(latestReceipt.items);
 
     setAnim({
       guestEmoji,
       guestAddr,
-      productEm,
+      productEm: cartEmojis,
       amount: latestReceipt.amount,
       txHash: latestReceipt.tx_hash,
     });
@@ -130,8 +130,8 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
         type: 'guest' as const,
         emoji: guestEmoji,
         label: guestAddr,
-        productEm,
-        productName: latestReceipt.product_name,
+        productEm: cartEmojis,
+        productName: cartName,
         amount: latestReceipt.amount,
         fee: latestReceipt.fee_ausd,
         key: latestReceipt.tx_hash,

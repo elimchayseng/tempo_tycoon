@@ -186,7 +186,8 @@ export class StateManager {
 
       await this.updateState(agentId, updates);
 
-      console.log(`[StateManager] 🛍️  Recorded purchase for ${agentId}: ${purchaseRecord.name} ($${purchaseRecord.amount})`);
+      const itemNames = purchaseRecord.items.map(i => i.name).join(' + ');
+      console.log(`[StateManager] 🛍️  Recorded purchase for ${agentId}: ${itemNames} ($${purchaseRecord.amount})`);
       console.log(`[StateManager] ${agentId} totals: ${updates.purchase_count} purchases, $${updates.total_spent} spent`);
 
     } catch (error) {

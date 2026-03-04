@@ -41,14 +41,14 @@ function assert(condition: boolean, name: string) {
 // ---------- Test data ----------
 
 const MOCK_CATALOG: MerchantProduct[] = [
-  { sku: 'burger-classic', name: 'Classic Burger', price: '8.50', currency: 'AlphaUSD', category: 'main', available: true },
-  { sku: 'pizza-margherita', name: 'Margherita Pizza', price: '9.00', currency: 'AlphaUSD', category: 'main', available: true },
-  { sku: 'fries-regular', name: 'Regular Fries', price: '3.50', currency: 'AlphaUSD', category: 'snack', available: true },
-  { sku: 'nachos-cheese', name: 'Cheese Nachos', price: '4.50', currency: 'AlphaUSD', category: 'snack', available: true },
-  { sku: 'cola-large', name: 'Large Cola', price: '2.50', currency: 'AlphaUSD', category: 'beverage', available: true },
-  { sku: 'water-bottle', name: 'Bottled Water', price: '1.50', currency: 'AlphaUSD', category: 'beverage', available: true },
-  { sku: 'ice-cream-vanilla', name: 'Vanilla Ice Cream', price: '4.00', currency: 'AlphaUSD', category: 'dessert', available: true },
-  { sku: 'brownie-choc', name: 'Chocolate Brownie', price: '3.50', currency: 'AlphaUSD', category: 'dessert', available: false },
+  { sku: 'burger-classic', name: 'Classic Burger', price: '8.50', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true },
+  { sku: 'pizza-margherita', name: 'Margherita Pizza', price: '9.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true },
+  { sku: 'fries-regular', name: 'Regular Fries', price: '3.50', currency: 'AlphaUSD', category: 'snack', satisfaction_value: 50, available: true },
+  { sku: 'nachos-cheese', name: 'Cheese Nachos', price: '4.50', currency: 'AlphaUSD', category: 'snack', satisfaction_value: 50, available: true },
+  { sku: 'cola-large', name: 'Large Cola', price: '2.50', currency: 'AlphaUSD', category: 'beverage', satisfaction_value: 30, available: true },
+  { sku: 'water-bottle', name: 'Bottled Water', price: '1.50', currency: 'AlphaUSD', category: 'beverage', satisfaction_value: 30, available: true },
+  { sku: 'ice-cream-vanilla', name: 'Vanilla Ice Cream', price: '4.00', currency: 'AlphaUSD', category: 'dessert', satisfaction_value: 60, available: true },
+  { sku: 'brownie-choc', name: 'Chocolate Brownie', price: '3.50', currency: 'AlphaUSD', category: 'dessert', satisfaction_value: 60, available: false },
 ];
 
 function makeContext(overrides: Partial<BuyerLLMContext> = {}): BuyerLLMContext {
@@ -162,15 +162,15 @@ async function testToolCallCompletion() {
     {
       type: 'function' as const,
       function: {
-        name: 'acp_select_and_purchase',
-        description: 'Select and purchase a product',
+        name: 'acp_purchase_cart',
+        description: 'Purchase a cart of 1-3 items',
         parameters: {
           type: 'object',
           properties: {
-            sku: { type: 'string', description: 'Product SKU' },
-            reasoning: { type: 'string', description: 'Why this product' },
+            items: { type: 'array', items: { type: 'object', properties: { sku: { type: 'string' }, quantity: { type: 'number' } }, required: ['sku', 'quantity'] } },
+            reasoning: { type: 'string', description: 'Why this cart' },
           },
-          required: ['sku', 'reasoning'],
+          required: ['items', 'reasoning'],
         },
       },
     },
@@ -197,8 +197,8 @@ async function testToolCallCompletion() {
         food_need: 20,
         balance: '40.00',
         catalog: [
-          { sku: 'burger-classic', name: 'Classic Burger', price: '8.50', category: 'main' },
-          { sku: 'fries-regular', name: 'Regular Fries', price: '3.50', category: 'snack' },
+          { sku: 'burger-classic', name: 'Classic Burger', price: '8.50', category: 'main', satisfaction_value: 70 },
+          { sku: 'fries-regular', name: 'Regular Fries', price: '3.50', category: 'snack', satisfaction_value: 50 },
         ],
       }),
       tools,
@@ -211,16 +211,16 @@ async function testToolCallCompletion() {
 
     const toolCall = choice.message.tool_calls![0];
     assert(
-      toolCall.function.name === 'acp_select_and_purchase' || toolCall.function.name === 'acp_skip_cycle',
+      toolCall.function.name === 'acp_purchase_cart' || toolCall.function.name === 'acp_skip_cycle',
       `Tool call is a known ACP tool (got: ${toolCall.function.name})`,
     );
 
     const args = JSON.parse(toolCall.function.arguments);
     assert(!!args.reasoning, 'Tool call includes reasoning');
 
-    if (toolCall.function.name === 'acp_select_and_purchase') {
-      assert(!!args.sku, 'Purchase tool call includes sku');
-      console.log(`  LLM chose: ${args.sku} — "${args.reasoning}"`);
+    if (toolCall.function.name === 'acp_purchase_cart') {
+      assert(!!args.items && args.items.length > 0, 'Purchase tool call includes items');
+      console.log(`  LLM chose cart: ${JSON.stringify(args.items)} — "${args.reasoning}"`);
     } else {
       console.log(`  LLM chose to skip: "${args.reasoning}"`);
     }
@@ -251,8 +251,9 @@ async function testBuyerBrainDecide() {
     if (decision.action.type === 'purchase') {
       const purchaseAction = decision.action;
       const validSkus = MOCK_CATALOG.filter(p => p.available).map(p => p.sku);
-      assert(validSkus.includes(purchaseAction.sku), `Selected SKU is valid and available (got: ${purchaseAction.sku})`);
-      console.log(`  Decision: BUY ${purchaseAction.sku} — "${decision.reasoning}"`);
+      const allValid = purchaseAction.items.every(i => validSkus.includes(i.sku));
+      assert(allValid, `All cart SKUs are valid and available (got: ${purchaseAction.items.map(i => i.sku).join(', ')})`);
+      console.log(`  Decision: BUY [${purchaseAction.items.map(i => i.sku).join(', ')}] — "${decision.reasoning}"`);
     } else {
       console.log(`  Decision: WAIT — "${decision.reasoning}"`);
     }
@@ -276,7 +277,7 @@ async function testBuyerBrainVeryHungry() {
     needs: { food_need: 10, fun_need: 80 },
     balance: '40.00',
     purchase_history: [
-      { sku: 'fries-regular', name: 'Regular Fries', amount: '3.50', time_ago_seconds: 30 },
+      { items: [{ sku: 'fries-regular', name: 'Regular Fries' }], amount: '3.50', time_ago_seconds: 30 },
     ],
   });
 
@@ -287,8 +288,9 @@ async function testBuyerBrainVeryHungry() {
 
     if (decision.action.type === 'purchase') {
       const action = decision.action;
-      const product = MOCK_CATALOG.find(p => p.sku === action.sku);
-      console.log(`  Decision: BUY ${action.sku} (${product?.category}) — "${decision.reasoning}"`);
+      const firstSku = action.items[0]?.sku;
+      const product = MOCK_CATALOG.find(p => p.sku === firstSku);
+      console.log(`  Decision: BUY [${action.items.map(i => i.sku).join(', ')}] (${product?.category}) — "${decision.reasoning}"`);
 
       // We expect a main course when very hungry, but don't hard-fail if LLM picks something else
       if (product?.category === 'main') {
@@ -299,7 +301,8 @@ async function testBuyerBrainVeryHungry() {
       }
 
       // Should not pick the same item as recent purchase
-      if (action.sku !== 'fries-regular') {
+      const hasRecentRepeat = action.items.some(i => i.sku === 'fries-regular');
+      if (!hasRecentRepeat) {
         assert(true, 'LLM avoided recently purchased item');
       } else {
         console.log('  Note: LLM repeated a recent purchase — acceptable but not ideal');

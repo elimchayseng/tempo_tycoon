@@ -40,17 +40,20 @@ const PROTOCOL_STEPS: { stage: TxFlowStage; label: string }[] = [
   { stage: "merchant_verified", label: "merchant_verified" },
 ];
 
-const STAGGER_DELAY_MS = 1500;
+const REVEAL_DELAY_MS = 400;
 
 function getStepDetail(stage: TxFlowStage, events: TransactionFlowEvent[]): string | null {
   const ev = events.find((e) => e.stage === stage);
   if (!ev) return null;
   const d = ev.data;
   switch (stage) {
-    case "checkout_created":
-      return d.session_id
-        ? `session: ${String(d.session_id).slice(0, 8)}...  amount: $${d.amount ?? "?"}`
-        : null;
+    case "checkout_created": {
+      if (d.items && Array.isArray(d.items)) {
+        const skus = (d.items as Array<{ sku: string }>).map((i) => i.sku).join(", ");
+        return `cart: [${skus}]`;
+      }
+      return d.preferred_category ? `category: ${d.preferred_category}` : null;
+    }
     case "signing":
       return d.product
         ? `${d.product}  amount: $${d.amount ?? "?"}`
@@ -77,8 +80,11 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
   const reasoningText = decision ? decision.reasoning : "";
   const { displayed: typedReasoning, done: reasoningDone } = useTypewriter(reasoningText, 30);
 
-  // Filter tx flow events for this agent
-  const agentTxEvents = txFlowEvents.filter((e) => e.agent_id === agentId);
+  // Filter tx flow events for this agent, only AFTER the current decision timestamp
+  const decisionTs = decision?.timestamp ?? 0;
+  const agentTxEvents = txFlowEvents.filter(
+    (e) => e.agent_id === agentId && e.timestamp >= decisionTs
+  );
   const completedStages = new Set(agentTxEvents.map((e) => e.stage));
 
   // Reset visible stages when a new decision arrives
@@ -90,24 +96,23 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
     }
   }, [decision?.timestamp]);
 
-  // Staggered reveal: queue completed stages to appear one at a time
+  // Reveal completed stages with a short delay as each event arrives
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    PROTOCOL_STEPS.forEach(({ stage }, idx) => {
+    for (const { stage } of PROTOCOL_STEPS) {
       if (completedStages.has(stage) && !visibleStages.has(stage)) {
-        const delay = idx * STAGGER_DELAY_MS;
         const t = setTimeout(() => {
           setVisibleStages((prev) => new Set([...prev, stage]));
-        }, delay);
+        }, REVEAL_DELAY_MS);
         timers.push(t);
+        break; // reveal one at a time — next will fire on re-render
       }
-    });
+    }
 
     return () => timers.forEach(clearTimeout);
-    // Only re-run when the set of completed stages actually changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completedStages.size]);
+  }, [completedStages.size, visibleStages.size]);
 
   // Auto-scroll to bottom
   useEffect(() => {

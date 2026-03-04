@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import type { ZooPurchaseReceipt } from "../../lib/types";
-import { shortAddr, productEmoji, formatGuestLabel } from "../../utils/formatting";
+import { shortAddr, cartDisplayInfo, formatGuestLabel } from "../../utils/formatting";
 
 const EXPLORER_URL = "https://explore.moderato.tempo.xyz";
 
@@ -34,7 +34,7 @@ export default function ReceiptViewer({ receipts, initialIndex, onClose }: Recei
   const receipt = receipts[index];
   if (!receipt) return null;
 
-  const emoji = productEmoji(receipt.product_name);
+  const { emojis, displayName } = cartDisplayInfo(receipt.items);
   const explorerUrl = `${EXPLORER_URL}/tx/${receipt.tx_hash}`;
   const time = new Date(receipt.timestamp).toLocaleTimeString();
   const needChange = receipt.need_after - receipt.need_before;
@@ -63,10 +63,10 @@ export default function ReceiptViewer({ receipts, initialIndex, onClose }: Recei
         <div className="zt-parchment p-4">
           {/* Header: emoji + product + amount */}
           <div className="flex items-center gap-3 pb-2">
-            <span className="text-2xl">{emoji}</span>
+            <span className="text-2xl">{emojis}</span>
             <div className="flex-1">
               <div className="font-pixel text-[12px] text-[var(--zt-text-dark)]">
-                {receipt.product_name}
+                {displayName}
               </div>
             </div>
             <div className="font-pixel text-[14px] text-[var(--zt-text-dark)]">

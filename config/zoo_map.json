@@ -25,6 +25,7 @@
           "description": "Classic grilled hot dog with your choice of toppings",
           "price": "3.50",
           "category": "main",
+          "satisfaction_value": 70,
           "available": true
         },
         {
@@ -33,6 +34,7 @@
           "description": "Crispy tortilla chips with cheese and jalapeños",
           "price": "4.00",
           "category": "snack",
+          "satisfaction_value": 50,
           "available": true
         },
         {
@@ -41,6 +43,7 @@
           "description": "Refreshing cold beverage",
           "price": "2.50",
           "category": "beverage",
+          "satisfaction_value": 30,
           "available": true
         },
         {
@@ -49,6 +52,7 @@
           "description": "Fresh buttered popcorn",
           "price": "3.00",
           "category": "snack",
+          "satisfaction_value": 50,
           "available": true
         },
         {
@@ -57,6 +61,7 @@
           "description": "Cool and creamy ice cream",
           "price": "4.50",
           "category": "dessert",
+          "satisfaction_value": 60,
           "available": true
         }
       ],
@@ -78,13 +83,7 @@
     "food_need": {
       "categories": ["food"],
       "decay_rate": 2,
-      "purchase_threshold": 30,
-      "satisfaction_gain": {
-        "main": 50,
-        "snack": 30,
-        "beverage": 20,
-        "dessert": 25
-      }
+      "purchase_threshold": 30
     },
     "fun_need": {
       "categories": ["entertainment", "games"],

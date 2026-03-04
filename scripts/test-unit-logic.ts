@@ -70,7 +70,7 @@ async function testDecisionEngine() {
   assert(tooSoon.shouldPurchase === false, 'no purchase when too soon after last');
 
   // Need recovery after purchase
-  const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', available: true };
+  const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true };
   const recovered = engine.calculateNeedRecovery({ food_need: 20, fun_need: 50 }, product);
   assert(recovered.food_need > 20, 'need recovery increases food_need');
   assert(recovered.food_need <= 100, 'need recovery clamped at 100');

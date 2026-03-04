@@ -11,10 +11,10 @@ describe('DecisionEngine', () => {
   });
 
   describe('degradeNeeds', () => {
-    it('reduces food_need by 1-20 (random decay)', () => {
+    it('reduces food_need by 1-40 (random decay)', () => {
       const needs = { food_need: 80, fun_need: 60 };
       const degraded = engine.degradeNeeds(needs);
-      expect(degraded.food_need).toBeGreaterThanOrEqual(60);
+      expect(degraded.food_need).toBeGreaterThanOrEqual(40);
       expect(degraded.food_need).toBeLessThanOrEqual(79);
     });
 
@@ -77,7 +77,7 @@ describe('DecisionEngine', () => {
 
   describe('calculateNeedRecovery', () => {
     it('increases food_need after purchase', () => {
-      const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', available: true };
+      const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true };
       const recovered = engine.calculateNeedRecovery({ food_need: 20, fun_need: 50 }, product);
       expect(recovered.food_need).toBeGreaterThan(20);
       expect(recovered.food_need).toBeLessThanOrEqual(100);

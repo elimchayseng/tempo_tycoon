@@ -80,6 +80,15 @@ export function formatGuestLabel(agentId: string, address?: string): string {
 }
 
 /**
+ * Get combined emoji string and display name from an items array
+ */
+export function cartDisplayInfo(items: Array<{ name: string; quantity: number }>): { emojis: string; displayName: string } {
+  const emojis = items.map(i => productEmoji(i.name)).join('');
+  const displayName = items.map(i => i.name).join(' + ');
+  return { emojis, displayName };
+}
+
+/**
  * Get the emoji for a product name
  */
 export function productEmoji(name: string): string {

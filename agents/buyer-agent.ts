@@ -34,7 +34,7 @@ export class BuyerAgent {
   private startTime: Date | null = null;
 
   /** In-memory rolling window of recent purchases (for LLM context). */
-  private recentPurchases: Array<{ sku: string; name: string; amount: string; completedAt: Date }> = [];
+  private recentPurchases: Array<{ items: Array<{ sku: string; name: string }>; amount: string; completedAt: Date }> = [];
 
   // Event handlers
   private eventHandlers: Map<AgentEventType, Array<(event: AgentEvent) => void>> = new Map();
@@ -51,7 +51,6 @@ export class BuyerAgent {
       pollingIntervalMs: config.polling_interval_ms,
       needDecayRate: config.need_decay_rate,
       purchaseThreshold: config.purchase_threshold,
-      needRecovery: config.need_recovery,
       minBalanceThreshold: parseFloat(config.refund_threshold),
     });
     this.acpClient = new ACPClient(`http://localhost:${process.env.PORT || 4000}`);
@@ -249,7 +248,7 @@ export class BuyerAgent {
   }
 
   /**
-   * Execute an LLM-powered purchase: ask BuyerBrain which specific product to buy.
+   * Execute an LLM-powered purchase: ask BuyerBrain which cart to buy.
    * Returns true if a purchase was made (or brain chose to wait), false if caller should fallback.
    */
   private async executeLLMPurchase(balanceStr: string): Promise<boolean> {
@@ -296,41 +295,142 @@ export class BuyerAgent {
       return true;
     }
 
-    // Brain decided to purchase a specific SKU
-    const { sku } = decision.action;
-    const product = catalog.products.find((p) => p.sku === sku && p.available);
-    if (!product) {
-      log.warn(`[${this.config.agent_id}] LLM selected unavailable SKU ${sku}, falling back`);
-      return false;
+    // Brain decided to purchase a cart of items
+    const { items } = decision.action;
+
+    // Validate all items exist and are available
+    for (const item of items) {
+      const product = catalog.products.find((p) => p.sku === item.sku && p.available);
+      if (!product) {
+        log.warn(`[${this.config.agent_id}] LLM selected unavailable SKU ${item.sku}, falling back`);
+        return false;
+      }
     }
 
-    log.info(`[${this.config.agent_id}] LLM purchasing: ${product.name} ($${product.price})`);
+    const itemSummary = items.map(i => `${i.sku}x${i.quantity}`).join(', ');
+    log.info(`[${this.config.agent_id}] LLM purchasing cart: [${itemSummary}]`);
 
     this.state.status = 'purchasing';
     await this.stateManager.saveState(this.state);
 
     this.emitEvent('purchase_initiated', {
       max_budget: parseFloat(balanceStr),
-      preferred_category: product.category,
       current_needs: this.state.needs,
       llm_selected: true,
     });
 
-    // Create checkout for the LLM-selected product
-    this.emitTxFlow('checkout_created', { preferred_category: product.category });
-    const session = await this.acpClient.createCheckoutSession('food', sku, 1, this.config.address);
+    // Create cart checkout session
+    this.emitTxFlow('checkout_created', { items });
+    const session = await this.acpClient.createCartCheckoutSession('food', items, this.config.address);
 
-    // Validate price
-    const price = parseFloat(session.amount);
+    // Validate total price
+    const totalPrice = parseFloat(session.amount);
     const balance = parseFloat(balanceStr);
-    if (price > balance) {
-      throw new Error(`LLM-selected product price ($${session.amount}) exceeds balance ($${balanceStr})`);
+    if (totalPrice > balance) {
+      throw new Error(`LLM cart total ($${session.amount}) exceeds balance ($${balanceStr})`);
     }
 
-    // Execute shared ACP payment → checkout → state update
-    await this.executeACPPurchase(session, product, 'food');
+    // Execute cart ACP payment → checkout → state update
+    await this.executeACPCartPurchase(session, 'food');
 
     return true;
+  }
+
+  /**
+   * Execute a cart-based ACP purchase: single payment → merchant checkout → cart recovery → state update → events.
+   */
+  private async executeACPCartPurchase(
+    session: import('./types.js').CheckoutSession,
+    merchantCategory: string,
+  ): Promise<void> {
+    if (!this.state) return;
+
+    const cartItems = session.items;
+    const firstItemName = cartItems.map(i => i.name).join(' + ');
+
+    // Execute single payment for the whole cart
+    this.emitTxFlow('signing', { product: firstItemName, amount: session.amount });
+
+    // Create a dummy product for payment manager (it only needs name for logging)
+    const dummyProduct = {
+      sku: cartItems[0].sku,
+      name: firstItemName,
+      price: session.amount,
+      currency: 'AlphaUSD',
+      category: 'food',
+      satisfaction_value: 0,
+      available: true,
+    } as import('./types.js').MerchantProduct;
+
+    const paymentResult = await this.paymentManager.executeAlphaUsdTransferWithRetry(session, dummyProduct);
+
+    if (!paymentResult.success) {
+      throw new Error(paymentResult.error || 'Payment failed');
+    }
+
+    log.info(`[${this.config.agent_id}] Cart payment successful: ${paymentResult.tx_hash}`);
+    this.emitTxFlow('block_inclusion', { tx_hash: paymentResult.tx_hash, block_number: paymentResult.block_number });
+
+    // Complete checkout with merchant
+    this.emitTxFlow('merchant_verified', { session_id: session.session_id });
+    const checkoutResult = await this.acpClient.completeCheckout(
+      merchantCategory,
+      session.session_id,
+      paymentResult.tx_hash!,
+    );
+
+    if (!checkoutResult.success || !checkoutResult.verified) {
+      log.warn(`[${this.config.agent_id}] Checkout verification failed:`, checkoutResult.error);
+    }
+
+    // Update needs based on cart recovery
+    const needsBefore = { ...this.state.needs };
+    this.state.needs = this.decisionEngine.calculateCartRecovery(
+      this.state.needs,
+      cartItems.map(i => ({
+        sku: i.sku,
+        name: i.name,
+        satisfaction_value: i.satisfaction_value,
+        quantity: i.quantity,
+      })),
+    );
+
+    // Create purchase record with items array
+    const purchaseRecord = this.paymentManager.createPurchaseRecord(
+      session, paymentResult, needsBefore, this.state.needs,
+    );
+
+    // Persist purchase
+    await this.stateManager.recordPurchase(this.config.agent_id, purchaseRecord);
+
+    // Sync in-memory state
+    this.state.purchase_count = (this.state.purchase_count || 0) + 1;
+    this.state.total_spent = (parseFloat(this.state.total_spent || '0') + parseFloat(paymentResult.amount)).toFixed(2);
+    this.state.last_purchase_time = purchaseRecord.completed_at;
+
+    // Track for LLM context
+    this.recentPurchases.push({
+      items: cartItems.map(i => ({ sku: i.sku, name: i.name })),
+      amount: session.amount,
+      completedAt: purchaseRecord.completed_at,
+    });
+    if (this.recentPurchases.length > 10) {
+      this.recentPurchases.shift();
+    }
+
+    // Re-read authoritative balance from chain
+    const postPurchaseBalance = await getAlphaUsdOnChainBalance(this.config.agent_id);
+    this.state.balance = postPurchaseBalance.toFixed(2);
+    this.state.status = 'online';
+
+    log.info(`[${this.config.agent_id}] Cart purchase completed: [${firstItemName}]`);
+    log.debug(`[${this.config.agent_id}] Updated balance: $${this.state.balance}, food_need: ${this.state.needs.food_need}`);
+
+    this.emitEvent('purchase_completed', {
+      purchase_record: purchaseRecord,
+      new_needs: this.state.needs,
+      new_balance: this.state.balance,
+    });
   }
 
   /**
@@ -374,7 +474,7 @@ export class BuyerAgent {
 
     // Create purchase record
     const purchaseRecord = this.paymentManager.createPurchaseRecord(
-      session, product, paymentResult, needsBefore, this.state.needs,
+      session, paymentResult, needsBefore, this.state.needs,
     );
 
     // Persist purchase
@@ -387,8 +487,7 @@ export class BuyerAgent {
 
     // Track for LLM context
     this.recentPurchases.push({
-      sku: product.sku,
-      name: product.name,
+      items: [{ sku: product.sku, name: product.name }],
       amount: product.price,
       completedAt: purchaseRecord.completed_at,
     });
@@ -417,8 +516,7 @@ export class BuyerAgent {
   private getRecentPurchaseHistory(): BuyerLLMContext['purchase_history'] {
     const now = Date.now();
     return this.recentPurchases.slice(-5).map((p) => ({
-      sku: p.sku,
-      name: p.name,
+      items: p.items,
       amount: p.amount,
       time_ago_seconds: Math.round((now - p.completedAt.getTime()) / 1000),
     }));

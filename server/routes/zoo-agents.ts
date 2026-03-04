@@ -119,15 +119,18 @@ if (config.zoo.enabled) {
   });
 
   runner.on('purchase_completed', (event) => {
+    const rec = event.data.purchase_record;
+    const itemNames = rec.items?.map((i: { name: string }) => i.name).join(' + ') ?? 'Unknown';
+
     emitLog({
       action: 'zoo_purchase',
       type: 'info',
-      label: `Purchase: ${event.data.purchase_record.name} ($${event.data.purchase_record.amount})`,
+      label: `Purchase: ${itemNames} ($${rec.amount})`,
       data: {
         agent_id: event.agent_id,
-        product: event.data.purchase_record.name,
-        amount: event.data.purchase_record.amount,
-        tx_hash: event.data.purchase_record.tx_hash,
+        items: rec.items,
+        amount: rec.amount,
+        tx_hash: rec.tx_hash,
         new_needs: event.data.new_needs
       }
     });
@@ -135,7 +138,6 @@ if (config.zoo.enabled) {
     // Increment zoo tx counter
     incrementZooTxCount();
 
-    const rec = event.data.purchase_record;
     const registry = loadZooRegistry();
     const merchantName = registry.merchants?.[0]?.name ?? 'Unknown Merchant';
     const merchantAccount = getZooAccountByRole('merchantA');
@@ -145,8 +147,7 @@ if (config.zoo.enabled) {
     const receipt: ZooPurchaseReceipt = {
       agent_id: event.agent_id,
       agent_address: agentAccount?.address ?? '',
-      product_name: rec.name ?? rec.product_name ?? '',
-      sku: rec.sku ?? '',
+      items: rec.items ?? [],
       amount: String(rec.amount),
       merchant_name: merchantName,
       merchant_address: merchantAccount?.address ?? '',
@@ -155,7 +156,7 @@ if (config.zoo.enabled) {
       gas_used: String(rec.gas_used ?? ''),
       fee_ausd: rec.fee_ausd ?? undefined,
       fee_payer: rec.fee_payer ?? undefined,
-      need_before: event.data.need_before ?? 0,
+      need_before: rec.need_before?.food_need ?? 0,
       need_after: event.data.new_needs?.food_need ?? 0,
       timestamp: Date.now(),
     };

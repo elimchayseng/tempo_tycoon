@@ -9,7 +9,7 @@ export const SIMULATION_DEFAULTS = {
   pollingIntervalMs: 3000,
   needDecayRate: { food_need: 5, fun_need: 4 },
   purchaseThreshold: { food_need: 40, fun_need: 30 },
-  needRecovery: { main: 70, snack: 50, beverage: 30, dessert: 60 },
+  needRecovery: { main: 70, snack: 50, beverage: 30, dessert: 60 }, // legacy fallback
   minBalanceThreshold: 5.0,
   maxPurchaseFrequencyMs: 2000,
   randomFactor: 0.2,
@@ -90,8 +90,8 @@ export class DecisionEngine {
    * Degrade needs over time - this runs every polling cycle
    */
   degradeNeeds(currentNeeds: AgentNeeds): AgentNeeds {
-    // Apply random degradation (1–20 per cycle) for visual variety
-    const decay = Math.floor(Math.random() * 20) + 1;
+    // Apply random degradation (1–40 per cycle) for meaningful variance
+    const decay = Math.floor(Math.random() * 40) + 1;
     let newFoodNeed = currentNeeds.food_need - decay;
 
     // Clamp to 0-100 range
@@ -184,15 +184,14 @@ export class DecisionEngine {
   }
 
   /**
-   * Calculate need recovery after purchasing a product
+   * Calculate need recovery after purchasing a single product (uses satisfaction_value)
    */
   calculateNeedRecovery(currentNeeds: AgentNeeds, product: MerchantProduct): AgentNeeds {
-    const category = product.category.toLowerCase();
-    const recoveryAmount = this.config.needRecovery[category as keyof typeof this.config.needRecovery] || 40;
+    const baseRecovery = product.satisfaction_value ?? 40;
 
     // Add some randomness to recovery (+/- 20%)
     const randomFactor = (Math.random() - 0.5) * 0.4; // -0.2 to +0.2
-    const actualRecovery = Math.round(recoveryAmount * (1 + randomFactor));
+    const actualRecovery = Math.round(baseRecovery * (1 + randomFactor));
 
     const newFoodNeed = Math.min(100, currentNeeds.food_need + actualRecovery);
 
@@ -201,7 +200,36 @@ export class DecisionEngine {
       fun_need: currentNeeds.fun_need,
     };
 
-    log.info(`[${this.agentId}] Need recovery: ${product.name} (${category}) +${actualRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
+    log.info(`[${this.agentId}] Need recovery: ${product.name} (sat=${baseRecovery}) +${actualRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
+
+    return newNeeds;
+  }
+
+  /**
+   * Calculate need recovery from a cart of items — sums satisfaction_value with ±20% per item, caps at 100
+   */
+  calculateCartRecovery(
+    currentNeeds: AgentNeeds,
+    items: Array<{ sku: string; name: string; satisfaction_value: number; quantity: number }>,
+  ): AgentNeeds {
+    let totalRecovery = 0;
+
+    for (const item of items) {
+      for (let q = 0; q < item.quantity; q++) {
+        const randomFactor = (Math.random() - 0.5) * 0.4;
+        totalRecovery += Math.round(item.satisfaction_value * (1 + randomFactor));
+      }
+    }
+
+    const newFoodNeed = Math.min(100, currentNeeds.food_need + totalRecovery);
+
+    const newNeeds = {
+      food_need: newFoodNeed,
+      fun_need: currentNeeds.fun_need,
+    };
+
+    const itemNames = items.map(i => `${i.name}x${i.quantity}`).join(', ');
+    log.info(`[${this.agentId}] Cart recovery: [${itemNames}] +${totalRecovery} -> food: ${currentNeeds.food_need} -> ${newNeeds.food_need}`);
 
     return newNeeds;
   }

@@ -18,9 +18,9 @@ function mockLLMClient(overrides: Partial<LLMClient> = {}): LLMClient {
 
 function makeCatalog(): MerchantProduct[] {
   return [
-    { sku: 'burger-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', available: true },
-    { sku: 'soda-1', name: 'Soda', price: '2.50', currency: 'AlphaUSD', category: 'beverage', available: true },
-    { sku: 'sold-out', name: 'Sold Out', price: '1.00', currency: 'AlphaUSD', category: 'snack', available: false },
+    { sku: 'burger-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true },
+    { sku: 'soda-1', name: 'Soda', price: '2.50', currency: 'AlphaUSD', category: 'beverage', satisfaction_value: 30, available: true },
+    { sku: 'sold-out', name: 'Sold Out', price: '1.00', currency: 'AlphaUSD', category: 'snack', satisfaction_value: 50, available: false },
   ];
 }
 
@@ -36,7 +36,7 @@ function makeContext(overrides: Partial<BuyerLLMContext> = {}): BuyerLLMContext 
   };
 }
 
-function purchaseResponse(sku: string, reasoning: string): ChatCompletionResponse {
+function cartResponse(items: Array<{ sku: string; quantity: number }>, reasoning: string): ChatCompletionResponse {
   return {
     id: 'resp-1',
     choices: [{
@@ -48,8 +48,8 @@ function purchaseResponse(sku: string, reasoning: string): ChatCompletionRespons
           id: 'tc-1',
           type: 'function',
           function: {
-            name: 'acp_select_and_purchase',
-            arguments: JSON.stringify({ merchant_category: 'food', sku, reasoning }),
+            name: 'acp_purchase_cart',
+            arguments: JSON.stringify({ items, reasoning }),
           },
         }],
       },
@@ -82,20 +82,40 @@ function skipResponse(reasoning: string): ChatCompletionResponse {
 }
 
 describe('BuyerBrain', () => {
-  it('returns purchase decision when LLM selects a valid SKU', async () => {
+  it('returns purchase decision when LLM selects a valid cart', async () => {
     const client = mockLLMClient({
-      chat: vi.fn().mockResolvedValue(purchaseResponse('burger-1', 'I am hungry')),
+      chat: vi.fn().mockResolvedValue(cartResponse([{ sku: 'burger-1', quantity: 1 }], 'I am hungry')),
     });
     const brain = new BuyerBrain(client);
     const result = await brain.decide(makeContext());
 
     expect(result.action.type).toBe('purchase');
     if (result.action.type === 'purchase') {
-      expect(result.action.sku).toBe('burger-1');
+      expect(result.action.items).toHaveLength(1);
+      expect(result.action.items[0].sku).toBe('burger-1');
     }
-    expect(result.toolName).toBe('acp_select_and_purchase');
+    expect(result.toolName).toBe('acp_purchase_cart');
     expect(result.model).toBe('test-model');
     expect(result.tokenUsage).toBeDefined();
+  });
+
+  it('returns purchase decision for multi-item cart', async () => {
+    const client = mockLLMClient({
+      chat: vi.fn().mockResolvedValue(cartResponse([
+        { sku: 'burger-1', quantity: 1 },
+        { sku: 'soda-1', quantity: 1 },
+      ], 'Hungry and thirsty')),
+    });
+    const brain = new BuyerBrain(client);
+    const result = await brain.decide(makeContext());
+
+    expect(result.action.type).toBe('purchase');
+    if (result.action.type === 'purchase') {
+      expect(result.action.items).toHaveLength(2);
+      expect(result.action.items[0].sku).toBe('burger-1');
+      expect(result.action.items[1].sku).toBe('soda-1');
+    }
+    expect(result.toolName).toBe('acp_purchase_cart');
   });
 
   it('returns wait decision when LLM chooses to skip', async () => {
@@ -111,7 +131,7 @@ describe('BuyerBrain', () => {
 
   it('falls back when LLM selects an unavailable SKU', async () => {
     const client = mockLLMClient({
-      chat: vi.fn().mockResolvedValue(purchaseResponse('sold-out', 'Looks good')),
+      chat: vi.fn().mockResolvedValue(cartResponse([{ sku: 'sold-out', quantity: 1 }], 'Looks good')),
     });
     const brain = new BuyerBrain(client);
     const result = await brain.decide(makeContext());
@@ -121,9 +141,9 @@ describe('BuyerBrain', () => {
     expect(result.action.type).toBe('wait');
   });
 
-  it('falls back when LLM selects a SKU beyond budget', async () => {
+  it('falls back when cart total exceeds budget', async () => {
     const client = mockLLMClient({
-      chat: vi.fn().mockResolvedValue(purchaseResponse('burger-1', 'Yum')),
+      chat: vi.fn().mockResolvedValue(cartResponse([{ sku: 'burger-1', quantity: 1 }], 'Yum')),
     });
     const brain = new BuyerBrain(client);
     const result = await brain.decide(makeContext({ balance: '1.00' }));
