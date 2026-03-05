@@ -1,13 +1,9 @@
-import { useEffect } from "react";
-import type { TokenInfo, WalletInfo, BalanceHistoryEntry } from "../../lib/types";
-import { shortAddr, ANIMAL_EMOJI, formatGuestLabel } from "../../utils/formatting";
-import BalanceHistorySparkline from "./BalanceHistorySparkline";
+import type { TokenInfo, WalletInfo } from "../../lib/types";
+import { shortAddr, ANIMAL_EMOJI } from "../../utils/formatting";
 
 interface TokenWalletPanelProps {
   tokenInfo: TokenInfo | null;
   wallets: WalletInfo[];
-  balanceHistories: Record<string, BalanceHistoryEntry[]>;
-  fetchBalanceHistory: (agentId: string) => void;
 }
 
 function roleIcon(role: string): string {
@@ -19,18 +15,7 @@ function roleIcon(role: string): string {
 export default function TokenWalletPanel({
   tokenInfo,
   wallets,
-  balanceHistories,
-  fetchBalanceHistory,
 }: TokenWalletPanelProps) {
-  // Fetch balance histories for agent wallets on mount
-  useEffect(() => {
-    for (const w of wallets) {
-      if (w.role === "agent") {
-        const agentId = w.label.toLowerCase().replace(/ /g, "_");
-        fetchBalanceHistory(agentId);
-      }
-    }
-  }, [wallets.length]);
 
   return (
     <div className="space-y-4 px-4 py-4">
@@ -66,7 +51,6 @@ export default function TokenWalletPanel({
         <div className="space-y-3">
           {wallets.map((wallet) => {
             const agentId = wallet.label.toLowerCase().replace(/ /g, "_");
-            const history = balanceHistories[agentId] ?? [];
 
             return (
               <div
@@ -76,12 +60,21 @@ export default function TokenWalletPanel({
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">{roleIcon(wallet.role)}</span>
-                    <span className="font-pixel text-[11px] text-[var(--zt-tan)]">
-                      {wallet.role === "agent"
-                        ? formatGuestLabel(wallet.label.toLowerCase().replace(/ /g, "_"), wallet.address)
-                        : wallet.label}
-                    </span>
+                    {wallet.role === "agent" ? (
+                      <>
+                        <span className="text-lg">{ANIMAL_EMOJI[agentId] ?? "🧑"}</span>
+                        <span className="font-pixel text-[11px] text-[var(--zt-tan)]">
+                          {agentId}: {shortAddr(wallet.address)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-base">{roleIcon(wallet.role)}</span>
+                        <span className="font-pixel text-[11px] text-[var(--zt-tan)]">
+                          {wallet.role === "merchant" ? "Zoo Gift Shop" : wallet.label}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <span className="font-pixel text-[13px] text-[var(--zt-gold)]">
                     ${wallet.balance} AUSD
@@ -102,9 +95,6 @@ export default function TokenWalletPanel({
                       nonce: {wallet.nonce}
                     </span>
                   </div>
-                  {wallet.role === "agent" && history.length > 1 && (
-                    <BalanceHistorySparkline history={history} width={120} height={36} />
-                  )}
                 </div>
               </div>
             );

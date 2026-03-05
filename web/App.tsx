@@ -209,8 +209,6 @@ export default function App() {
                 txFlowEvents={explorer.txFlowEvents}
                 tokenInfo={explorer.tokenInfo}
                 wallets={explorer.wallets}
-                balanceHistories={explorer.balanceHistories}
-                fetchBalanceHistory={explorer.fetchBalanceHistory}
               />
             </div>
           </>

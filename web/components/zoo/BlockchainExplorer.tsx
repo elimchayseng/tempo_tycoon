@@ -3,7 +3,6 @@ import type {
   TransactionFlowEvent,
   TokenInfo,
   WalletInfo,
-  BalanceHistoryEntry,
 } from "../../lib/types";
 import NetworkAnalyticsPanel from "./NetworkAnalyticsPanel";
 import TokenWalletPanel from "./TokenWalletPanel";
@@ -14,8 +13,6 @@ interface BlockchainExplorerProps {
   txFlowEvents: TransactionFlowEvent[];
   tokenInfo: TokenInfo | null;
   wallets: WalletInfo[];
-  balanceHistories: Record<string, BalanceHistoryEntry[]>;
-  fetchBalanceHistory: (agentId: string) => void;
 }
 
 export default function BlockchainExplorer({
@@ -23,8 +20,6 @@ export default function BlockchainExplorer({
   txFlowEvents,
   tokenInfo,
   wallets,
-  balanceHistories,
-  fetchBalanceHistory,
 }: BlockchainExplorerProps) {
   return (
     <div className="h-full flex flex-col bg-[var(--zt-green-dark)]">
@@ -59,8 +54,6 @@ export default function BlockchainExplorer({
           <TokenWalletPanel
             tokenInfo={tokenInfo}
             wallets={wallets}
-            balanceHistories={balanceHistories}
-            fetchBalanceHistory={fetchBalanceHistory}
           />
         </div>
       </div>
