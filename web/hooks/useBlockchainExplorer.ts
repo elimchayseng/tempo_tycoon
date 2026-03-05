@@ -15,24 +15,26 @@ export function useBlockchainExplorer(
   balanceUpdates: BalanceUpdate[],
   accountsCount = 0,
 ) {
-  const [isOpen, setIsOpen] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [balanceHistories, setBalanceHistories] = useState<Record<string, BalanceHistoryEntry[]>>({});
 
   // Fetch token info once
   useEffect(() => {
-    if (!isOpen) return;
     ApiService.getTokenInfo().then(setTokenInfo).catch(() => {});
-  }, [isOpen]);
+  }, []);
 
-  // Fetch wallets when panel opens and on balance updates
+  // Fetch wallets immediately, on balance updates, and poll every 5s
   useEffect(() => {
-    if (!isOpen) return;
-    ApiService.getWallets()
-      .then((data) => setWallets(data.wallets))
-      .catch(() => {});
-  }, [isOpen, balanceUpdates.length, accountsCount]);
+    const fetchWallets = () =>
+      ApiService.getWallets()
+        .then((data) => setWallets(data.wallets))
+        .catch(() => {});
+
+    fetchWallets();
+    const interval = setInterval(fetchWallets, 5000);
+    return () => clearInterval(interval);
+  }, [balanceUpdates.length, accountsCount]);
 
   // Fetch balance history for all agents when wallets tab is active
   const fetchBalanceHistory = useCallback(async (agentId: string) => {
@@ -44,11 +46,7 @@ export function useBlockchainExplorer(
     }
   }, []);
 
-  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
-
   return {
-    isOpen,
-    toggle,
     tokenInfo,
     wallets,
     balanceHistories,

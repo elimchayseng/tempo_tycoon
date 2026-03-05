@@ -53,15 +53,6 @@ export default function App() {
     }
   }, [simulationComplete, phase, markComplete]);
 
-  // Auto-open explorer data fetching when dashboard is visible
-  useEffect(() => {
-    if (phase === "running" || phase === "starting" || phase === "stopping" || phase === "complete") {
-      if (!explorer.isOpen) {
-        explorer.toggle();
-      }
-    }
-  }, [phase]);
-
   const handleNewSimulation = async () => {
     resetSimulationData();
     await ApiService.zooStopAgents().catch(() => {});
