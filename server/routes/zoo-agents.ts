@@ -16,6 +16,8 @@ import { createRateLimit } from "../middleware/rate-limit.js";
 
 const log = createLogger('zoo-agents');
 
+let demoStartCount = 0;
+
 export const zooAgentRoutes = new Hono();
 
 function broadcastAgentStates() {
@@ -378,6 +380,10 @@ zooAgentRoutes.post("/agents/start", requireAdmin, createRateLimit(10, 60_000), 
     }
 
     await runner.start();
+
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    demoStartCount++;
+    log.info(`Demo simulation started by ${ip} (total demo starts: ${demoStartCount})`);
 
     // Broadcast fresh zero-state so UI starts clean
     const initialMerchant: ZooMerchantState = {

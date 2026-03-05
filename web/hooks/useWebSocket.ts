@@ -80,7 +80,14 @@ export function useWebSocket() {
 
       ws.onmessage = (event) => {
         if (!active) return;
-        const msg: WsMessage = JSON.parse(event.data);
+
+        let msg: WsMessage;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          console.warn('WebSocket: malformed JSON received, ignoring');
+          return;
+        }
 
         switch (msg.type) {
           case "log":
@@ -129,7 +136,7 @@ export function useWebSocket() {
             setSimulationComplete(true);
             break;
           case "zoo_funding_progress":
-            setFundingProgress({ step: (msg as any).step, detail: (msg as any).detail });
+            setFundingProgress({ step: msg.step, detail: msg.detail });
             break;
         }
       };
