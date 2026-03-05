@@ -6,5 +6,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     testTimeout: 10000,
+    coverage: {
+      provider: 'v8',
+      include: ['agents/**/*.ts', 'server/**/*.ts', 'shared/**/*.ts'],
+      exclude: ['**/*.d.ts', '**/types.ts'],
+    },
   },
 });

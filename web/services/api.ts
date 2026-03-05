@@ -13,7 +13,7 @@ import type {
 // Configuration for API calls
 const API_BASE_URL = '/api';
 const DEFAULT_TIMEOUT = 60000; // 60 seconds (accommodates faucet + distribution during start)
-const ADMIN_TOKEN = (import.meta as any).env?.VITE_ADMIN_TOKEN as string | undefined;
+const ADMIN_TOKEN = import.meta.env?.VITE_ADMIN_TOKEN as string | undefined;
 
 // Custom error class for API errors
 export class ApiError extends Error {
