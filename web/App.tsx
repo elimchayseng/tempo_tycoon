@@ -40,7 +40,7 @@ export default function App() {
     markComplete,
   } = useZoo();
 
-  const explorer = useBlockchainExplorer(networkStats, txFlowEvents, balanceUpdates);
+  const explorer = useBlockchainExplorer(networkStats, txFlowEvents, balanceUpdates, accounts.length);
 
   // Refs for rail positioning
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,9 +113,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Preflight phase */}
+        {/* Preflight phase — standalone full-width view */}
         {showPreflight && (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0">
+            {/* Wallet init progress / ready banner */}
             {phase === "ready" ? (
               <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
                 <div className="font-pixel text-[10px] text-[var(--zt-gold)]">
@@ -145,7 +146,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Running / Complete — 3-column Mission Control layout */}
+        {/* 3-column Mission Control layout (running/complete) */}
         {showDashboard && (
           <>
             {/* Left: Agents (~22%) */}

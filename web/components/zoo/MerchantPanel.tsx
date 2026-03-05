@@ -157,9 +157,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     };
   }, [priceAdjustments]);
 
-  if (!merchant) return null;
-
-  const rawBalance = merchant.balances[ALPHA_USD] ?? "0";
+  const rawBalance = merchant?.balances[ALPHA_USD] ?? "0";
   const balance = formatAlphaUsdBalance(rawBalance);
   const inventory = merchantState?.inventory ?? [];
 
@@ -179,15 +177,19 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
           {/* Wallet + Financials */}
           <div className="flex items-center justify-between">
             <div className="font-pixel text-[9px] text-gray-500">
-              Wallet:{" "}
-              <a
-                href={`${EXPLORER_URL}/address/${merchant.address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline cursor-pointer transition-colors"
-              >
-                {shortAddr(merchant.address)}
-              </a>
+              Merchant Wallet:{" "}
+              {merchant ? (
+                <a
+                  href={`${EXPLORER_URL}/address/${merchant.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline cursor-pointer transition-colors"
+                >
+                  {shortAddr(merchant.address)}
+                </a>
+              ) : (
+                <span className="text-gray-600">...</span>
+              )}
             </div>
             {merchantState && (
               <div className="flex gap-3 font-pixel text-[9px]">
@@ -200,10 +202,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             )}
           </div>
 
-          {/* Animation area + inventory shelf */}
-          <div className="relative flex items-stretch gap-3">
-            {/* Main animation zone */}
-            <div className="flex-1 relative h-16 flex items-center justify-between px-4 overflow-hidden">
+          {/* Animation area */}
+          <div className="relative">
+            <div className="relative h-16 flex items-center justify-between px-4 overflow-hidden">
               {/* Guest side */}
               <div className="z-10 flex flex-col items-center">
                 <span className="text-3xl">{anim ? anim.guestEmoji : "🦁"}</span>
@@ -246,42 +247,43 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                 </div>
               </div>
             </div>
-
-            {/* Inventory shelf */}
-            {inventory.length > 0 && (
-              <div className="shrink-0 space-y-0.5 flex flex-col justify-center">
-                <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider text-right mb-0.5">Stock</div>
-                {inventory.map((item) => {
-                  const price = parseFloat(item.price);
-                  const basePrice = parseFloat(item.base_price || item.price);
-                  const pctDiff = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
-                  const pctColor = pctDiff > 0 ? "text-green-400" : pctDiff < 0 ? "text-red-400" : "text-gray-500";
-                  const pctSign = pctDiff > 0 ? "+" : "";
-                  const isFlashing = flashingSkus.has(item.sku);
-
-                  return (
-                    <div key={item.sku} className="flex items-center gap-1 font-pixel text-[9px]">
-                      <span className={`w-10 text-right ${isFlashing ? "zt-price-flash" : "text-[var(--zt-gold)]"}`}>
-                        ${price.toFixed(2)}
-                      </span>
-                      <span className={`w-8 text-right ${pctColor}`} style={{ fontSize: "7px" }}>
-                        {pctDiff !== 0 ? `${pctSign}${pctDiff.toFixed(0)}%` : ""}
-                      </span>
-                      <span className="text-xs">{productEmoji(item.name)}</span>
-                      <StockBar stock={item.stock} maxStock={item.max_stock} />
-                      <span className={`w-5 text-right ${
-                        item.stock === 0 ? 'text-red-500 font-bold' :
-                        item.stock <= 1 ? 'text-amber-400' :
-                        'text-gray-500'
-                      }`}>
-                        {item.stock === 0 ? '!' : item.stock}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
+
+          {/* Inventory catalog */}
+          {inventory.length > 0 && (
+            <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-1.5 space-y-0.5">
+              <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider mb-0.5">Catalog</div>
+              {inventory.map((item) => {
+                const price = parseFloat(item.price);
+                const basePrice = parseFloat(item.base_price || item.price);
+                const pctDiff = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+                const pctColor = pctDiff > 0 ? "text-green-400" : pctDiff < 0 ? "text-red-400" : "text-gray-500";
+                const pctSign = pctDiff > 0 ? "+" : "";
+                const isFlashing = flashingSkus.has(item.sku);
+
+                return (
+                  <div key={item.sku} className="flex items-center gap-1.5 font-pixel text-[9px]">
+                    <span className="text-xs">{productEmoji(item.name)}</span>
+                    <span className="text-[var(--zt-tan)] min-w-[60px] truncate">{item.name}</span>
+                    <span className={`w-12 text-right ${isFlashing ? "zt-price-flash" : "text-[var(--zt-gold)]"}`}>
+                      ${price.toFixed(2)}
+                    </span>
+                    <span className={`w-10 text-right ${pctColor}`} style={{ fontSize: "7px" }}>
+                      {pctDiff !== 0 ? `${pctSign}${pctDiff.toFixed(0)}%` : "—"}
+                    </span>
+                    <StockBar stock={item.stock} maxStock={item.max_stock} />
+                    <span className={`w-5 text-right ${
+                      item.stock === 0 ? 'text-red-500 font-bold' :
+                      item.stock <= 1 ? 'text-amber-400' :
+                      'text-gray-500'
+                    }`}>
+                      {item.stock === 0 ? '!' : item.stock}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Merchant Brain Terminal */}
           <MerchantBrainTerminal

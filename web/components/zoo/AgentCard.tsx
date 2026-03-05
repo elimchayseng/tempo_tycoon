@@ -1,5 +1,5 @@
 import type { ZooAgentState } from "../../lib/types";
-import { formatGuestLabel, ANIMAL_EMOJI } from "../../utils/formatting";
+import { shortAddr, ANIMAL_EMOJI } from "../../utils/formatting";
 
 interface AgentCardProps {
   agent: ZooAgentState;
@@ -50,7 +50,21 @@ export default function AgentCard({ agent, selected, isPurchasing, onClick, simu
           <span className={`inline-block w-2 h-2 shrink-0 rounded-full ${dotClass}`} />
           <span className="text-sm">{emoji}</span>
           <span className="font-pixel text-[7px] text-white truncate">
-            {formatGuestLabel(agent.agent_id, agent.address)}
+            Guest:{" "}
+            {agent.address ? (
+              <a
+                href={`https://explore.moderato.tempo.xyz/address/${agent.address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {shortAddr(agent.address)}
+              </a>
+            ) : (
+              <span>{agent.agent_id}</span>
+            )}
+            {" "}{emoji}
           </span>
         </div>
         <span className="font-pixel text-[8px] text-[var(--zt-gold)] shrink-0 ml-1">

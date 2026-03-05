@@ -13,6 +13,7 @@ export function useBlockchainExplorer(
   networkStats: NetworkStats | null,
   txFlowEvents: TransactionFlowEvent[],
   balanceUpdates: BalanceUpdate[],
+  accountsCount = 0,
 ) {
   const [isOpen, setIsOpen] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
@@ -31,7 +32,7 @@ export function useBlockchainExplorer(
     ApiService.getWallets()
       .then((data) => setWallets(data.wallets))
       .catch(() => {});
-  }, [isOpen, balanceUpdates.length]);
+  }, [isOpen, balanceUpdates.length, accountsCount]);
 
   // Fetch balance history for all agents when wallets tab is active
   const fetchBalanceHistory = useCallback(async (agentId: string) => {
