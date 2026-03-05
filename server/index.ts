@@ -35,6 +35,9 @@ const log = createLogger('server');
 // Validate configuration on startup
 validateConfig();
 
+// In-memory unique visitor tracking
+const uniqueVisitors = new Set<string>();
+
 const app = new Hono();
 
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
@@ -46,6 +49,16 @@ app.use("/*", cors({
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   maxAge: 3600,
 }));
+
+// Unique visitor logging middleware
+app.use("*", async (c, next) => {
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!uniqueVisitors.has(ip)) {
+    uniqueVisitors.add(ip);
+    log.info(`New visitor: ${ip} (total unique: ${uniqueVisitors.size})`);
+  }
+  await next();
+});
 
 // Request logging middleware (if enabled)
 if (config.logging.enableRequestLogging) {
