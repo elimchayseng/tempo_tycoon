@@ -9,15 +9,12 @@ import type {
   BalanceUpdate,
 } from "../lib/types";
 
-export type ExplorerTab = "network" | "wallets" | "txflow";
-
 export function useBlockchainExplorer(
   networkStats: NetworkStats | null,
   txFlowEvents: TransactionFlowEvent[],
   balanceUpdates: BalanceUpdate[],
 ) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ExplorerTab>("txflow");
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [balanceHistories, setBalanceHistories] = useState<Record<string, BalanceHistoryEntry[]>>({});
@@ -51,8 +48,6 @@ export function useBlockchainExplorer(
   return {
     isOpen,
     toggle,
-    activeTab,
-    setActiveTab,
     tokenInfo,
     wallets,
     balanceHistories,

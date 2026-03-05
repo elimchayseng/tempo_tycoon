@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, ZooLLMDecision, ZooPriceAdjustment } from "../../lib/types";
 import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
 import MerchantBrainTerminal from "./MerchantBrainTerminal";
+import ReceiptViewer from "./ReceiptViewer";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
@@ -11,6 +12,7 @@ interface MerchantPanelProps {
   merchantDecision: ZooLLMDecision | null;
   priceAdjustments: ZooPriceAdjustment[];
   simulationComplete?: boolean;
+  receipts: ZooPurchaseReceipt[];
 }
 
 interface AnimState {
@@ -21,50 +23,13 @@ interface AnimState {
   txHash: string;
 }
 
-type LogEntryType = 'guest' | 'merchant';
-
-interface ActivityEntry {
-  type: LogEntryType;
-  emoji: string;
-  label: string;
-  productEm: string;
-  productName: string;
-  amount: string;
-  fee?: string;
-  key: string;
-}
-
 interface RestockAnimState {
   productEm: string;
   key: string;
 }
 
-function buildProtocolSteps(receipt: ZooPurchaseReceipt, guestLabel: string): { text: string; delay: number }[] {
-  const { emojis, displayName } = cartDisplayInfo(receipt.items);
-  return [
-    { text: `${guestLabel} evaluating purchase decision...`, delay: 0 },
-    { text: `Discovering merchants via /api/zoo/registry`, delay: 600 },
-    { text: `Browsing merchant catalog...`, delay: 1200 },
-    { text: `Found ${emojis} ${displayName} — $${receipt.amount} AUSD`, delay: 1800 },
-    { text: `Creating checkout session...`, delay: 2400 },
-    { text: `🔐 Signing transferWithMemo tx...`, delay: 3000 },
-    { text: `📡 Broadcasting to Tempo Moderato...`, delay: 3600 },
-    { text: `✅ AlphaUSD transfer confirmed on-chain!`, delay: 4200 },
-  ];
-}
-
-function buildRestockSteps(event: ZooRestockEvent): { text: string; delay: number }[] {
-  const prodEm = productEmoji(event.name);
-  return [
-    { text: `📦 Low stock detected: ${prodEm} ${event.name}`, delay: 0 },
-    { text: `Calculating restock: ${event.quantity} units @ cost basis`, delay: 600 },
-    { text: `🔐 Signing restock payment: $${event.cost} → Zoo Master`, delay: 1200 },
-    { text: `📡 Broadcasting to Tempo Moderato...`, delay: 1800 },
-    { text: `✅ Restocked ${prodEm} ${event.name} +${event.quantity} units!`, delay: 2400 },
-  ];
-}
-
 const ALPHA_USD = "0x20c0000000000000000000000000000000000001";
+const EXPLORER_URL = "https://explore.moderato.tempo.xyz";
 
 function StockBar({ stock, maxStock }: { stock: number; maxStock: number }) {
   const cells = [];
@@ -84,32 +49,29 @@ function StockBar({ stock, maxStock }: { stock: number; maxStock: number }) {
   return <div className="flex gap-0.5">{cells}</div>;
 }
 
-export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments, simulationComplete }: MerchantPanelProps) {
+export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments, simulationComplete, receipts }: MerchantPanelProps) {
   const lastTxRef = useRef<string | null>(null);
   const lastRestockRef = useRef<string | null>(null);
   const [anim, setAnim] = useState<AnimState | null>(null);
   const [restockAnim, setRestockAnim] = useState<RestockAnimState | null>(null);
   const [balanceFlash, setBalanceFlash] = useState(false);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [protocolStep, setProtocolStep] = useState<string | null>(null);
-  const [restockProtocolStep, setRestockProtocolStep] = useState<string | null>(null);
-  const [showRestockProtocol, setShowRestockProtocol] = useState(false);
   const [flashingSkus, setFlashingSkus] = useState<Set<string>>(new Set());
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPriceAdjRef = useRef<number>(0);
   const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const restockTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  // Receipt viewer modal state
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
   // Purchase animation
   useEffect(() => {
     if (!latestReceipt) {
-      // Reset all purchase animation state when receipts are cleared (e.g. new simulation)
       stepTimersRef.current.forEach(clearTimeout);
       stepTimersRef.current = [];
-      setProtocolStep(null);
       setAnim(null);
       setBalanceFlash(false);
-      setActivity([]);
       lastTxRef.current = null;
       return;
     }
@@ -119,8 +81,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
     const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🦊";
     const guestAddr = latestReceipt.agent_address ? shortAddr(latestReceipt.agent_address) : latestReceipt.agent_id;
-    const guestLabel = formatGuestLabel(latestReceipt.agent_id, latestReceipt.agent_address);
-    const { emojis: cartEmojis, displayName: cartName } = cartDisplayInfo(latestReceipt.items);
+    const { emojis: cartEmojis } = cartDisplayInfo(latestReceipt.items);
 
     setAnim({
       guestEmoji,
@@ -131,41 +92,18 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
     });
     setBalanceFlash(true);
 
-    // Add guest entry to activity log
-    setActivity((prev) => [
-      {
-        type: 'guest' as const,
-        emoji: guestEmoji,
-        label: guestAddr,
-        productEm: cartEmojis,
-        productName: cartName,
-        amount: latestReceipt.amount,
-        fee: latestReceipt.fee_ausd,
-        key: latestReceipt.tx_hash,
-      },
-      ...prev.slice(0, 4),
-    ]);
-
     stepTimersRef.current.forEach(clearTimeout);
     stepTimersRef.current = [];
-
-    const steps = buildProtocolSteps(latestReceipt, guestLabel);
-    for (const step of steps) {
-      const id = setTimeout(() => setProtocolStep(step.text), step.delay);
-      stepTimersRef.current.push(id);
-    }
 
     const timer = setTimeout(() => {
       setAnim(null);
       setBalanceFlash(false);
-      setProtocolStep(null);
     }, 5000);
     stepTimersRef.current.push(timer);
 
     return () => {
       stepTimersRef.current.forEach(clearTimeout);
       stepTimersRef.current = [];
-      setProtocolStep(null);
       setAnim(null);
       setBalanceFlash(false);
     };
@@ -175,74 +113,33 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
   useEffect(() => {
     const latestRestock = restockEvents[0];
     if (!latestRestock) {
-      // Reset all restock animation state when events are cleared (e.g. new simulation)
       restockTimersRef.current.forEach(clearTimeout);
       restockTimersRef.current = [];
-      setRestockProtocolStep(null);
       setRestockAnim(null);
-      setShowRestockProtocol(false);
       lastRestockRef.current = null;
       return;
     }
     if (latestRestock.tx_hash === lastRestockRef.current) return;
 
     lastRestockRef.current = latestRestock.tx_hash;
-    setShowRestockProtocol(true);
-
     const prodEm = productEmoji(latestRestock.name);
 
-    // Trigger the drop animation
-    setRestockAnim({
-      productEm: prodEm,
-      key: latestRestock.tx_hash,
-    });
-
-    // Add merchant restock entry to activity log
-    setActivity((prev) => [
-      {
-        type: 'merchant' as const,
-        emoji: '🏪',
-        label: 'Merchant',
-        productEm: prodEm,
-        productName: latestRestock.name,
-        amount: latestRestock.cost,
-        fee: latestRestock.fee_ausd,
-        key: `restock-${latestRestock.tx_hash}`,
-      },
-      ...prev.slice(0, 4),
-    ]);
+    setRestockAnim({ productEm: prodEm, key: latestRestock.tx_hash });
 
     restockTimersRef.current.forEach(clearTimeout);
     restockTimersRef.current = [];
 
-    const steps = buildRestockSteps(latestRestock);
-    for (const step of steps) {
-      const id = setTimeout(() => setRestockProtocolStep(step.text), step.delay);
-      restockTimersRef.current.push(id);
-    }
-
-    // Clear restock anim after drop completes
-    const animTimer = setTimeout(() => {
-      setRestockAnim(null);
-    }, 1500);
+    const animTimer = setTimeout(() => setRestockAnim(null), 1500);
     restockTimersRef.current.push(animTimer);
-
-    const hideTimer = setTimeout(() => {
-      setShowRestockProtocol(false);
-      setRestockProtocolStep(null);
-    }, 4000);
-    restockTimersRef.current.push(hideTimer);
 
     return () => {
       restockTimersRef.current.forEach(clearTimeout);
       restockTimersRef.current = [];
-      setRestockProtocolStep(null);
-      setShowRestockProtocol(false);
       setRestockAnim(null);
     };
   }, [restockEvents]);
 
-  // Price flash animation when new price adjustments arrive
+  // Price flash animation
   useEffect(() => {
     if (priceAdjustments.length === 0) return;
     const latestTs = priceAdjustments[0]?.timestamp ?? 0;
@@ -264,14 +161,13 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
   const rawBalance = merchant.balances[ALPHA_USD] ?? "0";
   const balance = formatAlphaUsdBalance(rawBalance);
-
   const inventory = merchantState?.inventory ?? [];
 
   return (
-    <div className="px-5 pt-4 shrink-0">
-      <div className="zt-bevel overflow-hidden">
+    <div className="h-full flex flex-col p-2 overflow-y-auto">
+      <div className="zt-bevel overflow-hidden flex flex-col">
         {/* Title bar */}
-        <div className="zt-titlebar flex items-center justify-between">
+        <div className="zt-titlebar flex items-center justify-between shrink-0">
           <span>🏪 ZOO GIFT SHOP</span>
           <span className={balanceFlash ? "zt-balance-flash" : "text-[var(--zt-gold)]"}>
             💰 {balance}
@@ -279,22 +175,22 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
         </div>
 
         {/* Body */}
-        <div className="bg-[var(--zt-green-dark)] px-4 py-3 space-y-3">
-          {/* Wallet + Financials row */}
+        <div className="bg-[var(--zt-green-dark)] px-3 py-2 space-y-2 flex-1 min-h-0 overflow-y-auto">
+          {/* Wallet + Financials */}
           <div className="flex items-center justify-between">
-            <div className="font-pixel text-[10px] text-gray-500">
+            <div className="font-pixel text-[9px] text-gray-500">
               Wallet:{" "}
               <a
-                href={`https://explore.moderato.tempo.xyz/address/${merchant.address}`}
+                href={`${EXPLORER_URL}/address/${merchant.address}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-[var(--zt-gold)] transition-colors"
+                className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline cursor-pointer transition-colors"
               >
                 {shortAddr(merchant.address)}
               </a>
             </div>
             {merchantState && (
-              <div className="flex gap-3 font-pixel text-[10px]">
+              <div className="flex gap-3 font-pixel text-[9px]">
                 <span className="text-green-400">Rev: ${merchantState.total_revenue}</span>
                 <span className="text-red-400">Cost: ${merchantState.total_cost}</span>
                 <span className={`${parseFloat(merchantState.profit) >= 0 ? 'text-[var(--zt-gold)]' : 'text-red-500'}`}>
@@ -304,7 +200,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             )}
           </div>
 
-          {/* Animation area with inventory shelf on the right */}
+          {/* Animation area + inventory shelf */}
           <div className="relative flex items-stretch gap-3">
             {/* Main animation zone */}
             <div className="flex-1 relative h-16 flex items-center justify-between px-4 overflow-hidden">
@@ -318,29 +214,22 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                 )}
               </div>
 
-              {/* Animated coin (left → right) */}
+              {/* Animated coin */}
               {anim && (
-                <div
-                  key={`coin-${anim.txHash}`}
-                  className="zt-coin-fly absolute left-12 text-sm whitespace-nowrap"
-                >
+                <div key={`coin-${anim.txHash}`} className="zt-coin-fly absolute left-12 text-sm whitespace-nowrap">
                   💸 <span className="text-base">${anim.amount}</span>
                 </div>
               )}
 
-              {/* Animated product (right → left) */}
+              {/* Animated product */}
               {anim && (
-                <div
-                  key={`item-${anim.txHash}`}
-                  className="zt-item-fly absolute right-12 text-lg"
-                >
+                <div key={`item-${anim.txHash}`} className="zt-item-fly absolute right-12 text-lg">
                   {anim.productEm}
                 </div>
               )}
 
-              {/* Shop side with restock drop zone */}
+              {/* Shop side */}
               <div className="relative z-10">
-                {/* Restock drop animation — product falls into shop */}
                 {restockAnim && (
                   <div
                     key={`restock-${restockAnim.key}`}
@@ -358,7 +247,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
               </div>
             </div>
 
-            {/* Inventory shelf — right-aligned next to shop */}
+            {/* Inventory shelf */}
             {inventory.length > 0 && (
               <div className="shrink-0 space-y-0.5 flex flex-col justify-center">
                 <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider text-right mb-0.5">Stock</div>
@@ -403,100 +292,86 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             merchantState={merchantState}
           />
 
-          {/* Protocol step text (purchases) — left-aligned, gold */}
-          {protocolStep && (
-            <div
-              key={protocolStep}
-              className="zt-step-fade font-pixel text-[10px] text-[var(--zt-gold)] px-1 truncate"
-              style={{ textShadow: "0 0 6px rgba(255,215,0,0.4)" }}
-            >
-              &gt; {protocolStep}
+          {/* Purchase History Table */}
+          <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-pixel text-[7px] text-[var(--zt-tan)] uppercase tracking-widest">
+                🧾 Purchase History
+              </span>
+              {receipts.length > 0 && (
+                <button
+                  onClick={() => { setViewerIndex(0); setViewerOpen(true); }}
+                  className="font-pixel text-[7px] text-[var(--zt-gold)] hover:text-white transition-colors"
+                >
+                  View All →
+                </button>
+              )}
             </div>
-          )}
-
-          {/* Restock protocol step — right-aligned, amber */}
-          {showRestockProtocol && restockProtocolStep && (
-            <div
-              key={restockProtocolStep}
-              className="zt-step-fade font-pixel text-[10px] text-amber-400 px-1 truncate text-right"
-              style={{ textShadow: "0 0 6px rgba(245,158,11,0.4)" }}
-            >
-              {restockProtocolStep} &lt;
-            </div>
-          )}
-
-          {/* Activity log — guest left, merchant right */}
-          {activity.length > 0 && (
-            <>
-              <div className="border-t border-dashed border-[var(--zt-green-mid)] my-1" />
-              <div className="space-y-1 max-h-[80px] overflow-y-auto">
-                {activity.map((entry) =>
-                  entry.type === 'guest' ? (
-                    <div
-                      key={entry.key}
-                      className="font-pixel text-[10px] text-[var(--zt-tan)] flex items-center gap-1.5"
-                    >
-                      <span>{entry.emoji}</span>
-                      <span className="text-[var(--zt-tan)]">{entry.label}</span>
-                      <span className="text-gray-500">bought</span>
-                      <span>{entry.productEm} {entry.productName}</span>
-                      <span className="text-[var(--zt-gold)] ml-auto">${entry.amount}</span>
-                      {entry.fee && <span className="text-gray-500 text-[8px]">+${entry.fee} gas</span>}
-                    </div>
-                  ) : (
-                    <div
-                      key={entry.key}
-                      className="font-pixel text-[10px] text-amber-400 flex items-center gap-1.5 justify-end"
-                    >
-                      <span className="text-amber-500/70 mr-auto">restocked</span>
-                      <span>{entry.productEm} {entry.productName}</span>
-                      <span className="text-amber-300">+${entry.amount}</span>
-                      {entry.fee && <span className="text-gray-500 text-[8px]">+${entry.fee} gas</span>}
-                      <span>{entry.emoji}</span>
-                    </div>
-                  )
-                )}
+            {receipts.length === 0 ? (
+              <div className="text-center py-2">
+                <span className="font-pixel text-[7px] text-gray-500">No purchases yet</span>
               </div>
-            </>
-          )}
+            ) : (
+              <div className="max-h-[140px] overflow-y-auto">
+                <table className="w-full font-pixel text-[8px]">
+                  <thead>
+                    <tr className="text-gray-500 text-left">
+                      <th className="pb-1 pr-1">#</th>
+                      <th className="pb-1 pr-1">Guest</th>
+                      <th className="pb-1 pr-1">Items</th>
+                      <th className="pb-1 pr-1 text-right">Amount</th>
+                      <th className="pb-1 text-right">TX</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receipts.map((receipt, i) => {
+                      const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "🦊";
+                      const { emojis } = cartDisplayInfo(receipt.items);
+                      const txShort = receipt.tx_hash ? `${receipt.tx_hash.slice(0, 6)}..` : "—";
 
-          {/* ACP Protocol Object (restock) */}
-          {restockEvents.length > 0 && (
-            <RestockProtocolObject latestEvent={restockEvents[0]} />
-          )}
+                      return (
+                        <tr
+                          key={`${receipt.tx_hash}-${i}`}
+                          className="hover:bg-[var(--zt-green-mid)]/30 cursor-pointer transition-colors border-t border-[var(--zt-green-mid)]/30"
+                          onClick={() => { setViewerIndex(i); setViewerOpen(true); }}
+                        >
+                          <td className="py-0.5 pr-1 text-gray-500">{receipts.length - i}</td>
+                          <td className="py-0.5 pr-1">{guestEmoji}</td>
+                          <td className="py-0.5 pr-1">{emojis}</td>
+                          <td className="py-0.5 pr-1 text-right text-[var(--zt-gold)]">${receipt.amount}</td>
+                          <td className="py-0.5 text-right">
+                            {receipt.tx_hash ? (
+                              <a
+                                href={`${EXPLORER_URL}/tx/${receipt.tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {txShort}
+                              </a>
+                            ) : (
+                              <span className="text-gray-500">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function RestockProtocolObject({ latestEvent }: { latestEvent: ZooRestockEvent }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-1">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="font-pixel text-[9px] text-gray-400 hover:text-gray-300 w-full text-left"
-      >
-        {expanded ? '▼' : '▶'} Last Restock Protocol Object
-      </button>
-      {expanded && (
-        <pre className="font-pixel text-[9px] text-amber-300 bg-black/30 rounded px-2 py-1 mt-1 overflow-x-auto max-h-[120px] overflow-y-auto">
-{JSON.stringify({
-  action: 'restock_payment',
-  sku: latestEvent.sku,
-  name: latestEvent.name,
-  units: latestEvent.quantity,
-  cost: `$${latestEvent.cost}`,
-  fee: latestEvent.fee_ausd ? `$${latestEvent.fee_ausd}` : undefined,
-  fee_payer: latestEvent.fee_payer ?? undefined,
-  to: 'Zoo Master (supplier)',
-  status: 'confirmed',
-  tx_hash: latestEvent.tx_hash,
-  block: latestEvent.block_number,
-}, null, 2)}
-        </pre>
+      {/* Receipt Viewer modal */}
+      {viewerOpen && (
+        <ReceiptViewer
+          receipts={receipts}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerOpen(false)}
+        />
       )}
     </div>
   );

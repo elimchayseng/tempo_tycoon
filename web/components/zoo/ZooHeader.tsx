@@ -1,4 +1,5 @@
 import type { ZooPhase } from "../../hooks/useZoo";
+import type { NetworkStats } from "../../lib/types";
 
 interface ZooHeaderProps {
   phase: ZooPhase;
@@ -8,8 +9,7 @@ interface ZooHeaderProps {
   onOpenGates: () => void;
   onStopZoo: () => void;
   onRestart: () => void;
-  explorerOpen?: boolean;
-  onToggleExplorer?: () => void;
+  networkStats?: NetworkStats | null;
 }
 
 export default function ZooHeader({
@@ -20,11 +20,8 @@ export default function ZooHeader({
   onOpenGates,
   onStopZoo,
   onRestart,
-  explorerOpen,
-  onToggleExplorer,
+  networkStats,
 }: ZooHeaderProps) {
-  const showDashboard = phase === "running" || phase === "starting" || phase === "stopping" || phase === "complete";
-
   return (
     <header className="zt-statusbar flex items-center justify-between px-5 py-2.5 shrink-0">
       <div className="flex items-center gap-3">
@@ -89,17 +86,6 @@ export default function ZooHeader({
           </button>
         )}
 
-        {/* Control Room toggle */}
-        {showDashboard && onToggleExplorer && (
-          <button
-            onClick={onToggleExplorer}
-            className={`zt-btn font-pixel text-[8px] ${explorerOpen ? "zt-btn-active" : ""}`}
-            title="Toggle Blockchain Explorer"
-          >
-            🖥️
-          </button>
-        )}
-
         {/* Connection indicator */}
         <div className="zt-inset px-2 py-1 flex items-center gap-1.5" style={{ background: "rgba(0,0,0,0.3)" }}>
           <span
@@ -111,6 +97,16 @@ export default function ZooHeader({
             {connected ? "ON" : "OFF"}
           </span>
         </div>
+
+        {/* Block height indicator */}
+        {networkStats && (
+          <div className="zt-inset px-2 py-1 flex items-center gap-1" style={{ background: "rgba(0,0,0,0.3)" }}>
+            <span className="font-pixel text-[7px] text-gray-400">BLK</span>
+            <span className="font-pixel text-[8px] text-[var(--zt-gold)]">
+              #{networkStats.latest_block.toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
     </header>
   );

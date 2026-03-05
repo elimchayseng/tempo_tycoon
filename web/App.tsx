@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useZoo } from "./hooks/useZoo";
 import { ApiService } from "./services/api";
@@ -6,8 +6,8 @@ import { useBlockchainExplorer } from "./hooks/useBlockchainExplorer";
 import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
 import MerchantPanel from "./components/zoo/MerchantPanel";
-import AgentBrainRow from "./components/zoo/AgentBrainRow";
-import ReceiptFeed from "./components/zoo/ReceiptFeed";
+import AgentColumn from "./components/zoo/AgentColumn";
+import AnimatedRail from "./components/zoo/AnimatedRail";
 import ZooFooter from "./components/zoo/ZooFooter";
 import BlockchainExplorer from "./components/zoo/BlockchainExplorer";
 
@@ -42,6 +42,10 @@ export default function App() {
 
   const explorer = useBlockchainExplorer(networkStats, txFlowEvents, balanceUpdates);
 
+  // Refs for rail positioning
+  const containerRef = useRef<HTMLDivElement>(null);
+  const agentColumnRef = useRef<HTMLDivElement>(null);
+
   // Transition to "complete" when simulation depletes
   useEffect(() => {
     if (simulationComplete && phase === "running") {
@@ -49,9 +53,18 @@ export default function App() {
     }
   }, [simulationComplete, phase, markComplete]);
 
+  // Auto-open explorer data fetching when dashboard is visible
+  useEffect(() => {
+    if (phase === "running" || phase === "starting" || phase === "stopping" || phase === "complete") {
+      if (!explorer.isOpen) {
+        explorer.toggle();
+      }
+    }
+  }, [phase]);
+
   const handleNewSimulation = async () => {
     resetSimulationData();
-    await ApiService.zooStopAgents().catch(() => {}); // best-effort stop server-side agents
+    await ApiService.zooStopAgents().catch(() => {});
     restart();
   };
 
@@ -75,82 +88,97 @@ export default function App() {
         onOpenGates={openGates}
         onStopZoo={handleStopZoo}
         onRestart={handleNewSimulation}
-        explorerOpen={explorer.isOpen}
-        onToggleExplorer={explorer.toggle}
+        networkStats={networkStats}
       />
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Main dashboard area */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
-          {/* Idle state — dialog popup */}
-          {phase === "idle" && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-full max-w-sm zt-bevel overflow-hidden">
-                {/* Title bar */}
-                <div className="zt-titlebar text-center">
-                  TEMPO TYCOON
-                </div>
-                {/* Parchment body */}
-                <div className="zt-parchment px-6 py-6 text-center">
-                  <p className="font-pixel text-[8px] text-[var(--zt-text-mid)] mb-5 leading-relaxed">
-                    Autonomous agent commerce<br />
-                    on Tempo Moderato Testnet
-                  </p>
-                  <button onClick={startPreflight} className="zt-btn-brown">
-                    Start Zoo
-                  </button>
-                </div>
+        {/* Idle state — dialog popup */}
+        {phase === "idle" && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-sm zt-bevel overflow-hidden">
+              <div className="zt-titlebar text-center">
+                TEMPO TYCOON
+              </div>
+              <div className="zt-parchment px-6 py-6 text-center">
+                <p className="font-pixel text-[8px] text-[var(--zt-text-mid)] mb-5 leading-relaxed">
+                  Autonomous agent commerce<br />
+                  on Tempo Moderato Testnet
+                </p>
+                <button onClick={startPreflight} className="zt-btn-brown">
+                  Start Zoo
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Preflight phase */}
-          {showPreflight && (
-            <>
-              {/* Wallet init progress / ready banner */}
-              {phase === "ready" ? (
-                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
-                  <div className="font-pixel text-[10px] text-[var(--zt-gold)]">
-                    Ready for business
-                  </div>
+        {/* Preflight phase */}
+        {showPreflight && (
+          <div className="flex-1 flex flex-col min-h-0">
+            {phase === "ready" ? (
+              <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
+                <div className="font-pixel text-[10px] text-[var(--zt-gold)]">
+                  Ready for business
                 </div>
-              ) : fundingProgress && (
-                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
-                  <div className="font-pixel text-[8px] text-[var(--zt-gold)] mb-1">
-                    Initializing Wallets...
-                  </div>
-                  <div className="font-pixel text-[7px] text-[var(--zt-gold-light,var(--zt-gold))]">
-                    {fundingProgress.step}
-                    {fundingProgress.detail && (
-                      <span className="ml-2">{fundingProgress.detail}</span>
-                    )}
-                  </div>
+              </div>
+            ) : fundingProgress && (
+              <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-5 py-3 shrink-0">
+                <div className="font-pixel text-[8px] text-[var(--zt-gold)] mb-1">
+                  Initializing Wallets...
+                </div>
+                <div className="font-pixel text-[7px] text-[var(--zt-gold-light,var(--zt-gold))]">
+                  {fundingProgress.step}
+                  {fundingProgress.detail && (
+                    <span className="ml-2">{fundingProgress.detail}</span>
+                  )}
+                </div>
+              </div>
+            )}
+            <PreflightPanel
+              checks={preflightChecks}
+              phase={phase}
+              error={error}
+              onOpenGates={openGates}
+              onRetry={startPreflight}
+            />
+          </div>
+        )}
+
+        {/* Running / Complete — 3-column Mission Control layout */}
+        {showDashboard && (
+          <>
+            {/* Left: Agents (~22%) */}
+            <div
+              ref={agentColumnRef}
+              className="w-[22%] min-w-[240px] border-r border-[var(--zt-border-dark)] flex flex-col min-h-0"
+            >
+              {/* Simulation complete banner (thin) */}
+              {phase === "complete" && (
+                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-2 py-1.5 shrink-0">
+                  <div className="font-pixel text-[7px] text-[var(--zt-gold)]">SIMULATION COMPLETE</div>
                 </div>
               )}
-              <PreflightPanel
-                checks={preflightChecks}
-                phase={phase}
-                error={error}
-                onOpenGates={openGates}
-                onRetry={startPreflight}
-              />
-            </>
-          )}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <AgentColumn
+                  agents={zooAgents}
+                  llmDecisions={llmDecisions}
+                  txFlowEvents={txFlowEvents}
+                  simulationComplete={phase === "complete"}
+                />
+              </div>
+            </div>
 
-          {/* Running / Complete dashboard */}
-          {showDashboard && (
-            <>
-              {/* Simulation Complete overlay */}
+            {/* Center: Merchant (~45%) with rail overlay */}
+            <div ref={containerRef} className="flex-1 min-w-0 relative border-r border-[var(--zt-border-dark)] flex flex-col min-h-0">
+              {/* Completion banner */}
               {phase === "complete" && (
-                <div className="bg-[var(--zt-green-mid)] border-b-2 border-[var(--zt-border-dark)] px-5 py-4 shrink-0">
+                <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-3 py-2 shrink-0">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-pixel text-[10px] text-[var(--zt-gold)] mb-1">
-                        SIMULATION COMPLETE
-                      </div>
-                      <p className="font-pixel text-[7px] text-[var(--zt-text-mid)]">
-                        All buyer agents have been depleted. Review the results below.
+                      <div className="font-pixel text-[8px] text-[var(--zt-gold)]">SIMULATION COMPLETE</div>
+                      <p className="font-pixel text-[6px] text-[var(--zt-text-mid)]">
+                        All buyer agents depleted. Review results below.
                       </p>
                     </div>
                     <button onClick={handleNewSimulation} className="zt-btn-brown">
@@ -160,34 +188,40 @@ export default function App() {
                 </div>
               )}
 
-              <MerchantPanel merchant={merchant} latestReceipt={receipts[0] ?? null} merchantState={merchantState} restockEvents={restockEvents} merchantDecision={llmDecisions['merchant_a'] ?? null} priceAdjustments={priceAdjustments} simulationComplete={phase === "complete"} />
-              <div className="border-b border-[var(--zt-green-mid)] shrink-0 overflow-y-auto" style={{ maxHeight: "60vh" }}>
-                <AgentBrainRow agents={zooAgents} llmDecisions={llmDecisions} txFlowEvents={txFlowEvents} simulationComplete={phase === "complete"} />
-              </div>
-              <div className="shrink-0">
-                <ReceiptFeed receipts={receipts} />
-              </div>
-            </>
-          )}
-        </div>
+              {/* Rail overlay */}
+              <AnimatedRail
+                agents={zooAgents}
+                latestReceipt={receipts[0] ?? null}
+                containerRef={containerRef}
+                agentColumnRef={agentColumnRef}
+              />
 
-        {/* Blockchain Explorer sidebar */}
-        {showDashboard && explorer.isOpen && (
-          <div
-            className="shrink-0 border-l-2 border-[var(--zt-border-dark)] overflow-hidden zt-sidebar-enter"
-            style={{ width: 380 }}
-          >
-            <BlockchainExplorer
-              activeTab={explorer.activeTab}
-              setActiveTab={explorer.setActiveTab}
-              networkStats={explorer.networkStats}
-              txFlowEvents={explorer.txFlowEvents}
-              tokenInfo={explorer.tokenInfo}
-              wallets={explorer.wallets}
-              balanceHistories={explorer.balanceHistories}
-              fetchBalanceHistory={explorer.fetchBalanceHistory}
-            />
-          </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <MerchantPanel
+                  merchant={merchant}
+                  latestReceipt={receipts[0] ?? null}
+                  merchantState={merchantState}
+                  restockEvents={restockEvents}
+                  merchantDecision={llmDecisions['merchant_a'] ?? null}
+                  priceAdjustments={priceAdjustments}
+                  simulationComplete={phase === "complete"}
+                  receipts={receipts}
+                />
+              </div>
+            </div>
+
+            {/* Right: Blockchain (~33%) */}
+            <div className="w-[33%] min-w-[280px] flex flex-col min-h-0">
+              <BlockchainExplorer
+                networkStats={explorer.networkStats}
+                txFlowEvents={explorer.txFlowEvents}
+                tokenInfo={explorer.tokenInfo}
+                wallets={explorer.wallets}
+                balanceHistories={explorer.balanceHistories}
+                fetchBalanceHistory={explorer.fetchBalanceHistory}
+              />
+            </div>
+          </>
         )}
       </div>
 

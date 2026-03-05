@@ -401,3 +401,44 @@
   background-position: -8px 0;
   height: 16px;
 }
+
+/* ── Agent Card Glows ── */
+.zt-card-glow-gold {
+  box-shadow: 0 0 12px rgba(255,215,0,0.3), inset 0 0 4px rgba(255,215,0,0.1);
+  outline: 2px solid var(--zt-gold);
+  outline-offset: -2px;
+}
+
+@keyframes zt-purchasing-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(52,211,153,0.2); outline-color: rgba(52,211,153,0.6); }
+  50%      { box-shadow: 0 0 16px rgba(52,211,153,0.5); outline-color: rgba(52,211,153,1); }
+}
+.zt-card-glow-purchasing {
+  outline: 2px solid rgba(52,211,153,0.6);
+  outline-offset: -2px;
+  animation: zt-purchasing-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Animated Rail Emojis ── */
+
+/* Money flows left-to-right (guest → merchant) */
+@keyframes zt-rail-lr {
+  0%   { transform: translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(60px); opacity: 0; }
+}
+.zt-rail-emoji-lr {
+  animation: zt-rail-lr 1.5s ease-in-out forwards;
+}
+
+/* Product flows right-to-left (merchant → guest) */
+@keyframes zt-rail-rl {
+  0%   { transform: translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(-60px); opacity: 0; }
+}
+.zt-rail-emoji-rl {
+  animation: zt-rail-rl 1.5s ease-in-out forwards;
+}
