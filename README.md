@@ -1,4 +1,4 @@
-# Stablecoin Zoo Tycoon
+# Tempo Tycoon: A Stablecoin Zoo Simulation
 
 > Autonomous agents making real blockchain purchases in a virtual zoo economy
 
@@ -7,7 +7,7 @@
 
 ## What is this?
 
-Stablecoin Zoo Tycoon is an autonomous agent commerce simulation built on the Tempo Moderato Testnet. Three AI-driven "zoo attendee" agents discover merchants, make need-based purchase decisions, and execute real on-chain stablecoin transactions — all visualized through a retro Zoo Tycoon-themed dashboard.
+Tempo Tycoon is an autonomous agent commerce simulation built on the Tempo Moderato Testnet. Three AI-driven "zoo attendee" agents discover merchants, make need-based purchase decisions, and execute real on-chain stablecoin transactions — all visualized through a retro Zoo Tycoon-themed dashboard.
 
 The simulation implements the **Agentic Commerce Protocol (ACP)**: agents autonomously browse a merchant registry, evaluate catalogs against their internal needs, create checkout sessions, sign blockchain transactions, and verify purchases. An optional LLM integration lets agents make purchase decisions via tool-calling instead of hard-coded rules.
 
