@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { ZooLLMDecision, ZooPriceAdjustment, ZooRestockEvent } from "../../lib/types";
+import type { ZooLLMDecision, ZooPriceAdjustment, ZooRestockEvent, ZooMerchantState } from "../../lib/types";
 import { useTypewriter } from "../../hooks/useTypewriter";
 
 interface MerchantBrainTerminalProps {
   decision: ZooLLMDecision | null;
   priceAdjustments: ZooPriceAdjustment[];
   restockEvents: ZooRestockEvent[];
+  simulationComplete?: boolean;
+  merchantState?: ZooMerchantState | null;
 }
 
 type RestockStage = "restock_initiated" | "signing" | "broadcast" | "block_inclusion" | "confirmed";
@@ -22,6 +24,8 @@ export default function MerchantBrainTerminal({
   decision,
   priceAdjustments,
   restockEvents,
+  simulationComplete,
+  merchantState,
 }: MerchantBrainTerminalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleRestockStages, setVisibleRestockStages] = useState<Set<RestockStage>>(new Set());
@@ -75,6 +79,30 @@ export default function MerchantBrainTerminal({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [typedReasoning, visibleRestockStages.size, priceAdjustments]);
+
+  if (simulationComplete) {
+    const totalStock = merchantState?.inventory.reduce((sum, i) => sum + i.stock, 0) ?? "?";
+    const lowStockCount = merchantState?.inventory.filter((i) => i.stock <= 1).length ?? "?";
+    return (
+      <div className="zt-terminal" ref={scrollRef} style={{ maxHeight: 250, minHeight: 0 }}>
+        <div className="zt-terminal-header text-gray-500">{"> SIMULATION ENDED ─────────────────"}</div>
+        {merchantState && (
+          <div className="text-gray-500 mt-1">
+            <span>balance: ${merchantState.balance}</span>
+            <span className="mx-2">|</span>
+            <span>profit: ${merchantState.profit}</span>
+            <br />
+            <span>stock: {totalStock}</span>
+            <span className="mx-2">|</span>
+            <span>low: {lowStockCount}</span>
+          </div>
+        )}
+        <div className="text-gray-500 mt-2">
+          merchant agent offline — all buyers depleted
+        </div>
+      </div>
+    );
+  }
 
   if (!decision) {
     return (

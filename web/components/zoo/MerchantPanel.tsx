@@ -10,6 +10,7 @@ interface MerchantPanelProps {
   restockEvents: ZooRestockEvent[];
   merchantDecision: ZooLLMDecision | null;
   priceAdjustments: ZooPriceAdjustment[];
+  simulationComplete?: boolean;
 }
 
 interface AnimState {
@@ -83,7 +84,7 @@ function StockBar({ stock, maxStock }: { stock: number; maxStock: number }) {
   return <div className="flex gap-0.5">{cells}</div>;
 }
 
-export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments }: MerchantPanelProps) {
+export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments, simulationComplete }: MerchantPanelProps) {
   const lastTxRef = useRef<string | null>(null);
   const lastRestockRef = useRef<string | null>(null);
   const [anim, setAnim] = useState<AnimState | null>(null);
@@ -398,6 +399,8 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             decision={merchantDecision}
             priceAdjustments={priceAdjustments}
             restockEvents={restockEvents}
+            simulationComplete={simulationComplete}
+            merchantState={merchantState}
           />
 
           {/* Protocol step text (purchases) — left-aligned, gold */}

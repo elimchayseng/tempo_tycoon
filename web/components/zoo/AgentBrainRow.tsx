@@ -6,11 +6,12 @@ interface AgentBrainRowProps {
   agents: ZooAgentState[];
   llmDecisions: Record<string, ZooLLMDecision>;
   txFlowEvents: TransactionFlowEvent[];
+  simulationComplete?: boolean;
 }
 
 const ANIMAL_EMOJI_LIST = Object.values(ANIMAL_EMOJI);
 
-export default function AgentBrainRow({ agents, llmDecisions, txFlowEvents }: AgentBrainRowProps) {
+export default function AgentBrainRow({ agents, llmDecisions, txFlowEvents, simulationComplete }: AgentBrainRowProps) {
   if (agents.length === 0) {
     return (
       <div className="space-y-4 px-5 py-5">
@@ -36,6 +37,7 @@ export default function AgentBrainRow({ agents, llmDecisions, txFlowEvents }: Ag
           agent={agent}
           decision={llmDecisions[agent.agent_id] ?? null}
           txFlowEvents={txFlowEvents}
+          simulationComplete={simulationComplete}
         />
       ))}
     </div>
