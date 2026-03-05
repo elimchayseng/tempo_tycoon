@@ -39,6 +39,8 @@ BUDGET CONSERVATION:
 - Critical budget (<$8): skip purchase or buy cheapest single item only
 
 VARIETY: avoid buying the same item you bought recently.
+            
+PRICE CHANGES: be aware, prices will shift based on demand, so optimize for using your budget wisely 
 
 You MUST call exactly one tool: acp_purchase_cart or acp_skip_cycle.`;
 }

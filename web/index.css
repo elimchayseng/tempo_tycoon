@@ -382,6 +382,18 @@
   color: #555;
 }
 
+/* ── Price flash animation (scale + glow) ── */
+@keyframes zt-price-flash {
+  0%   { transform: scale(1); text-shadow: 0 0 0 transparent; }
+  30%  { transform: scale(1.25); text-shadow: 0 0 10px rgba(255,215,0,0.9); color: #fff; }
+  60%  { transform: scale(1.1); text-shadow: 0 0 6px rgba(255,215,0,0.5); }
+  100% { transform: scale(1); text-shadow: 0 0 0 transparent; color: var(--zt-gold); }
+}
+.zt-price-flash {
+  animation: zt-price-flash 1.5s ease-out;
+  display: inline-block;
+}
+
 /* ── Perforated ticket edge ── */
 .zt-ticket-perf {
   background-image: radial-gradient(circle, var(--zt-parchment) 4px, transparent 4px);

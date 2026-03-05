@@ -6,6 +6,7 @@ interface AgentBrainPanelProps {
   agent: ZooAgentState;
   decision: ZooLLMDecision | null;
   txFlowEvents: TransactionFlowEvent[];
+  simulationComplete?: boolean;
 }
 
 function needBarClass(value: number): string {
@@ -26,17 +27,20 @@ function statusDot(status: string): string {
   }
 }
 
-export default function AgentBrainPanel({ agent, decision, txFlowEvents }: AgentBrainPanelProps) {
+export default function AgentBrainPanel({ agent, decision, txFlowEvents, simulationComplete }: AgentBrainPanelProps) {
+  const displayStatus = simulationComplete ? "decommissioned" : agent.status;
+  const dotClass = simulationComplete ? "bg-gray-500" : statusDot(agent.status);
+
   return (
     <div className="zt-bevel overflow-hidden">
       {/* Title bar */}
       <div className="zt-titlebar flex items-center justify-between overflow-hidden">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`inline-block w-2 h-2 shrink-0 rounded-full ${statusDot(agent.status)}`} />
+          <span className={`inline-block w-2 h-2 shrink-0 rounded-full ${dotClass}`} />
           <span className="truncate">{formatGuestLabel(agent.agent_id, agent.address)}</span>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-2">
-          <span className="text-[9px] opacity-70">{agent.status}</span>
+          <span className={`text-[9px] ${simulationComplete ? "text-gray-500" : "opacity-70"}`}>{displayStatus}</span>
           <span className="text-[10px] text-[var(--zt-gold)]">
             🪙 ${agent.balance}
           </span>
@@ -92,6 +96,8 @@ export default function AgentBrainPanel({ agent, decision, txFlowEvents }: Agent
             decision={decision}
             txFlowEvents={txFlowEvents}
             agentId={agent.agent_id}
+            simulationComplete={simulationComplete}
+            agent={agent}
           />
         </div>
       </div>

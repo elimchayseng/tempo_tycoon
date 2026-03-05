@@ -1,35 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import type { ZooLLMDecision, TransactionFlowEvent, TxFlowStage } from "../../lib/types";
+import type { ZooLLMDecision, TransactionFlowEvent, TxFlowStage, ZooAgentState } from "../../lib/types";
+import { useTypewriter } from "../../hooks/useTypewriter";
 
 interface BrainTerminalProps {
   decision: ZooLLMDecision | null;
   txFlowEvents: TransactionFlowEvent[];
   agentId: string;
-}
-
-function useTypewriter(text: string, speed: number = 30) {
-  const [displayed, setDisplayed] = useState("");
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    setDisplayed("");
-    setDone(false);
-    if (!text) { setDone(true); return; }
-
-    let i = 0;
-    const timer = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(timer);
-        setDone(true);
-      }
-    }, speed);
-
-    return () => clearInterval(timer);
-  }, [text, speed]);
-
-  return { displayed, done };
+  simulationComplete?: boolean;
+  agent?: ZooAgentState;
 }
 
 // Only the 4 stages the server actually emits
@@ -71,7 +49,7 @@ function getStepDetail(stage: TxFlowStage, events: TransactionFlowEvent[]): stri
   }
 }
 
-export default function BrainTerminal({ decision, txFlowEvents, agentId }: BrainTerminalProps) {
+export default function BrainTerminal({ decision, txFlowEvents, agentId, simulationComplete, agent }: BrainTerminalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleStages, setVisibleStages] = useState<Set<TxFlowStage>>(new Set());
   const decisionTimestampRef = useRef<number>(0);
@@ -124,6 +102,24 @@ export default function BrainTerminal({ decision, txFlowEvents, agentId }: Brain
   const isPurchasing = decision?.action.type === "purchase";
   const isPriceAdjust = decision?.action.type === "adjust_prices";
   const isRestock = decision?.action.type === "restock";
+
+  if (simulationComplete) {
+    return (
+      <div className="zt-terminal" ref={scrollRef}>
+        <div className="zt-terminal-header text-gray-500">{"> SIMULATION ENDED ─────────────────"}</div>
+        {agent && (
+          <div className="text-gray-500 mt-1">
+            <span>food_need: {agent.needs.food_need}</span>
+            <span className="mx-2">|</span>
+            <span>balance: ${agent.balance}</span>
+          </div>
+        )}
+        <div className="text-gray-500 mt-2">
+          agent offline — wallet depleted
+        </div>
+      </div>
+    );
+  }
 
   if (!decision) {
     return (
