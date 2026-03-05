@@ -61,9 +61,9 @@ export function isValidMemo(memo: string): boolean {
  * Map agent IDs to animal emojis
  */
 export const ANIMAL_EMOJI: Record<string, string> = {
-  guest_1: "🦁",
-  guest_2: "🐘",
-  guest_3: "🐧",
+  guest_1: "👨",
+  guest_2: "👩",
+  guest_3: "🧑",
 };
 
 /**
@@ -72,7 +72,7 @@ export const ANIMAL_EMOJI: Record<string, string> = {
  * @param address - optional wallet address
  */
 export function formatGuestLabel(agentId: string, address?: string): string {
-  const emoji = ANIMAL_EMOJI[agentId] ?? "🦊";
+  const emoji = ANIMAL_EMOJI[agentId] ?? "🧑";
   if (address) {
     return `Guest: ${shortAddr(address)} ${emoji}`;
   }

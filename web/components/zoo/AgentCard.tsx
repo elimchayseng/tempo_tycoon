@@ -30,7 +30,7 @@ function statusDot(status: string): string {
 export default function AgentCard({ agent, selected, isPurchasing, onClick, simulationComplete }: AgentCardProps) {
   const displayStatus = simulationComplete ? "decommissioned" : agent.status;
   const dotClass = simulationComplete ? "bg-gray-500" : statusDot(agent.status);
-  const emoji = ANIMAL_EMOJI[agent.agent_id] ?? "🦊";
+  const emoji = ANIMAL_EMOJI[agent.agent_id] ?? "🧑";
 
   let borderClass = "";
   if (selected) {
@@ -45,46 +45,46 @@ export default function AgentCard({ agent, selected, isPurchasing, onClick, simu
       className={`w-full text-left zt-bevel overflow-hidden transition-all ${borderClass}`}
     >
       {/* Compact title row */}
-      <div className="bg-[var(--zt-green-mid)] px-2 py-1.5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`inline-block w-2 h-2 shrink-0 rounded-full ${dotClass}`} />
-          <span className="text-sm">{emoji}</span>
-          <span className="font-pixel text-[7px] text-white truncate">
-            Guest:{" "}
-            {agent.address ? (
-              <a
-                href={`https://explore.moderato.tempo.xyz/address/${agent.address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {shortAddr(agent.address)}
-              </a>
-            ) : (
-              <span>{agent.agent_id}</span>
+      <div className="bg-[var(--zt-green-mid)] px-3 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`inline-block w-2.5 h-2.5 shrink-0 rounded-full ${dotClass}`} />
+          <span className="text-lg">{emoji}</span>
+          <span className="font-pixel text-[9px] text-white truncate">
+            {agent.agent_id}
+            {agent.address && (
+              <>
+                :{" "}
+                <a
+                  href={`https://explore.moderato.tempo.xyz/address/${agent.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {shortAddr(agent.address)}
+                </a>
+              </>
             )}
-            {" "}{emoji}
           </span>
         </div>
-        <span className="font-pixel text-[8px] text-[var(--zt-gold)] shrink-0 ml-1">
+        <span className="font-pixel text-[10px] text-[var(--zt-gold)] shrink-0 ml-1">
           ${agent.balance}
         </span>
       </div>
 
       {/* Body: needs + stats */}
-      <div className="bg-[var(--zt-green-dark)] px-2 py-1.5 space-y-1">
+      <div className="bg-[var(--zt-green-dark)] px-3 py-2 space-y-1.5">
         {/* Need bars inline */}
         <div className="flex items-center gap-2">
-          <span className="font-pixel text-[7px] text-[var(--zt-tan)] w-6">Fd:{agent.needs.food_need}</span>
-          <div className="zt-bar-track flex-1" style={{ height: 8 }}>
+          <span className="font-pixel text-[8px] text-[var(--zt-tan)] w-8">Fd:{agent.needs.food_need}</span>
+          <div className="zt-bar-track flex-1" style={{ height: 10 }}>
             <div
               className={needBarClass(agent.needs.food_need)}
               style={{ width: `${Math.min(agent.needs.food_need, 100)}%` }}
             />
           </div>
-          <span className="font-pixel text-[7px] text-[var(--zt-tan)] w-6">Fn:{agent.needs.fun_need}</span>
-          <div className="zt-bar-track flex-1" style={{ height: 8 }}>
+          <span className="font-pixel text-[8px] text-[var(--zt-tan)] w-8">Fn:{agent.needs.fun_need}</span>
+          <div className="zt-bar-track flex-1" style={{ height: 10 }}>
             <div
               className={needBarClass(agent.needs.fun_need)}
               style={{ width: `${Math.min(agent.needs.fun_need, 100)}%` }}
@@ -94,10 +94,10 @@ export default function AgentCard({ agent, selected, isPurchasing, onClick, simu
 
         {/* Stats row */}
         <div className="flex items-center justify-between">
-          <span className="font-pixel text-[7px] text-gray-400">
+          <span className="font-pixel text-[8px] text-gray-400">
             {agent.purchase_count} buy{agent.purchase_count !== 1 ? "s" : ""}
           </span>
-          <span className={`font-pixel text-[6px] ${simulationComplete ? "text-gray-500" : "opacity-70 text-gray-400"}`}>
+          <span className={`font-pixel text-[8px] ${simulationComplete ? "text-gray-500" : "opacity-70 text-gray-400"}`}>
             {displayStatus}
           </span>
         </div>

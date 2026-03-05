@@ -6,12 +6,12 @@ interface TransactionFlowVizProps {
 }
 
 const STAGES: { stage: TxFlowStage; label: string; icon: string }[] = [
-  { stage: "decision", label: "Decision", icon: "🤔" },
-  { stage: "checkout_created", label: "Checkout", icon: "🛒" },
-  { stage: "signing", label: "Sign Tx", icon: "🔐" },
-  { stage: "broadcast", label: "Broadcast", icon: "📡" },
-  { stage: "block_inclusion", label: "In Block", icon: "⛓️" },
-  { stage: "confirmed", label: "Confirmed", icon: "✅" },
+  { stage: "decision", label: "Decision", icon: "🤖" },
+  { stage: "checkout_created", label: "Checkout", icon: "🤖" },
+  { stage: "signing", label: "Sign Tx", icon: "🔗" },
+  { stage: "broadcast", label: "Broadcast", icon: "🔗" },
+  { stage: "block_inclusion", label: "In Block", icon: "🔗" },
+  { stage: "confirmed", label: "Confirmed", icon: "🔗" },
   { stage: "merchant_verified", label: "Verified", icon: "🏪" },
 ];
 
@@ -78,7 +78,7 @@ export default function TransactionFlowViz({ events }: TransactionFlowVizProps) 
   return (
     <div className="px-4 py-3 space-y-3">
       {agentFlows.map((flow) => {
-        const agentEmoji = ANIMAL_EMOJI[flow.agentId] ?? "🦊";
+        const agentEmoji = ANIMAL_EMOJI[flow.agentId] ?? "🧑";
         const activeStageIndex = getStageIndex(flow.latestEvent.stage);
 
         return (
@@ -87,7 +87,7 @@ export default function TransactionFlowViz({ events }: TransactionFlowVizProps) 
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-base">{agentEmoji}</span>
               <span className="font-pixel text-[11px] text-[var(--zt-tan)]">
-                {formatGuestLabel(flow.agentId)}
+                {flow.agentId}
               </span>
             </div>
 
@@ -111,7 +111,7 @@ export default function TransactionFlowViz({ events }: TransactionFlowVizProps) 
                     title={s.label}
                   >
                     <span className="text-[11px]">
-                      {isCompleted ? "✅" : isActive ? s.icon : "○"}
+                      {isCompleted ? s.icon : isActive ? s.icon : "○"}
                     </span>
                     <span className="hidden xl:inline">{s.label}</span>
                     {i < STAGES.length - 1 && (

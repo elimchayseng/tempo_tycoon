@@ -70,14 +70,14 @@ function LlmTerminal({
     }
   }, [typedReasoning]);
 
-  const emoji = ANIMAL_EMOJI[agentId] ?? "🦊";
+  const emoji = ANIMAL_EMOJI[agentId] ?? "🧑";
   const label = formatGuestLabel(agentId);
 
   if (simulationComplete) {
     return (
       <div className="flex flex-col min-h-0 flex-[6]">
-        <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[7px] text-white shrink-0">
-          🧠 LLM RESPONSE — {emoji} {label}
+        <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
+          🧠 LLM RESPONSE — {emoji} {agentId}
         </div>
         <div className="zt-terminal flex-1" ref={scrollRef} style={{ minHeight: 0, maxHeight: "none" }}>
           <div className="zt-terminal-header text-gray-500">{"> SIMULATION ENDED ─────────────────"}</div>
@@ -97,8 +97,8 @@ function LlmTerminal({
   if (!decision) {
     return (
       <div className="flex flex-col min-h-0 flex-[6]">
-        <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[7px] text-white shrink-0">
-          🧠 LLM RESPONSE — {emoji} {label}
+        <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
+          🧠 LLM RESPONSE — {emoji} {agentId}
         </div>
         <div className="zt-terminal flex-1" ref={scrollRef} style={{ minHeight: 0, maxHeight: "none" }}>
           <div className="text-gray-500">
@@ -111,8 +111,8 @@ function LlmTerminal({
 
   return (
     <div className="flex flex-col min-h-0 flex-[6]">
-      <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[7px] text-white shrink-0">
-        🧠 LLM RESPONSE — {emoji} {label}
+      <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
+        🧠 LLM RESPONSE — {emoji} {agentId}
       </div>
       <div className="zt-terminal flex-1 overflow-y-auto" ref={scrollRef} style={{ minHeight: 0, maxHeight: "none" }}>
         {/* Context */}
@@ -214,13 +214,13 @@ function AcpTerminal({
     }
   }, [visibleStages]);
 
-  const emoji = ANIMAL_EMOJI[agentId] ?? "🦊";
+  const emoji = ANIMAL_EMOJI[agentId] ?? "🧑";
   const label = formatGuestLabel(agentId);
 
   return (
     <div className="flex flex-col min-h-0 flex-[4]">
-      <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[7px] text-white shrink-0">
-        ⛓️ ACP PROTOCOL — {emoji} {label}
+      <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
+        ⛓️ ACP PROTOCOL — {emoji} {agentId}
       </div>
       <div className="zt-terminal flex-1 overflow-y-auto" ref={scrollRef} style={{ minHeight: 0, maxHeight: "none" }}>
         {simulationComplete ? (
@@ -250,7 +250,7 @@ function AcpTerminal({
                 <div key={stage} className={`${className} zt-step-fade`}>
                   <span>{"  "}{icon} {stepLabel}</span>
                   {detail && (
-                    <div className="text-gray-500 ml-6" style={{ fontSize: "8px" }}>
+                    <div className="text-gray-500 ml-6" style={{ fontSize: "10px" }}>
                       {"    "}{detail}
                     </div>
                   )}

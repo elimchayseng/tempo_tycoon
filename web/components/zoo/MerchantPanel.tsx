@@ -79,7 +79,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
     lastTxRef.current = latestReceipt.tx_hash;
 
-    const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🦊";
+    const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🧑";
     const guestAddr = latestReceipt.agent_address ? shortAddr(latestReceipt.agent_address) : latestReceipt.agent_id;
     const { emojis: cartEmojis } = cartDisplayInfo(latestReceipt.items);
 
@@ -327,7 +327,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                   </thead>
                   <tbody>
                     {receipts.map((receipt, i) => {
-                      const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "🦊";
+                      const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "🧑";
                       const { emojis } = cartDisplayInfo(receipt.items);
                       const txShort = receipt.tx_hash ? `${receipt.tx_hash.slice(0, 6)}..` : "—";
 
