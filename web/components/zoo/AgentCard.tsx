@@ -1,8 +1,12 @@
 import type { ZooAgentState } from "../../lib/types";
-import { formatGuestLabel } from "../../utils/formatting";
+import { shortAddr, ANIMAL_EMOJI } from "../../utils/formatting";
 
 interface AgentCardProps {
   agent: ZooAgentState;
+  selected: boolean;
+  isPurchasing: boolean;
+  onClick: () => void;
+  simulationComplete?: boolean;
 }
 
 function needBarClass(value: number): string {
@@ -23,41 +27,64 @@ function statusDot(status: string): string {
   }
 }
 
-export default function AgentCard({ agent }: AgentCardProps) {
+export default function AgentCard({ agent, selected, isPurchasing, onClick, simulationComplete }: AgentCardProps) {
+  const displayStatus = simulationComplete ? "decommissioned" : agent.status;
+  const dotClass = simulationComplete ? "bg-gray-500" : statusDot(agent.status);
+  const emoji = ANIMAL_EMOJI[agent.agent_id] ?? "🧑";
+
+  let borderClass = "";
+  if (selected) {
+    borderClass = "zt-card-glow-gold";
+  } else if (isPurchasing && !simulationComplete) {
+    borderClass = "zt-card-glow-purchasing";
+  }
+
   return (
-    <div className="zt-bevel overflow-hidden">
-      {/* Green title bar */}
-      <div className="zt-titlebar flex items-center justify-between overflow-hidden">
+    <button
+      onClick={onClick}
+      className={`w-full text-left zt-bevel overflow-hidden transition-all ${borderClass}`}
+    >
+      {/* Compact title row */}
+      <div className="bg-[var(--zt-green-mid)] px-3 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`inline-block w-2 h-2 shrink-0 ${statusDot(agent.status)}`} />
-          <span className="truncate">{formatGuestLabel(agent.agent_id, agent.address)}</span>
+          <span className={`inline-block w-2.5 h-2.5 shrink-0 rounded-full ${dotClass}`} />
+          <span className="text-lg">{emoji}</span>
+          <span className="font-pixel text-[9px] text-white truncate">
+            {agent.agent_id}
+            {agent.address && (
+              <>
+                :{" "}
+                <a
+                  href={`https://explore.moderato.tempo.xyz/address/${agent.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {shortAddr(agent.address)}
+                </a>
+              </>
+            )}
+          </span>
         </div>
-        <span className="text-[10px] opacity-70 shrink-0 ml-2">{agent.status}</span>
+        <span className="font-pixel text-[10px] text-[var(--zt-gold)] shrink-0 ml-1">
+          ${agent.balance}
+        </span>
       </div>
 
-      {/* Dark green body */}
-      <div className="bg-[var(--zt-green-dark)] px-4 py-4 space-y-3">
-        {/* Food need bar */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-pixel text-[10px] text-[var(--zt-tan)]">🍖 Food</span>
-            <span className="font-pixel text-[10px] text-gray-400">{agent.needs.food_need}</span>
-          </div>
-          <div className="zt-bar-track">
+      {/* Body: needs + stats */}
+      <div className="bg-[var(--zt-green-dark)] px-3 py-2 space-y-1.5">
+        {/* Need bars inline */}
+        <div className="flex items-center gap-2">
+          <span className="font-pixel text-[8px] text-[var(--zt-tan)] w-8">Fd:{agent.needs.food_need}</span>
+          <div className="zt-bar-track flex-1" style={{ height: 10 }}>
             <div
               className={needBarClass(agent.needs.food_need)}
               style={{ width: `${Math.min(agent.needs.food_need, 100)}%` }}
             />
           </div>
-        </div>
-
-        {/* Fun need bar */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-pixel text-[10px] text-[var(--zt-tan)]">🎪 Fun</span>
-            <span className="font-pixel text-[10px] text-gray-400">{agent.needs.fun_need}</span>
-          </div>
-          <div className="zt-bar-track">
+          <span className="font-pixel text-[8px] text-[var(--zt-tan)] w-8">Fn:{agent.needs.fun_need}</span>
+          <div className="zt-bar-track flex-1" style={{ height: 10 }}>
             <div
               className={needBarClass(agent.needs.fun_need)}
               style={{ width: `${Math.min(agent.needs.fun_need, 100)}%` }}
@@ -66,15 +93,15 @@ export default function AgentCard({ agent }: AgentCardProps) {
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center justify-between pt-1 border-t border-[var(--zt-green-mid)]">
-          <span className="font-pixel text-[10px] text-[var(--zt-gold)]">
-            🪙 ${agent.balance} AUSD
-          </span>
-          <span className="font-pixel text-[10px] text-gray-500">
+        <div className="flex items-center justify-between">
+          <span className="font-pixel text-[8px] text-gray-400">
             {agent.purchase_count} buy{agent.purchase_count !== 1 ? "s" : ""}
+          </span>
+          <span className={`font-pixel text-[8px] ${simulationComplete ? "text-gray-500" : "opacity-70 text-gray-400"}`}>
+            {displayStatus}
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

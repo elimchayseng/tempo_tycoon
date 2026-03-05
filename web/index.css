@@ -181,31 +181,81 @@
   );
 }
 
-/* ── Merchant Panel Animations ── */
+/* ── Zoo Park View Animations ── */
 
-/* Coin flies left-to-right (guest → merchant) */
-@keyframes zt-coin-fly {
-  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
-  30%  { transform: translate(40%, -30px) scale(1.3); opacity: 1; }
-  70%  { transform: translate(70%, -10px) scale(1.1); opacity: 1; }
-  100% { transform: translate(100%, 0) scale(1); opacity: 0; }
+/* Visitor idle wander — three different gentle drift patterns */
+@keyframes zt-visitor-wander-1 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(8px, -5px); }
+  50% { transform: translate(-4px, -8px); }
+  75% { transform: translate(-6px, 3px); }
 }
-.zt-coin-fly {
-  animation: zt-coin-fly 1.5s ease-in-out forwards;
-}
+.zt-visitor-wander-1 { animation: zt-visitor-wander-1 7s ease-in-out infinite; }
 
-/* Product flies right-to-left (merchant → guest) */
-@keyframes zt-item-fly {
-  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
-  30%  { transform: translate(-30%, -25px) scale(1.2); opacity: 1; }
-  70%  { transform: translate(-70%, -8px) scale(1.1); opacity: 1; }
-  100% { transform: translate(-100%, 0) scale(1); opacity: 0; }
+@keyframes zt-visitor-wander-2 {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, -4px); }
+  45% { transform: translate(5px, -7px); }
+  70% { transform: translate(7px, 4px); }
+  90% { transform: translate(-3px, 2px); }
 }
-.zt-item-fly {
-  animation: zt-item-fly 1.5s ease-in-out 0.5s forwards;
-  opacity: 0;
-  animation-fill-mode: backwards;
+.zt-visitor-wander-2 { animation: zt-visitor-wander-2 9s ease-in-out infinite; }
+
+@keyframes zt-visitor-wander-3 {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(5px, 6px); }
+  50% { transform: translate(-7px, -3px); }
+  80% { transform: translate(3px, -5px); }
 }
+.zt-visitor-wander-3 { animation: zt-visitor-wander-3 8s ease-in-out infinite; }
+
+/* Visitor active highlight — gold glow pulse */
+@keyframes zt-visitor-active {
+  0%, 100% { opacity: 0; stroke-width: 1; }
+  30% { opacity: 0.9; stroke-width: 3; }
+  70% { opacity: 0.6; stroke-width: 2; }
+}
+.zt-visitor-active { animation: zt-visitor-active 0.6s ease-out forwards; }
+
+/* Money flies from visitor toward shop using CSS custom properties */
+@keyframes zt-money-to-shop {
+  0%   { transform: translate(var(--start-x), var(--start-y)) scale(1); opacity: 1; }
+  40%  { transform: translate(
+           calc((var(--start-x) + var(--end-x)) / 2),
+           calc(var(--start-y) - 15px)
+         ) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--end-x), var(--end-y)) scale(0.8); opacity: 0; }
+}
+.zt-money-to-shop { animation: zt-money-to-shop 1s ease-in-out forwards; }
+
+/* Product flies from shop back to visitor */
+@keyframes zt-product-to-visitor {
+  0%   { transform: translate(var(--start-x), var(--start-y)) scale(1); opacity: 1; }
+  40%  { transform: translate(
+           calc((var(--start-x) + var(--end-x)) / 2),
+           calc(var(--start-y) - 12px)
+         ) scale(1.15); opacity: 1; }
+  100% { transform: translate(var(--end-x), var(--end-y)) scale(1); opacity: 0; }
+}
+.zt-product-to-visitor { animation: zt-product-to-visitor 1s ease-in-out forwards; }
+
+/* Animal enclosure idle — gentle scale pulse */
+@keyframes zt-animal-idle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+.zt-animal-idle { animation: zt-animal-idle 4s ease-in-out infinite; }
+
+/* Restock drop into shop (park version) */
+@keyframes zt-restock-drop-park {
+  0%   { transform: translateY(-50px) scale(1.3); opacity: 0; }
+  20%  { transform: translateY(-30px) scale(1.2); opacity: 1; }
+  60%  { transform: translateY(0) scale(1); opacity: 1; }
+  75%  { transform: translateY(-6px) scale(1.05); opacity: 1; }
+  90%  { transform: translateY(0) scale(0.95); opacity: 0.7; }
+  100% { transform: translateY(0) scale(0); opacity: 0; }
+}
+.zt-restock-drop-park { animation: zt-restock-drop-park 1.2s ease-in forwards; }
 
 /* Balance flashes gold on purchase */
 @keyframes zt-balance-flash {
@@ -229,6 +279,17 @@
   animation: zt-shop-bounce 0.8s ease-in-out;
 }
 
+/* Shop gold shine on purchase (no movement) */
+@keyframes zt-shop-shine {
+  0%   { filter: drop-shadow(0 0 0 transparent); }
+  30%  { filter: drop-shadow(0 0 8px rgba(255,215,0,0.9)) drop-shadow(0 0 16px rgba(255,215,0,0.4)); }
+  70%  { filter: drop-shadow(0 0 5px rgba(255,215,0,0.5)); }
+  100% { filter: drop-shadow(0 0 0 transparent); }
+}
+.zt-shop-shine {
+  animation: zt-shop-shine 0.8s ease-in-out;
+}
+
 /* Protocol step text fade-in + slide up */
 @keyframes zt-step-fade {
   0%   { opacity: 0; transform: translateY(4px); }
@@ -238,29 +299,6 @@
   animation: zt-step-fade 0.3s ease-out;
 }
 
-/* Restock: product emoji drops from above into the shop */
-@keyframes zt-restock-drop {
-  0%   { transform: translateY(-60px) scale(1.3); opacity: 0; }
-  20%  { transform: translateY(-40px) scale(1.2); opacity: 1; }
-  60%  { transform: translateY(0) scale(1); opacity: 1; }
-  75%  { transform: translateY(-8px) scale(1.05); opacity: 1; }
-  90%  { transform: translateY(0) scale(0.95); opacity: 0.8; }
-  100% { transform: translateY(0) scale(0); opacity: 0; }
-}
-.zt-restock-drop {
-  animation: zt-restock-drop 1.2s ease-in forwards;
-}
-
-/* Shop absorbs the restocked item — pulse inward */
-@keyframes zt-shop-absorb {
-  0%, 100% { transform: scale(1); }
-  40%      { transform: scale(0.85); }
-  60%      { transform: scale(1.2); }
-  80%      { transform: scale(1.05); }
-}
-.zt-shop-absorb {
-  animation: zt-shop-absorb 0.8s ease-in-out 0.7s;
-}
 
 /* ── Blockchain Explorer: Sidebar slide-in ── */
 @keyframes zt-sidebar-enter {
@@ -318,12 +356,12 @@
 .zt-terminal {
   background: rgba(10, 20, 8, 0.85);
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.8;
   min-height: 200px;
   max-height: 300px;
   overflow-y: auto;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 2px solid;
   border-color: #0e1a08 #4a6a38 #4a6a38 #0e1a08;
   box-shadow: inset 1px 1px 3px rgba(0,0,0,0.5);
@@ -360,7 +398,7 @@
 .zt-terminal-header {
   color: var(--zt-tan);
   text-transform: uppercase;
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 1px;
   border-bottom: 1px solid rgba(212, 184, 122, 0.2);
   padding-bottom: 4px;
@@ -401,3 +439,21 @@
   background-position: -8px 0;
   height: 16px;
 }
+
+/* ── Agent Card Glows ── */
+.zt-card-glow-gold {
+  box-shadow: 0 0 12px rgba(255,215,0,0.3), inset 0 0 4px rgba(255,215,0,0.1);
+  outline: 2px solid var(--zt-gold);
+  outline-offset: -2px;
+}
+
+@keyframes zt-purchasing-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(52,211,153,0.2); outline-color: rgba(52,211,153,0.6); }
+  50%      { box-shadow: 0 0 16px rgba(52,211,153,0.5); outline-color: rgba(52,211,153,1); }
+}
+.zt-card-glow-purchasing {
+  outline: 2px solid rgba(52,211,153,0.6);
+  outline-offset: -2px;
+  animation: zt-purchasing-pulse 1.5s ease-in-out infinite;
+}
+

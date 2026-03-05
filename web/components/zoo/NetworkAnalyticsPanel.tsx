@@ -33,7 +33,7 @@ export default function NetworkAnalyticsPanel({ stats }: NetworkAnalyticsPanelPr
   if (!stats) {
     return (
       <div className="px-3 py-4 text-center">
-        <span className="font-pixel text-[8px] text-gray-500 animate-pulse">
+        <span className="font-pixel text-[11px] text-gray-500 animate-pulse">
           Connecting to network...
         </span>
       </div>
@@ -41,23 +41,23 @@ export default function NetworkAnalyticsPanel({ stats }: NetworkAnalyticsPanelPr
   }
 
   return (
-    <div className="space-y-3 px-3 py-3">
+    <div className="space-y-4 px-4 py-4">
       {/* Chain info */}
-      <div className="zt-inset px-3 py-2" style={{ background: "rgba(0,0,0,0.3)" }}>
-        <div className="font-pixel text-[7px] text-gray-400 mb-1">CHAIN</div>
-        <div className="font-pixel text-[9px] text-[var(--zt-tan)]">
+      <div className="zt-inset px-4 py-3" style={{ background: "rgba(0,0,0,0.3)" }}>
+        <div className="font-pixel text-[10px] text-gray-400 mb-1">CHAIN</div>
+        <div className="font-pixel text-[13px] text-[var(--zt-tan)]">
           {stats.chain_name}
         </div>
-        <div className="font-pixel text-[7px] text-gray-500 mt-0.5">
+        <div className="font-pixel text-[10px] text-gray-500 mt-0.5">
           ID: {stats.chain_id}
         </div>
       </div>
 
       {/* Block height */}
       <div className="flex items-center justify-between">
-        <span className="font-pixel text-[7px] text-gray-400">BLOCK</span>
+        <span className="font-pixel text-[10px] text-gray-400">BLOCK</span>
         <span
-          className={`font-pixel text-[10px] text-[var(--zt-gold)] transition-all ${
+          className={`font-pixel text-[14px] text-[var(--zt-gold)] transition-all ${
             blockFlash ? "zt-block-flash scale-110" : ""
           }`}
         >
@@ -67,21 +67,21 @@ export default function NetworkAnalyticsPanel({ stats }: NetworkAnalyticsPanelPr
 
       {/* Gas price */}
       <div className="flex items-center justify-between">
-        <span className="font-pixel text-[7px] text-gray-400">GAS PRICE</span>
-        <span className="font-pixel text-[9px] text-[var(--zt-tan)]">
+        <span className="font-pixel text-[10px] text-gray-400">GAS PRICE</span>
+        <span className="font-pixel text-[13px] text-[var(--zt-tan)]">
           {stats.gas_price_gwei} Gwei
         </span>
       </div>
 
       {/* RPC Latency */}
       <div className="flex items-center justify-between">
-        <span className="font-pixel text-[7px] text-gray-400">RPC LATENCY</span>
-        <div className="flex items-center gap-1.5">
-          <span className={`inline-block w-2 h-2 ${latencyColor(stats.rpc_latency_ms)}`} />
-          <span className="font-pixel text-[9px] text-[var(--zt-tan)]">
+        <span className="font-pixel text-[10px] text-gray-400">RPC LATENCY</span>
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2.5 h-2.5 ${latencyColor(stats.rpc_latency_ms)}`} />
+          <span className="font-pixel text-[13px] text-[var(--zt-tan)]">
             {stats.rpc_latency_ms}ms
           </span>
-          <span className="font-pixel text-[7px] text-gray-500">
+          <span className="font-pixel text-[10px] text-gray-500">
             {latencyLabel(stats.rpc_latency_ms)}
           </span>
         </div>
@@ -92,15 +92,15 @@ export default function NetworkAnalyticsPanel({ stats }: NetworkAnalyticsPanelPr
 
       {/* Zoo TX stats */}
       <div className="flex items-center justify-between">
-        <span className="font-pixel text-[7px] text-gray-400">ZOO TX COUNT</span>
-        <span className="font-pixel text-[10px] text-[var(--zt-gold)]">
+        <span className="font-pixel text-[10px] text-gray-400">ZOO TX COUNT</span>
+        <span className="font-pixel text-[14px] text-[var(--zt-gold)]">
           {stats.zoo_tx_count}
         </span>
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="font-pixel text-[7px] text-gray-400">THROUGHPUT</span>
-        <span className="font-pixel text-[9px] text-[var(--zt-tan)]">
+        <span className="font-pixel text-[10px] text-gray-400">THROUGHPUT</span>
+        <span className="font-pixel text-[13px] text-[var(--zt-tan)]">
           {stats.zoo_tx_throughput_per_min} tx/min
         </span>
       </div>

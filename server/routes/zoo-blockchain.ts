@@ -95,7 +95,8 @@ zooBlockchainRoutes.get("/network/token-info", async (c) => {
 // GET /network/wallets
 zooBlockchainRoutes.get("/network/wallets", async (c) => {
   try {
-    await refreshZooBalances();
+    // Refresh in background — serve from in-memory cache immediately
+    refreshZooBalances().catch(() => {});
     const zooAccounts = getAllZooAccounts();
     const wallets: WalletInfo[] = [];
 
@@ -114,7 +115,7 @@ zooBlockchainRoutes.get("/network/wallets", async (c) => {
       let role = 'unknown';
       if (account.label === 'Zoo Master') role = 'facilitator';
       else if (account.label.startsWith('Merchant')) role = 'merchant';
-      else if (account.label.startsWith('Attendee')) role = 'agent';
+      else if (account.label.startsWith('Guest')) role = 'agent';
 
       wallets.push({
         role,

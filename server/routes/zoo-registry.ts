@@ -5,6 +5,8 @@ import { config } from "../config.js";
 import { publicClient } from "../tempo-client.js";
 import type { PreflightCheck, PreflightResult } from "../../shared/types.js";
 import { loadZooRegistry, getAgentRunner, refreshZooBalances } from "./zoo-shared.js";
+import { broadcast } from "../instrumented-client.js";
+import { accountStore } from "../accounts.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 import { createRateLimit } from "../middleware/rate-limit.js";
 
@@ -53,6 +55,8 @@ zooRegistryRoutes.post("/preflight", requireAdmin, createRateLimit(10, 60_000), 
     // Initialize wallets first (requires blockchain + runner)
     if (runner && check("blockchain").status === "pass") {
       await runner.initializeWallets();
+      // Broadcast funded accounts so the UI wallet panel can render immediately
+      broadcast({ type: "accounts", accounts: accountStore.toPublic() });
     } else if (!runner) {
       throw new Error("Agent runner not initialized");
     } else {
