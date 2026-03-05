@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, ZooLLMDecision, ZooPriceAdjustment } from "../../lib/types";
 import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
-import MerchantBrainTerminal from "./MerchantBrainTerminal";
+import { MerchantLlmTerminal, MerchantAcpTerminal } from "./MerchantBrainTerminal";
 import ReceiptViewer from "./ReceiptViewer";
 
 interface MerchantPanelProps {
@@ -162,8 +162,8 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
   const inventory = merchantState?.inventory ?? [];
 
   return (
-    <div className="h-full flex flex-col p-2 overflow-y-auto">
-      <div className="zt-bevel overflow-hidden flex flex-col">
+    <div className="h-full flex flex-col p-2">
+      <div className="zt-bevel overflow-hidden flex flex-col h-full">
         {/* Title bar */}
         <div className="zt-titlebar flex items-center justify-between shrink-0">
           <span>🏪 ZOO GIFT SHOP</span>
@@ -173,37 +173,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
         </div>
 
         {/* Body */}
-        <div className="bg-[var(--zt-green-dark)] px-3 py-2 space-y-2 flex-1 min-h-0 overflow-y-auto">
-          {/* Wallet + Financials */}
-          <div className="flex items-center justify-between">
-            <div className="font-pixel text-[9px] text-gray-500">
-              Merchant Wallet:{" "}
-              {merchant ? (
-                <a
-                  href={`${EXPLORER_URL}/address/${merchant.address}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline cursor-pointer transition-colors"
-                >
-                  {shortAddr(merchant.address)}
-                </a>
-              ) : (
-                <span className="text-gray-600">...</span>
-              )}
-            </div>
-            {merchantState && (
-              <div className="flex gap-3 font-pixel text-[9px]">
-                <span className="text-green-400">Rev: ${merchantState.total_revenue}</span>
-                <span className="text-red-400">Cost: ${merchantState.total_cost}</span>
-                <span className={`${parseFloat(merchantState.profit) >= 0 ? 'text-[var(--zt-gold)]' : 'text-red-500'}`}>
-                  Profit: ${merchantState.profit}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Animation area */}
-          <div className="relative">
+        <div className="bg-[var(--zt-green-dark)] px-3 py-2 flex flex-col flex-1 min-h-0">
+          {/* Animation area — shrink-0 */}
+          <div className="relative shrink-0">
             <div className="relative h-16 flex items-center justify-between px-4 overflow-hidden">
               {/* Guest side */}
               <div className="z-10 flex flex-col items-center">
@@ -249,9 +221,9 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             </div>
           </div>
 
-          {/* Inventory catalog */}
+          {/* Inventory catalog — shrink-0 */}
           {inventory.length > 0 && (
-            <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-1.5 space-y-0.5">
+            <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-1.5 space-y-0.5 shrink-0">
               <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider mb-0.5">Catalog</div>
               {inventory.map((item) => {
                 const price = parseFloat(item.price);
@@ -268,8 +240,8 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
                     <span className={`w-12 text-right ${isFlashing ? "zt-price-flash" : "text-[var(--zt-gold)]"}`}>
                       ${price.toFixed(2)}
                     </span>
-                    <span className={`w-10 text-right ${pctColor}`} style={{ fontSize: "7px" }}>
-                      {pctDiff !== 0 ? `${pctSign}${pctDiff.toFixed(0)}%` : "—"}
+                    <span className={`w-16 text-right whitespace-nowrap ${pctColor}`} style={{ fontSize: "7px" }}>
+                      {pctDiff !== 0 ? `${pctSign}${pctDiff.toFixed(0)}% net` : "—"}
                     </span>
                     <StockBar stock={item.stock} maxStock={item.max_stock} />
                     <span className={`w-5 text-right ${
@@ -285,17 +257,51 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             </div>
           )}
 
-          {/* Merchant Brain Terminal */}
-          <MerchantBrainTerminal
-            decision={merchantDecision}
-            priceAdjustments={priceAdjustments}
-            restockEvents={restockEvents}
-            simulationComplete={simulationComplete}
-            merchantState={merchantState}
-          />
+          {/* Wallet + Financials — shrink-0 */}
+          <div className="flex items-center justify-between shrink-0 mt-2">
+            <div className="font-pixel text-[9px] text-gray-500">
+              Merchant Wallet:{" "}
+              {merchant ? (
+                <a
+                  href={`${EXPLORER_URL}/address/${merchant.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline cursor-pointer transition-colors"
+                >
+                  {shortAddr(merchant.address)}
+                </a>
+              ) : (
+                <span className="text-gray-600">...</span>
+              )}
+            </div>
+            {merchantState && (
+              <div className="flex gap-3 font-pixel text-[9px]">
+                <span className="text-green-400">Rev: ${merchantState.total_revenue}</span>
+                <span className="text-red-400">Cost: ${merchantState.total_cost}</span>
+                <span className={`${parseFloat(merchantState.profit) >= 0 ? 'text-[var(--zt-gold)]' : 'text-red-500'}`}>
+                  Profit: ${merchantState.profit}
+                </span>
+              </div>
+            )}
+          </div>
 
-          {/* Purchase History Table */}
-          <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-2">
+          {/* Terminal section — flex-1, fills remaining space */}
+          <div className="flex-1 flex flex-col min-h-0 mt-2 gap-1">
+            <MerchantLlmTerminal
+              decision={merchantDecision}
+              simulationComplete={simulationComplete}
+              merchantState={merchantState}
+            />
+            <MerchantAcpTerminal
+              decision={merchantDecision}
+              priceAdjustments={priceAdjustments}
+              restockEvents={restockEvents}
+              simulationComplete={simulationComplete}
+            />
+          </div>
+
+          {/* Purchase History — shrink-0, below terminals */}
+          <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-2 shrink-0">
             <div className="flex items-center justify-between mb-1">
               <span className="font-pixel text-[7px] text-[var(--zt-tan)] uppercase tracking-widest">
                 🧾 Purchase History
