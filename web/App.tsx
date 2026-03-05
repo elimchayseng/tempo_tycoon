@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useZoo } from "./hooks/useZoo";
 import { ApiService } from "./services/api";
@@ -7,7 +7,7 @@ import ZooHeader from "./components/zoo/ZooHeader";
 import PreflightPanel from "./components/zoo/PreflightPanel";
 import MerchantPanel from "./components/zoo/MerchantPanel";
 import AgentColumn from "./components/zoo/AgentColumn";
-import AnimatedRail from "./components/zoo/AnimatedRail";
+
 import ZooFooter from "./components/zoo/ZooFooter";
 import BlockchainExplorer from "./components/zoo/BlockchainExplorer";
 
@@ -41,10 +41,6 @@ export default function App() {
   } = useZoo();
 
   const explorer = useBlockchainExplorer(networkStats, txFlowEvents, balanceUpdates, accounts.length);
-
-  // Refs for rail positioning
-  const containerRef = useRef<HTMLDivElement>(null);
-  const agentColumnRef = useRef<HTMLDivElement>(null);
 
   // Transition to "complete" when simulation depletes
   useEffect(() => {
@@ -142,7 +138,6 @@ export default function App() {
           <>
             {/* Left: Agents (~22%) */}
             <div
-              ref={agentColumnRef}
               className="w-[22%] min-w-[240px] border-r border-[var(--zt-border-dark)] flex flex-col min-h-0"
             >
               {/* Simulation complete banner (thin) */}
@@ -161,8 +156,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Center: Merchant (~45%) with rail overlay */}
-            <div ref={containerRef} className="flex-1 min-w-0 relative border-r border-[var(--zt-border-dark)] flex flex-col min-h-0">
+            {/* Center: Merchant (~45%) */}
+            <div className="flex-1 min-w-0 relative border-r border-[var(--zt-border-dark)] flex flex-col min-h-0">
               {/* Completion banner */}
               {phase === "complete" && (
                 <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-3 py-2 shrink-0">
@@ -180,17 +175,10 @@ export default function App() {
                 </div>
               )}
 
-              {/* Rail overlay */}
-              <AnimatedRail
-                agents={zooAgents}
-                latestReceipt={receipts[0] ?? null}
-                containerRef={containerRef}
-                agentColumnRef={agentColumnRef}
-              />
-
               <div className="flex-1 min-h-0 overflow-hidden">
                 <MerchantPanel
                   merchant={merchant}
+                  agents={zooAgents}
                   latestReceipt={receipts[0] ?? null}
                   merchantState={merchantState}
                   restockEvents={restockEvents}

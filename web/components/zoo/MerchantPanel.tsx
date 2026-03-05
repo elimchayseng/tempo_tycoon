@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, ZooLLMDecision, ZooPriceAdjustment } from "../../lib/types";
+import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, ZooLLMDecision, ZooPriceAdjustment, ZooAgentState } from "../../lib/types";
 import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
 import { MerchantLlmTerminal, MerchantAcpTerminal } from "./MerchantBrainTerminal";
 import ReceiptViewer from "./ReceiptViewer";
+import ZooParkView from "./ZooParkView";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
+  agents: ZooAgentState[];
   latestReceipt: ZooPurchaseReceipt | null;
   merchantState: ZooMerchantState | null;
   restockEvents: ZooRestockEvent[];
@@ -15,18 +17,6 @@ interface MerchantPanelProps {
   receipts: ZooPurchaseReceipt[];
 }
 
-interface AnimState {
-  guestEmoji: string;
-  guestAddr: string;
-  productEm: string;
-  amount: string;
-  txHash: string;
-}
-
-interface RestockAnimState {
-  productEm: string;
-  key: string;
-}
 
 const ALPHA_USD = "0x20c0000000000000000000000000000000000001";
 const EXPLORER_URL = "https://explore.moderato.tempo.xyz";
@@ -49,95 +39,34 @@ function StockBar({ stock, maxStock }: { stock: number; maxStock: number }) {
   return <div className="flex gap-0.5">{cells}</div>;
 }
 
-export default function MerchantPanel({ merchant, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments, simulationComplete, receipts }: MerchantPanelProps) {
+export default function MerchantPanel({ merchant, agents, latestReceipt, merchantState, restockEvents, merchantDecision, priceAdjustments, simulationComplete, receipts }: MerchantPanelProps) {
   const lastTxRef = useRef<string | null>(null);
-  const lastRestockRef = useRef<string | null>(null);
-  const [anim, setAnim] = useState<AnimState | null>(null);
-  const [restockAnim, setRestockAnim] = useState<RestockAnimState | null>(null);
   const [balanceFlash, setBalanceFlash] = useState(false);
   const [flashingSkus, setFlashingSkus] = useState<Set<string>>(new Set());
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPriceAdjRef = useRef<number>(0);
-  const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const restockTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const balanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Receipt viewer modal state
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
 
-  // Purchase animation
+  // Balance flash on purchase
   useEffect(() => {
     if (!latestReceipt) {
-      stepTimersRef.current.forEach(clearTimeout);
-      stepTimersRef.current = [];
-      setAnim(null);
       setBalanceFlash(false);
       lastTxRef.current = null;
       return;
     }
     if (latestReceipt.tx_hash === lastTxRef.current) return;
-
     lastTxRef.current = latestReceipt.tx_hash;
-
-    const guestEmoji = ANIMAL_EMOJI[latestReceipt.agent_id] ?? "🧑";
-    const guestAddr = latestReceipt.agent_address ? shortAddr(latestReceipt.agent_address) : latestReceipt.agent_id;
-    const { emojis: cartEmojis } = cartDisplayInfo(latestReceipt.items);
-
-    setAnim({
-      guestEmoji,
-      guestAddr,
-      productEm: cartEmojis,
-      amount: latestReceipt.amount,
-      txHash: latestReceipt.tx_hash,
-    });
     setBalanceFlash(true);
-
-    stepTimersRef.current.forEach(clearTimeout);
-    stepTimersRef.current = [];
-
-    const timer = setTimeout(() => {
-      setAnim(null);
-      setBalanceFlash(false);
-    }, 5000);
-    stepTimersRef.current.push(timer);
-
+    if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
+    balanceTimerRef.current = setTimeout(() => setBalanceFlash(false), 2500);
     return () => {
-      stepTimersRef.current.forEach(clearTimeout);
-      stepTimersRef.current = [];
-      setAnim(null);
-      setBalanceFlash(false);
+      if (balanceTimerRef.current) clearTimeout(balanceTimerRef.current);
     };
   }, [latestReceipt]);
-
-  // Restock animation
-  useEffect(() => {
-    const latestRestock = restockEvents[0];
-    if (!latestRestock) {
-      restockTimersRef.current.forEach(clearTimeout);
-      restockTimersRef.current = [];
-      setRestockAnim(null);
-      lastRestockRef.current = null;
-      return;
-    }
-    if (latestRestock.tx_hash === lastRestockRef.current) return;
-
-    lastRestockRef.current = latestRestock.tx_hash;
-    const prodEm = productEmoji(latestRestock.name);
-
-    setRestockAnim({ productEm: prodEm, key: latestRestock.tx_hash });
-
-    restockTimersRef.current.forEach(clearTimeout);
-    restockTimersRef.current = [];
-
-    const animTimer = setTimeout(() => setRestockAnim(null), 1500);
-    restockTimersRef.current.push(animTimer);
-
-    return () => {
-      restockTimersRef.current.forEach(clearTimeout);
-      restockTimersRef.current = [];
-      setRestockAnim(null);
-    };
-  }, [restockEvents]);
 
   // Price flash animation
   useEffect(() => {
@@ -174,52 +103,13 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
 
         {/* Body */}
         <div className="bg-[var(--zt-green-dark)] px-3 py-2 flex flex-col flex-1 min-h-0">
-          {/* Animation area — shrink-0 */}
-          <div className="relative shrink-0">
-            <div className="relative h-16 flex items-center justify-between px-4 overflow-hidden">
-              {/* Guest side */}
-              <div className="z-10 flex flex-col items-center">
-                <span className="text-3xl">{anim ? anim.guestEmoji : "🦁"}</span>
-                {anim && (
-                  <span className="font-pixel text-[8px] text-[var(--zt-tan)] whitespace-nowrap mt-0.5">
-                    {anim.guestAddr}
-                  </span>
-                )}
-              </div>
-
-              {/* Animated coin */}
-              {anim && (
-                <div key={`coin-${anim.txHash}`} className="zt-coin-fly absolute left-12 text-sm whitespace-nowrap">
-                  💸 <span className="text-base">${anim.amount}</span>
-                </div>
-              )}
-
-              {/* Animated product */}
-              {anim && (
-                <div key={`item-${anim.txHash}`} className="zt-item-fly absolute right-12 text-lg">
-                  {anim.productEm}
-                </div>
-              )}
-
-              {/* Shop side */}
-              <div className="relative z-10">
-                {restockAnim && (
-                  <div
-                    key={`restock-${restockAnim.key}`}
-                    className="zt-restock-drop absolute -top-2 left-1/2 -translate-x-1/2 text-xl pointer-events-none"
-                  >
-                    {restockAnim.productEm}
-                  </div>
-                )}
-                <div
-                  className={`text-3xl ${anim ? "zt-shop-bounce" : ""} ${restockAnim ? "zt-shop-absorb" : ""}`}
-                  key={anim ? `shop-${anim.txHash}` : restockAnim ? `shop-restock-${restockAnim.key}` : "shop-idle"}
-                >
-                  🏪
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Zoo Park View */}
+          <ZooParkView
+            agents={agents}
+            latestReceipt={latestReceipt}
+            merchantState={merchantState}
+            restockEvents={restockEvents}
+          />
 
           {/* Inventory catalog — shrink-0 */}
           {inventory.length > 0 && (
@@ -285,7 +175,7 @@ export default function MerchantPanel({ merchant, latestReceipt, merchantState, 
             )}
           </div>
 
-          {/* Terminal section — flex-1, fills remaining space */}
+          {/* Terminal section — compact, fills remaining space */}
           <div className="flex-1 flex flex-col min-h-0 mt-2 gap-1">
             <MerchantLlmTerminal
               decision={merchantDecision}

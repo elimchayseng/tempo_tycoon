@@ -75,7 +75,7 @@ function LlmTerminal({
 
   if (simulationComplete) {
     return (
-      <div className="flex flex-col min-h-0 flex-[6]">
+      <div className="flex flex-col min-h-0 flex-[4]">
         <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
           🧠 LLM RESPONSE — {emoji} {agentId}
         </div>
@@ -96,7 +96,7 @@ function LlmTerminal({
 
   if (!decision) {
     return (
-      <div className="flex flex-col min-h-0 flex-[6]">
+      <div className="flex flex-col min-h-0 flex-[4]">
         <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
           🧠 LLM RESPONSE — {emoji} {agentId}
         </div>
@@ -110,7 +110,7 @@ function LlmTerminal({
   }
 
   return (
-    <div className="flex flex-col min-h-0 flex-[6]">
+    <div className="flex flex-col min-h-0 flex-[4]">
       <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
         🧠 LLM RESPONSE — {emoji} {agentId}
       </div>
@@ -218,7 +218,7 @@ function AcpTerminal({
   const label = formatGuestLabel(agentId);
 
   return (
-    <div className="flex flex-col min-h-0 flex-[4]">
+    <div className="flex flex-col min-h-0 flex-[3]">
       <div className="bg-[var(--zt-green-mid)] px-2 py-1 font-pixel text-[9px] text-white shrink-0">
         ⛓️ ACP PROTOCOL — {emoji} {agentId}
       </div>
