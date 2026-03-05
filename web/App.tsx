@@ -135,10 +135,10 @@ export default function App() {
 
         {/* 3-column Mission Control layout (running/complete) */}
         {showDashboard && (
-          <>
+          <div className="flex-1 flex min-h-0 h-full overflow-x-auto snap-x snap-mandatory hide-scrollbar lg:overflow-visible lg:snap-none">
             {/* Left: Agents (~22%) */}
             <div
-              className="w-[22%] min-w-[240px] border-r border-[var(--zt-border-dark)] flex flex-col min-h-0"
+              className="min-w-full w-full h-full shrink-0 snap-start lg:min-w-0 lg:w-[22%] lg:shrink lg:snap-align-none border-r border-[var(--zt-border-dark)] flex flex-col min-h-0"
             >
               {/* Simulation complete banner (thin) */}
               {phase === "complete" && (
@@ -157,7 +157,7 @@ export default function App() {
             </div>
 
             {/* Center: Merchant (~45%) */}
-            <div className="flex-1 min-w-0 relative border-r border-[var(--zt-border-dark)] flex flex-col min-h-0">
+            <div className="min-w-full w-full h-full shrink-0 snap-start lg:min-w-0 lg:w-auto lg:flex-1 lg:shrink lg:snap-align-none relative border-r border-[var(--zt-border-dark)] flex flex-col min-h-0">
               {/* Completion banner */}
               {phase === "complete" && (
                 <div className="bg-[var(--zt-green-mid)] border-b border-[var(--zt-border-dark)] px-3 py-2 shrink-0">
@@ -191,7 +191,7 @@ export default function App() {
             </div>
 
             {/* Right: Blockchain (~33%) */}
-            <div className="w-[33%] min-w-[280px] flex flex-col min-h-0">
+            <div className="min-w-full w-full h-full shrink-0 snap-start lg:min-w-0 lg:w-[33%] lg:shrink lg:snap-align-none flex flex-col min-h-0">
               <BlockchainExplorer
                 networkStats={explorer.networkStats}
                 txFlowEvents={explorer.txFlowEvents}
@@ -199,7 +199,7 @@ export default function App() {
                 wallets={explorer.wallets}
               />
             </div>
-          </>
+          </div>
         )}
       </div>
 

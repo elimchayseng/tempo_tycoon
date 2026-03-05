@@ -23,18 +23,18 @@ export default function ZooHeader({
   networkStats,
 }: ZooHeaderProps) {
   return (
-    <header className="zt-statusbar flex items-center justify-between px-5 py-2.5 shrink-0">
-      <div className="flex items-center gap-3">
-        <h1 className="font-pixel text-sm text-white" style={{ textShadow: "2px 2px 0 rgba(0,0,0,0.5)" }}>
+    <header className="zt-statusbar flex items-center justify-between px-3 lg:px-5 py-2.5 shrink-0 gap-2">
+      <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+        <h1 className="font-pixel text-xs lg:text-sm text-white whitespace-nowrap" style={{ textShadow: "2px 2px 0 rgba(0,0,0,0.5)" }}>
           <span className="text-[var(--zt-gold)]">Tempo</span>{" "}
           <span>Tycoon</span>
         </h1>
-        <span className="font-pixel text-[7px] text-[var(--zt-tan)] opacity-70">
+        <span className="font-pixel text-[7px] text-[var(--zt-tan)] opacity-70 hidden lg:inline">
           Moderato
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 lg:gap-3 flex-wrap justify-end">
         {error && (
           <span className="font-pixel text-[7px] text-red-400 max-w-60 truncate">{error}</span>
         )}
@@ -100,7 +100,7 @@ export default function ZooHeader({
 
         {/* Block height indicator */}
         {networkStats && (
-          <div className="zt-inset px-2 py-1 flex items-center gap-1" style={{ background: "rgba(0,0,0,0.3)" }}>
+          <div className="zt-inset px-2 py-1 hidden lg:flex items-center gap-1" style={{ background: "rgba(0,0,0,0.3)" }}>
             <span className="font-pixel text-[7px] text-gray-400">BLK</span>
             <span className="font-pixel text-[8px] text-[var(--zt-gold)]">
               #{networkStats.latest_block.toLocaleString()}
