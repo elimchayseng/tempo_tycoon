@@ -483,6 +483,21 @@
   overflow: hidden;
 }
 
+/* ── Mobile drawer ── */
+.zt-mobile-drawer {
+  animation: zt-drawer-up 0.25s ease-out;
+}
+@keyframes zt-drawer-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Mobile: toolbar buttons fill width evenly */
+@media (max-width: 639px) {
+  .zt-tool-btn { flex: 1; min-width: 0; }
+  .zt-tool-label { font-size: 5px; }
+}
+
 /* Title bar — wood-grain gradient, draggable */
 .zt-win-titlebar {
   background:
@@ -594,6 +609,7 @@
   justify-content: space-between;
   padding: 4px 10px;
   gap: 6px;
+  flex-shrink: 0;
   /* Stone/concrete base */
   background:
     repeating-linear-gradient(
