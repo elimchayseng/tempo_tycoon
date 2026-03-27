@@ -161,7 +161,17 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 | `agents/state-manager.ts` | Persistent agent state (file-based) |
 | `shared/logger.ts` | Structured logger with `LOG_LEVEL` support |
 | `shared/types.ts` | Shared TypeScript types for frontend + backend |
-| `web/` | React dashboard with Zoo Tycoon (2001) game-inspired UI |
+| `web/App.tsx` | Main dashboard — floating window state, simulation lifecycle, results overlay |
+| `web/FloatingWindow.tsx` | Draggable window with Zoo Tycoon wood-grain title bar |
+| `web/MobileDrawer.tsx` | Bottom-drawer panel for mobile (single panel at a time) |
+| `web/ZooToolbar.tsx` | Bottom toolbar with panel toggles, connection status, balance readout |
+| `web/ZooParkView.tsx` | Fullscreen animated zoo park canvas (visitors, shop, animations) |
+| `web/ZooHeader.tsx` | Top header bar with simulation title |
+| `web/MerchantPanel.tsx` | Shop inventory and purchase history panel |
+| `web/BlockchainExplorer.tsx` | Network stats, transaction flow, wallet balances |
+| `web/TransactionFlowViz.tsx` | Segmented progress bar for transaction stages |
+| `web/PreflightPanel.tsx` | Wallet funding and preflight check display |
+| `web/useIsMobile.ts` | Responsive hook (breakpoint at 640px) |
 
 ## Data Flow
 
