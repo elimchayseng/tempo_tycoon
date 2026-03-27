@@ -258,7 +258,7 @@ export default function PreflightPanel({
         <p className="font-pixel text-[7px] text-red-600 mb-4">{error}</p>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-3">
         {allPassed && phase === "ready" && (
           <button onClick={onOpenGates} className="zt-btn-brown">
             Open Gates
@@ -269,6 +269,14 @@ export default function PreflightPanel({
             Retry
           </button>
         )}
+        <a
+          href="https://github.com/elimchayseng/tempo_tycoon"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-pixel text-[7px] text-gray-500 hover:text-[var(--zt-gold)] transition-colors"
+        >
+          GitHub Source
+        </a>
       </div>
     </div>
   );
