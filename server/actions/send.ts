@@ -142,15 +142,13 @@ export async function transferAlphaUsdAction(params: {
     indent: 1,
   });
 
-  // Use feePayer: sender (self-sponsorship) to ensure Tempo transaction type (0x76).
-  // This keeps all transactions in the same format, which is required for
-  // compatibility with subsequent sponsored sends on the same account.
+  // Tempo auto-detects the transaction type and fee token from the chain config
+  // and the TIP-20 token being transferred. No need to set feePayer for self-pay.
   const result = await Actions.token.transferSync(walletClient, {
     token: ALPHA_USD,
     to: recipientAcct.address,
     amount: rawAmount,
     memo: memoHex as `0x${string}`,
-    feePayer: senderViemAccount,
   } as any);
 
   emitLog({

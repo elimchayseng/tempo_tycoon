@@ -32,7 +32,6 @@ async function fundWallet(
       to: toAccount.address,
       amount: parseAlphaUsd(amount),
       memo: `0x${Buffer.from(`Zoo funding: ${walletName}`).toString('hex')}` as `0x${string}`,
-      feePayer: fromAccount,
     } as any);
 
     console.log(`✓ ${walletName}: ${result.receipt.transactionHash}`);

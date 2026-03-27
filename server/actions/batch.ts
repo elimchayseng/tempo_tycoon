@@ -180,7 +180,6 @@ export async function batchAction(params: {
       to: payment.recipientAcct.address,
       amount: payment.rawAmount,
       memo: payment.memoHex as `0x${string}`,
-      feePayer: senderViemAccount,
     } as any);
 
     results.push(result);
