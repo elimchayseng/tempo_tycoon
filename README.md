@@ -39,7 +39,7 @@ The system has four main layers:
 - **Server** — Hono API server with WebSocket push, merchant registry, and checkout endpoints
 - **Agents** — Three autonomous buyer agents with need-decay loops and a merchant agent managing inventory
 - **Blockchain** — All payments via `viem` on Tempo Moderato Testnet (chain 42431, AlphaUSD stablecoin)
-- **Dashboard** — React 19 real-time UI showing agent state, transaction flow, and merchant inventory
+- **Dashboard** — React 19 real-time UI with draggable floating windows (desktop) and bottom drawer (mobile), Zoo Tycoon-inspired theme
 
 See [docs/architecture.md](docs/architecture.md) for the full system design and data flow.
 

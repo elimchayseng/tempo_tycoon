@@ -42,6 +42,12 @@ agents/           Autonomous buyer agents
   payment-manager.ts   Blockchain tx execution + queue
 shared/           Shared utilities (logger, types, validation)
 web/              React dashboard (Zoo Tycoon UI theme)
+  App.tsx         Main layout — floating windows + simulation state
+  FloatingWindow.tsx  Draggable window component
+  MobileDrawer.tsx    Bottom drawer for mobile
+  ZooToolbar.tsx      Panel toggles + status bar
+  ZooParkView.tsx     Animated zoo park canvas
+  useIsMobile.ts      Responsive breakpoint hook
 config/           zoo_map.json merchant registry
 scripts/          Test and health check scripts
 docs/             Documentation
