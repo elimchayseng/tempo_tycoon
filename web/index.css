@@ -461,3 +461,251 @@
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   FLOATING WINDOW SYSTEM — Zoo Tycoon-style draggable panels
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Window entrance */
+@keyframes zt-win-enter {
+  0%   { opacity: 0; transform: scale(0.92) translateY(12px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.zt-float-window {
+  border: 3px solid;
+  border-color: #b8a070 #2a1a0e #2a1a0e #b8a070;
+  box-shadow:
+    3px 3px 12px rgba(0,0,0,0.55),
+    inset 1px 1px 0 rgba(255,255,255,0.1);
+  animation: zt-win-enter 0.2s ease-out;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Title bar — wood-grain gradient, draggable */
+.zt-win-titlebar {
+  background:
+    linear-gradient(180deg,
+      #9b7440 0%,
+      #7a5830 30%,
+      #6b4826 60%,
+      #5a3a1e 100%
+    );
+  /* Faux wood grain via repeating stripes */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,0.06) 3px,
+      rgba(0,0,0,0.06) 4px
+    ),
+    linear-gradient(180deg,
+      #9b7440 0%,
+      #7a5830 30%,
+      #6b4826 60%,
+      #5a3a1e 100%
+    );
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+  border-bottom: 2px solid #2a1a0e;
+  min-height: 30px;
+  user-select: none;
+}
+.zt-win-titlebar:active { cursor: grabbing; }
+
+.zt-win-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: #f0e4c8;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Close button — recessed square */
+.zt-win-close {
+  width: 18px;
+  height: 18px;
+  border: 2px solid;
+  border-color: #3a2a18 #a08060 #a08060 #3a2a18;
+  background: linear-gradient(180deg, #8b6a3a 0%, #6b4a2a 100%);
+  color: #f0e4c8;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+.zt-win-close:hover {
+  background: linear-gradient(180deg, #a87a42 0%, #7a5a32 100%);
+  color: #fff;
+}
+.zt-win-close:active {
+  border-color: #a08060 #3a2a18 #3a2a18 #a08060;
+}
+
+/* Window body */
+.zt-win-body {
+  background: var(--zt-green-dark);
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Styled scrollbar for window body */
+.zt-win-body::-webkit-scrollbar { width: 10px; }
+.zt-win-body::-webkit-scrollbar-track {
+  background: #0e1a08;
+  border-left: 1px solid #2a4a1a;
+}
+.zt-win-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6b4a2a 0%, #4a3218 100%);
+  border: 1px solid #8a6a3a;
+  border-radius: 0;
+}
+.zt-win-body::-webkit-scrollbar-thumb:hover { background: #7a5a32; }
+
+/* Scrollbar arrows (up/down) */
+.zt-win-body::-webkit-scrollbar-button:single-button {
+  background: linear-gradient(180deg, #7a5830 0%, #5a3a1e 100%);
+  border: 1px solid;
+  border-color: #a08060 #3a2a18 #3a2a18 #a08060;
+  height: 12px;
+  display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BOTTOM TOOLBAR — Zoo Tycoon-style tool palette
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.zt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  gap: 6px;
+  /* Stone/concrete base */
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 11px,
+      rgba(0,0,0,0.04) 11px,
+      rgba(0,0,0,0.04) 12px
+    ),
+    linear-gradient(180deg,
+      #6a6258 0%,
+      #5a524a 20%,
+      #4a4238 60%,
+      #3a322a 100%
+    );
+  border-top: 3px solid;
+  border-color: #8a8070 #2a221a #2a221a #8a8070;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  min-height: 44px;
+}
+
+/* Tool button — raised square */
+.zt-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 2px solid;
+  border-color: #8a7a60 #2a1e14 #2a1e14 #8a7a60;
+  background: linear-gradient(180deg, #6b5a40 0%, #4a3a28 100%);
+  cursor: pointer;
+  transition: filter 0.08s;
+  min-width: 48px;
+}
+.zt-tool-btn:hover {
+  filter: brightness(1.15);
+}
+.zt-tool-btn:active {
+  border-color: #2a1e14 #8a7a60 #8a7a60 #2a1e14;
+  filter: brightness(0.9);
+}
+
+/* Active (pressed in) state */
+.zt-tool-btn-active {
+  border-color: #2a1e14 #8a7a60 #8a7a60 #2a1e14;
+  background: linear-gradient(180deg, #3a2a18 0%, #5a4a30 100%);
+  box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4);
+}
+.zt-tool-btn-active .zt-tool-label {
+  color: var(--zt-gold);
+}
+
+.zt-tool-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #c0a880;
+  letter-spacing: 0.3px;
+}
+
+/* Toolbar readouts — inset status displays */
+.zt-toolbar-readout {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 2px solid;
+  border-color: #2a221a #6a5a48 #6a5a48 #2a221a;
+  background: rgba(0,0,0,0.35);
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.3);
+}
+.zt-toolbar-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #8a7a60;
+}
+.zt-toolbar-value {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: var(--zt-gold);
+}
+.zt-toolbar-money {
+  background: rgba(0,0,0,0.45);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PARK VIEWPORT — full-screen background
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.zt-park-viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 80%, #2a5a1a 0%, #1a3a12 60%, #0e2808 100%);
+}
+
+/* Section headers inside floating windows */
+.zt-section-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: var(--zt-tan);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid rgba(168, 192, 144, 0.15);
+}
+
+/* Divider inside panels */
+.zt-win-divider {
+  border: none;
+  border-top: 1px dashed rgba(168, 192, 144, 0.2);
+  margin: 6px 0;
+}
+

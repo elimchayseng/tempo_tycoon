@@ -3,7 +3,6 @@ import type { Account, ZooPurchaseReceipt, ZooMerchantState, ZooRestockEvent, Zo
 import { shortAddr, formatAlphaUsdBalance, ANIMAL_EMOJI, formatGuestLabel, productEmoji, cartDisplayInfo } from "../../utils/formatting";
 import { MerchantLlmTerminal, MerchantAcpTerminal } from "./MerchantBrainTerminal";
 import ReceiptViewer from "./ReceiptViewer";
-import ZooParkView from "./ZooParkView";
 
 interface MerchantPanelProps {
   merchant: Account | undefined;
@@ -16,6 +15,8 @@ interface MerchantPanelProps {
   simulationComplete?: boolean;
   receipts: ZooPurchaseReceipt[];
 }
+
+// Re-export for backward compat — ZooParkView is now rendered separately
 
 
 const ALPHA_USD = "0x20c0000000000000000000000000000000000001";
@@ -91,27 +92,17 @@ export default function MerchantPanel({ merchant, agents, latestReceipt, merchan
   const inventory = merchantState?.inventory ?? [];
 
   return (
-    <div className="h-full flex flex-col p-2">
-      <div className="zt-bevel overflow-hidden flex flex-col h-full">
-        {/* Title bar */}
-        <div className="zt-titlebar flex items-center justify-between shrink-0">
-          <span>🏪 ZOO GIFT SHOP</span>
-          <span className={balanceFlash ? "zt-balance-flash" : "text-[var(--zt-gold)]"}>
-            💰 {balance}
-          </span>
-        </div>
+    <div className="flex flex-col">
+      {/* Balance readout */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--zt-green-mid)]">
+        <span className="font-pixel text-[8px] text-[var(--zt-tan)] uppercase">Balance</span>
+        <span className={`font-pixel text-[11px] ${balanceFlash ? "zt-balance-flash" : "text-[var(--zt-gold)]"}`}>
+          {balance}
+        </span>
+      </div>
 
-        {/* Body */}
-        <div className="bg-[var(--zt-green-dark)] px-3 py-2 flex flex-col flex-1 min-h-0">
-          {/* Zoo Park View */}
-          <ZooParkView
-            agents={agents}
-            latestReceipt={latestReceipt}
-            merchantState={merchantState}
-            restockEvents={restockEvents}
-          />
-
-          {/* Inventory catalog — shrink-0 */}
+      <div className="px-3 py-2 flex flex-col">
+          {/* Inventory catalog */}
           {inventory.length > 0 && (
             <div className="border-t border-dashed border-[var(--zt-green-mid)] pt-1.5 space-y-0.5 shrink-0">
               <div className="font-pixel text-[8px] text-gray-500 uppercase tracking-wider mb-0.5">Catalog</div>
@@ -261,7 +252,6 @@ export default function MerchantPanel({ merchant, agents, latestReceipt, merchan
             )}
           </div>
         </div>
-      </div>
 
       {/* Receipt Viewer modal */}
       {viewerOpen && (
@@ -274,3 +264,5 @@ export default function MerchantPanel({ merchant, agents, latestReceipt, merchan
     </div>
   );
 }
+
+export type { MerchantPanelProps };

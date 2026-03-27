@@ -5,14 +5,14 @@ interface TransactionFlowVizProps {
   events: TransactionFlowEvent[];
 }
 
-const STAGES: { stage: TxFlowStage; label: string; icon: string }[] = [
-  { stage: "decision", label: "Decision", icon: "🤖" },
-  { stage: "checkout_created", label: "Checkout", icon: "🤖" },
-  { stage: "signing", label: "Sign Tx", icon: "🔗" },
-  { stage: "broadcast", label: "Broadcast", icon: "🔗" },
-  { stage: "block_inclusion", label: "In Block", icon: "🔗" },
-  { stage: "confirmed", label: "Confirmed", icon: "🔗" },
-  { stage: "merchant_verified", label: "Verified", icon: "🏪" },
+const STAGES: { stage: TxFlowStage; label: string; short: string }[] = [
+  { stage: "decision", label: "Decision", short: "DEC" },
+  { stage: "checkout_created", label: "Checkout", short: "CHK" },
+  { stage: "signing", label: "Sign Tx", short: "SGN" },
+  { stage: "broadcast", label: "Broadcast", short: "BRD" },
+  { stage: "block_inclusion", label: "In Block", short: "BLK" },
+  { stage: "confirmed", label: "Confirmed", short: "CFM" },
+  { stage: "merchant_verified", label: "Verified", short: "VER" },
 ];
 
 function getStageIndex(stage: TxFlowStage): number {
@@ -82,59 +82,65 @@ export default function TransactionFlowViz({ events }: TransactionFlowVizProps) 
         const activeStageIndex = getStageIndex(flow.latestEvent.stage);
 
         return (
-          <div key={flow.agentId} className="zt-inset px-3 py-2.5" style={{ background: "rgba(0,0,0,0.2)" }}>
-            {/* Agent header */}
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-base">{agentEmoji}</span>
-              <span className="font-pixel text-[11px] text-[var(--zt-tan)]">
-                {flow.agentId}
-              </span>
-            </div>
-
-            {/* Compact pipeline */}
-            <div className="flex items-center gap-1 flex-wrap">
-              {STAGES.map((s, i) => {
-                const isCompleted = i < flow.highestStageIndex;
-                const isActive = i === activeStageIndex;
-                const isPending = i > flow.highestStageIndex;
-
-                return (
-                  <div
-                    key={s.stage}
-                    className={`flex items-center gap-0.5 px-1.5 py-1 text-[10px] font-pixel ${
-                      isActive
-                        ? "text-[var(--zt-gold)] zt-tx-pulse"
-                        : isCompleted
-                          ? "text-emerald-400 opacity-80"
-                          : "text-gray-600 opacity-40"
-                    }`}
-                    title={s.label}
-                  >
-                    <span className="text-[11px]">
-                      {isCompleted ? s.icon : isActive ? s.icon : "○"}
-                    </span>
-                    <span className="hidden xl:inline">{s.label}</span>
-                    {i < STAGES.length - 1 && (
-                      <span className={`mx-0.5 ${isCompleted ? "text-emerald-400/40" : "text-gray-600/20"}`}>→</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* TX Hash */}
-            {flow.txHash && (
-              <div className="mt-1.5">
+          <div key={flow.agentId} className="zt-inset px-3 py-2" style={{ background: "rgba(0,0,0,0.2)" }}>
+            {/* Agent header + TX hash */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">{agentEmoji}</span>
+                <span className="font-pixel text-[9px] text-[var(--zt-tan)]">
+                  {flow.agentId}
+                </span>
+              </div>
+              {flow.txHash && (
                 <a
                   href={`${EXPLORER_URL}/tx/${flow.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-[10px] text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                  className="font-mono text-[8px] text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
                 >
-                  tx: {flow.txHash.slice(0, 10)}...{flow.txHash.slice(-4)}
+                  {flow.txHash.slice(0, 8)}..
                 </a>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Pipeline as segmented progress bar */}
+            <div className="flex gap-[2px]">
+              {STAGES.map((s, i) => {
+                const isCompleted = i <= flow.highestStageIndex;
+                const isActive = i === activeStageIndex;
+
+                return (
+                  <div
+                    key={s.stage}
+                    className="flex-1 flex flex-col items-center gap-0.5"
+                    title={s.label}
+                  >
+                    {/* Bar segment */}
+                    <div
+                      className={`w-full h-[6px] transition-all duration-300 ${
+                        isActive
+                          ? "bg-[var(--zt-gold)] zt-tx-pulse"
+                          : isCompleted
+                            ? "bg-emerald-500"
+                            : "bg-gray-700"
+                      }`}
+                    />
+                    {/* Label */}
+                    <span
+                      className={`font-pixel text-[6px] leading-none ${
+                        isActive
+                          ? "text-[var(--zt-gold)]"
+                          : isCompleted
+                            ? "text-emerald-400/70"
+                            : "text-gray-600"
+                      }`}
+                    >
+                      {s.short}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })}
