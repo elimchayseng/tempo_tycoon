@@ -58,7 +58,7 @@ const BENCHES = [
 
 const AGENT_IDS = ["guest_1", "guest_2", "guest_3"];
 
-export default function ZooParkView({ agents, latestReceipt, merchantState, restockEvents, fullscreen }: ZooParkViewProps) {
+export default function ZooParkView({ agents, latestReceipt, merchantState, restockEvents, fullscreen, isMobile }: ZooParkViewProps & { isMobile?: boolean }) {
   const lastTxRef = useRef<string | null>(null);
   const lastRestockRef = useRef<string | null>(null);
   const [purchaseAnim, setPurchaseAnim] = useState<PurchaseAnim | null>(null);
@@ -137,7 +137,7 @@ export default function ZooParkView({ agents, latestReceipt, merchantState, rest
     <svg
       viewBox={vb}
       className="w-full h-full"
-      preserveAspectRatio="xMidYMid slice"
+      preserveAspectRatio={isMobile ? "xMidYMid meet" : "xMidYMid slice"}
       style={fullscreen ? { position: "absolute", inset: 0 } : { height: "auto", maxHeight: 180 }}
     >
       {/* Base grass */}

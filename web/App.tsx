@@ -11,7 +11,9 @@ import AgentColumn from "./components/zoo/AgentColumn";
 import ZooParkView from "./components/zoo/ZooParkView";
 import ZooToolbar from "./components/zoo/ZooToolbar";
 import FloatingWindow from "./components/zoo/FloatingWindow";
+import MobileDrawer from "./components/zoo/MobileDrawer";
 import BlockchainExplorer from "./components/zoo/BlockchainExplorer";
+import { useIsMobile } from "./hooks/useIsMobile";
 
 const ALPHA_USD = "0x20c0000000000000000000000000000000000001";
 
@@ -53,6 +55,7 @@ export default function App() {
   } = useZoo();
 
   const explorer = useBlockchainExplorer(networkStats, txFlowEvents, balanceUpdates, accounts.length);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (simulationComplete && phase === "running") {
@@ -78,12 +81,14 @@ export default function App() {
 
   const togglePanel = useCallback((id: string) => {
     setOpenPanels((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      if (prev.has(id)) {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+      return isMobile ? new Set([id]) : new Set([...prev, id]);
     });
-  }, []);
+  }, [isMobile]);
 
   const closePanel = useCallback((id: string) => {
     setOpenPanels((prev) => {
@@ -96,7 +101,7 @@ export default function App() {
   // Auto-open agents + shop when simulation starts
   useEffect(() => {
     if (phase === "running") {
-      setOpenPanels(new Set(["agents", "shop"]));
+      setOpenPanels(new Set(isMobile ? ["agents"] : ["agents", "shop"]));
     }
   }, [phase]);
 
@@ -105,9 +110,10 @@ export default function App() {
   const zooMaster = accounts.find(a => a.label === "Zoo Master");
   const merchant = accounts.find(a => a.label === "Merchant A");
   const merchantBalance = formatAlphaUsdBalance(merchant?.balances[ALPHA_USD] ?? "0");
+  const activeMobilePanel = isMobile ? [...openPanels][0] ?? null : null;
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--zt-green-dark)] text-gray-100">
+    <div className="h-dvh flex flex-col bg-[var(--zt-green-dark)] text-gray-100 overflow-hidden">
       <ZooHeader
         phase={phase}
         connected={connected}
@@ -192,12 +198,13 @@ export default function App() {
                 merchantState={merchantState}
                 restockEvents={restockEvents}
                 fullscreen
+                isMobile={isMobile}
               />
 
               {/* End-of-simulation results overlay */}
               {phase === "complete" && (
-                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40">
-                  <div className="zt-float-window" style={{ width: 400 }}>
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+                  <div className="zt-float-window w-full max-w-sm">
                     <div className="zt-win-titlebar" style={{ cursor: "default" }}>
                       <span className="zt-win-title">SIMULATION COMPLETE</span>
                     </div>
@@ -261,128 +268,227 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── Floating Windows ── */}
-
-              {openPanels.has("agents") && (
-                <FloatingWindow
-                  id="agents"
-                  title="ZOO GUESTS"
-                  onClose={() => closePanel("agents")}
-                  defaultPosition={DEFAULT_POSITIONS.agents}
-                  width={310}
-                  maxHeight={520}
-                >
-                  <AgentColumn
-                    agents={zooAgents}
-                    llmDecisions={llmDecisions}
-                    txFlowEvents={txFlowEvents}
-                    simulationComplete={phase === "complete"}
-                  />
-                </FloatingWindow>
-              )}
-
-              {openPanels.has("shop") && (
-                <FloatingWindow
-                  id="shop"
-                  title={`GIFT SHOP  $${merchantBalance}`}
-                  onClose={() => closePanel("shop")}
-                  defaultPosition={DEFAULT_POSITIONS.shop}
-                  width={380}
-                  maxHeight={480}
-                >
-                  <MerchantPanel
-                    merchant={merchant}
-                    agents={zooAgents}
-                    latestReceipt={receipts[0] ?? null}
-                    merchantState={merchantState}
-                    restockEvents={restockEvents}
-                    merchantDecision={llmDecisions['merchant_a'] ?? null}
-                    priceAdjustments={priceAdjustments}
-                    simulationComplete={phase === "complete"}
-                    receipts={receipts}
-                  />
-                </FloatingWindow>
-              )}
-
-              {openPanels.has("receipts") && (
-                <FloatingWindow
-                  id="receipts"
-                  title={`TX RECEIPTS (${receipts.length})`}
-                  onClose={() => closePanel("receipts")}
-                  defaultPosition={DEFAULT_POSITIONS.receipts}
-                  width={360}
-                  maxHeight={420}
-                >
-                  {receipts.length === 0 ? (
-                    <div className="px-4 py-6 text-center">
-                      <span className="font-pixel text-[9px] text-gray-500">No transactions yet</span>
-                    </div>
-                  ) : (
-                    <div className="px-3 py-2">
-                      <table className="w-full font-pixel text-[8px]">
-                        <thead>
-                          <tr className="text-gray-500 text-left">
-                            <th className="pb-1.5 pr-1">#</th>
-                            <th className="pb-1.5 pr-1">Guest</th>
-                            <th className="pb-1.5 pr-1">Items</th>
-                            <th className="pb-1.5 pr-1 text-right">Amount</th>
-                            <th className="pb-1.5 text-right">TX</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {receipts.map((receipt, i) => {
-                            const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "\u{1F9D1}";
-                            const { emojis } = cartDisplayInfo(receipt.items);
-                            const txShort = receipt.tx_hash ? `${receipt.tx_hash.slice(0, 6)}..` : "\u2014";
-                            return (
-                              <tr
-                                key={`${receipt.tx_hash}-${i}`}
-                                className="hover:bg-[var(--zt-green-mid)]/30 transition-colors border-t border-[var(--zt-green-mid)]/20"
-                              >
-                                <td className="py-1 pr-1 text-gray-500">{receipts.length - i}</td>
-                                <td className="py-1 pr-1">{guestEmoji}</td>
-                                <td className="py-1 pr-1">{emojis}</td>
-                                <td className="py-1 pr-1 text-right text-[var(--zt-gold)]">${receipt.amount}</td>
-                                <td className="py-1 text-right">
-                                  {receipt.tx_hash ? (
-                                    <a
-                                      href={`https://explore.moderato.tempo.xyz/tx/${receipt.tx_hash}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
-                                    >
-                                      {txShort}
-                                    </a>
-                                  ) : (
-                                    <span className="text-gray-500">{"\u2014"}</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+              {/* ── Floating Windows (desktop) ── */}
+              {!isMobile && (
+                <>
+                  {openPanels.has("agents") && (
+                    <FloatingWindow
+                      id="agents"
+                      title="ZOO GUESTS"
+                      onClose={() => closePanel("agents")}
+                      defaultPosition={DEFAULT_POSITIONS.agents}
+                      width={310}
+                      maxHeight={520}
+                    >
+                      <AgentColumn
+                        agents={zooAgents}
+                        llmDecisions={llmDecisions}
+                        txFlowEvents={txFlowEvents}
+                        simulationComplete={phase === "complete"}
+                      />
+                    </FloatingWindow>
                   )}
-                </FloatingWindow>
+
+                  {openPanels.has("shop") && (
+                    <FloatingWindow
+                      id="shop"
+                      title={`GIFT SHOP  $${merchantBalance}`}
+                      onClose={() => closePanel("shop")}
+                      defaultPosition={DEFAULT_POSITIONS.shop}
+                      width={380}
+                      maxHeight={480}
+                    >
+                      <MerchantPanel
+                        merchant={merchant}
+                        agents={zooAgents}
+                        latestReceipt={receipts[0] ?? null}
+                        merchantState={merchantState}
+                        restockEvents={restockEvents}
+                        merchantDecision={llmDecisions['merchant_a'] ?? null}
+                        priceAdjustments={priceAdjustments}
+                        simulationComplete={phase === "complete"}
+                        receipts={receipts}
+                      />
+                    </FloatingWindow>
+                  )}
+
+                  {openPanels.has("receipts") && (
+                    <FloatingWindow
+                      id="receipts"
+                      title={`TX RECEIPTS (${receipts.length})`}
+                      onClose={() => closePanel("receipts")}
+                      defaultPosition={DEFAULT_POSITIONS.receipts}
+                      width={360}
+                      maxHeight={420}
+                    >
+                      {receipts.length === 0 ? (
+                        <div className="px-4 py-6 text-center">
+                          <span className="font-pixel text-[9px] text-gray-500">No transactions yet</span>
+                        </div>
+                      ) : (
+                        <div className="px-3 py-2">
+                          <table className="w-full font-pixel text-[8px]">
+                            <thead>
+                              <tr className="text-gray-500 text-left">
+                                <th className="pb-1.5 pr-1">#</th>
+                                <th className="pb-1.5 pr-1">Guest</th>
+                                <th className="pb-1.5 pr-1">Items</th>
+                                <th className="pb-1.5 pr-1 text-right">Amount</th>
+                                <th className="pb-1.5 text-right">TX</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {receipts.map((receipt, i) => {
+                                const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "\u{1F9D1}";
+                                const { emojis } = cartDisplayInfo(receipt.items);
+                                const txShort = receipt.tx_hash ? `${receipt.tx_hash.slice(0, 6)}..` : "\u2014";
+                                return (
+                                  <tr
+                                    key={`${receipt.tx_hash}-${i}`}
+                                    className="hover:bg-[var(--zt-green-mid)]/30 transition-colors border-t border-[var(--zt-green-mid)]/20"
+                                  >
+                                    <td className="py-1 pr-1 text-gray-500">{receipts.length - i}</td>
+                                    <td className="py-1 pr-1">{guestEmoji}</td>
+                                    <td className="py-1 pr-1">{emojis}</td>
+                                    <td className="py-1 pr-1 text-right text-[var(--zt-gold)]">${receipt.amount}</td>
+                                    <td className="py-1 text-right">
+                                      {receipt.tx_hash ? (
+                                        <a
+                                          href={`https://explore.moderato.tempo.xyz/tx/${receipt.tx_hash}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                                        >
+                                          {txShort}
+                                        </a>
+                                      ) : (
+                                        <span className="text-gray-500">{"\u2014"}</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </FloatingWindow>
+                  )}
+
+                  {openPanels.has("blockchain") && (
+                    <FloatingWindow
+                      id="blockchain"
+                      title="BLOCKCHAIN"
+                      onClose={() => closePanel("blockchain")}
+                      defaultPosition={DEFAULT_POSITIONS.blockchain}
+                      width={340}
+                      maxHeight={500}
+                    >
+                      <BlockchainExplorer
+                        networkStats={explorer.networkStats}
+                        txFlowEvents={explorer.txFlowEvents}
+                        tokenInfo={explorer.tokenInfo}
+                        wallets={explorer.wallets}
+                      />
+                    </FloatingWindow>
+                  )}
+                </>
               )}
 
-              {openPanels.has("blockchain") && (
-                <FloatingWindow
-                  id="blockchain"
-                  title="BLOCKCHAIN"
-                  onClose={() => closePanel("blockchain")}
-                  defaultPosition={DEFAULT_POSITIONS.blockchain}
-                  width={340}
-                  maxHeight={500}
+              {/* ── Mobile Drawer (single panel) ── */}
+              {isMobile && activeMobilePanel && (
+                <MobileDrawer
+                  title={
+                    activeMobilePanel === "agents" ? "ZOO GUESTS" :
+                    activeMobilePanel === "shop" ? `GIFT SHOP  $${merchantBalance}` :
+                    activeMobilePanel === "blockchain" ? "BLOCKCHAIN" :
+                    `TX RECEIPTS (${receipts.length})`
+                  }
+                  onClose={() => closePanel(activeMobilePanel)}
                 >
-                  <BlockchainExplorer
-                    networkStats={explorer.networkStats}
-                    txFlowEvents={explorer.txFlowEvents}
-                    tokenInfo={explorer.tokenInfo}
-                    wallets={explorer.wallets}
-                  />
-                </FloatingWindow>
+                  {activeMobilePanel === "agents" && (
+                    <AgentColumn
+                      agents={zooAgents}
+                      llmDecisions={llmDecisions}
+                      txFlowEvents={txFlowEvents}
+                      simulationComplete={phase === "complete"}
+                    />
+                  )}
+                  {activeMobilePanel === "shop" && (
+                    <MerchantPanel
+                      merchant={merchant}
+                      agents={zooAgents}
+                      latestReceipt={receipts[0] ?? null}
+                      merchantState={merchantState}
+                      restockEvents={restockEvents}
+                      merchantDecision={llmDecisions['merchant_a'] ?? null}
+                      priceAdjustments={priceAdjustments}
+                      simulationComplete={phase === "complete"}
+                      receipts={receipts}
+                    />
+                  )}
+                  {activeMobilePanel === "receipts" && (
+                    receipts.length === 0 ? (
+                      <div className="px-4 py-6 text-center">
+                        <span className="font-pixel text-[9px] text-gray-500">No transactions yet</span>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-2">
+                        <table className="w-full font-pixel text-[8px]">
+                          <thead>
+                            <tr className="text-gray-500 text-left">
+                              <th className="pb-1.5 pr-1">#</th>
+                              <th className="pb-1.5 pr-1">Guest</th>
+                              <th className="pb-1.5 pr-1">Items</th>
+                              <th className="pb-1.5 pr-1 text-right">Amount</th>
+                              <th className="pb-1.5 text-right">TX</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {receipts.map((receipt, i) => {
+                              const guestEmoji = ANIMAL_EMOJI[receipt.agent_id] ?? "\u{1F9D1}";
+                              const { emojis } = cartDisplayInfo(receipt.items);
+                              const txShort = receipt.tx_hash ? `${receipt.tx_hash.slice(0, 6)}..` : "\u2014";
+                              return (
+                                <tr
+                                  key={`${receipt.tx_hash}-${i}`}
+                                  className="hover:bg-[var(--zt-green-mid)]/30 transition-colors border-t border-[var(--zt-green-mid)]/20"
+                                >
+                                  <td className="py-1 pr-1 text-gray-500">{receipts.length - i}</td>
+                                  <td className="py-1 pr-1">{guestEmoji}</td>
+                                  <td className="py-1 pr-1">{emojis}</td>
+                                  <td className="py-1 pr-1 text-right text-[var(--zt-gold)]">${receipt.amount}</td>
+                                  <td className="py-1 text-right">
+                                    {receipt.tx_hash ? (
+                                      <a
+                                        href={`https://explore.moderato.tempo.xyz/tx/${receipt.tx_hash}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[var(--zt-green-light)] hover:text-[var(--zt-gold)] hover:underline"
+                                      >
+                                        {txShort}
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-500">{"\u2014"}</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  )}
+                  {activeMobilePanel === "blockchain" && (
+                    <BlockchainExplorer
+                      networkStats={explorer.networkStats}
+                      txFlowEvents={explorer.txFlowEvents}
+                      tokenInfo={explorer.tokenInfo}
+                      wallets={explorer.wallets}
+                    />
+                  )}
+                </MobileDrawer>
               )}
             </div>
 

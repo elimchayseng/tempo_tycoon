@@ -41,9 +41,9 @@ export default function ZooToolbar({ openPanels, onToggle, money, blockHeight, c
           <span className={`inline-block w-[6px] h-[6px] ${connected ? "bg-emerald-400" : "bg-red-500"}`} />
         </div>
 
-        {/* Block height */}
+        {/* Block height — hidden on mobile to save space */}
         {blockHeight && (
-          <div className="zt-toolbar-readout">
+          <div className="zt-toolbar-readout hidden sm:flex">
             <span className="zt-toolbar-label">BLK</span>
             <span className="zt-toolbar-value">#{blockHeight.toLocaleString()}</span>
           </div>
