@@ -115,12 +115,16 @@ export class DecisionEngine {
   }
 
   /**
-   * Evaluate whether agent should make a purchase
+   * Evaluate whether agent should make a purchase.
+   *
+   * @param cheapestAvailablePrice Price of the cheapest available catalog item, if known.
+   *   When provided, a purchase is only approved if the budget covers at least that item.
    */
   evaluatePurchaseDecision(
     currentNeeds: AgentNeeds,
     currentBalance: number,
-    lastPurchaseTime: Date | null
+    lastPurchaseTime: Date | null,
+    cheapestAvailablePrice?: number
   ): PurchaseDecision {
     log.debug(`[${this.agentId}] Evaluating purchase decision...`);
     log.debug(`[${this.agentId}] Current state: food=${currentNeeds.food_need}, balance=$${currentBalance.toFixed(2)}`);
@@ -155,8 +159,29 @@ export class DecisionEngine {
 
     if (foodUrgent) {
       const urgency = this.calculateUrgency(currentNeeds.food_need, this.config.purchaseThreshold.food_need);
-      const maxBudget = this.calculateMaxBudget(currentBalance, urgency);
+      const minItemPrice =
+        cheapestAvailablePrice !== undefined && Number.isFinite(cheapestAvailablePrice) && cheapestAvailablePrice > 0
+          ? cheapestAvailablePrice
+          : undefined;
+      const maxBudget = this.calculateMaxBudget(currentBalance, urgency, minItemPrice);
       const preferredCategory = this.selectFoodCategory(currentNeeds.food_need);
+
+      // Never approve a purchase the budget cannot cover
+      if (maxBudget <= 0 || (minItemPrice !== undefined && maxBudget < minItemPrice)) {
+        const spendable = Math.max(0, currentBalance - this.config.minBalanceThreshold);
+        const base = `spendable $${spendable.toFixed(2)} (balance $${currentBalance.toFixed(2)} - reserve $${this.config.minBalanceThreshold.toFixed(2)})`;
+        const reason = minItemPrice !== undefined
+          ? `Budget too low: ${base} < cheapest item $${minItemPrice.toFixed(2)}`
+          : `Budget too low: ${base}`;
+        log.info(`[${this.agentId}] Food need urgent but ${reason}`);
+        return {
+          shouldPurchase: false,
+          reason,
+          urgency,
+          maxBudget: 0,
+          needsBefore: currentNeeds
+        };
+      }
 
       log.info(`[${this.agentId}] Food need urgent! (${currentNeeds.food_need} < ${this.config.purchaseThreshold.food_need})`);
       log.debug(`[${this.agentId}] Budget allocated: $${maxBudget.toFixed(2)} (urgency: ${urgency})`);
@@ -247,9 +272,18 @@ export class DecisionEngine {
   }
 
   /**
-   * Calculate maximum budget based on balance and urgency
+   * Calculate maximum budget based on balance and urgency.
+   *
+   * Only the amount above the reserve (minBalanceThreshold) is spendable; the urgency
+   * multiplier scales that amount. When the cheapest item price is known, the budget is
+   * raised to cover it, but never beyond the spendable amount, so a purchase never dips
+   * into the reserve.
    */
-  private calculateMaxBudget(currentBalance: number, urgency: 'low' | 'medium' | 'high' | 'critical'): number {
+  private calculateMaxBudget(
+    currentBalance: number,
+    urgency: 'low' | 'medium' | 'high' | 'critical',
+    minItemPrice?: number
+  ): number {
     const urgencyMultipliers = {
       'low': 0.2,
       'medium': 0.4,
@@ -257,10 +291,12 @@ export class DecisionEngine {
       'critical': 0.8
     };
 
-    const multiplier = urgencyMultipliers[urgency];
-    const maxBudget = currentBalance * multiplier;
+    const spendable = Math.max(0, currentBalance - this.config.minBalanceThreshold);
+    const scaled = spendable * urgencyMultipliers[urgency];
+    const budget = Math.min(spendable, Math.max(scaled, minItemPrice ?? 0));
 
-    return Math.max(0, maxBudget - this.config.minBalanceThreshold);
+    // Round down to cents so the budget never exceeds what is actually spendable
+    return Math.floor(budget * 100 + 1e-9) / 100;
   }
 
   /**

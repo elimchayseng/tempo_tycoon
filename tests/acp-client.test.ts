@@ -118,6 +118,22 @@ describe('ACPClient', () => {
     expect(product!.category).toBe('meal');
   });
 
+  it('findRandomProduct excludes products above maxBudget', () => {
+    for (let i = 0; i < 20; i++) {
+      const product = client.findRandomProduct(mockCatalog, undefined, 4);
+      expect(product!.sku).toBe('salad');
+    }
+  });
+
+  it('findRandomProduct falls back to any affordable product when category has none within budget', () => {
+    const product = client.findRandomProduct(mockCatalog, 'dessert', 4);
+    expect(product!.sku).toBe('salad');
+  });
+
+  it('findRandomProduct returns null when nothing fits the budget', () => {
+    expect(client.findRandomProduct(mockCatalog, undefined, 2)).toBeNull();
+  });
+
   it('findRandomProduct returns null when none available', () => {
     const emptyCatalog = { ...mockCatalog, products: [{ ...mockCatalog.products[2] }] };
     const product = client.findRandomProduct(emptyCatalog);

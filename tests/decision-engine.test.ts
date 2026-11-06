@@ -75,6 +75,72 @@ describe('DecisionEngine', () => {
     });
   });
 
+  describe('evaluatePurchaseDecision — low balance budgeting', () => {
+    const reserve = 10;
+    const cheapest = 2.5;
+    const lowBalanceEngine = new DecisionEngine('low-balance-agent', {
+      purchaseThreshold: { food_need: 40, fun_need: 30 },
+      minBalanceThreshold: reserve,
+    });
+    // food_need 35 / threshold 40 -> ratio 0.875 -> 'low' urgency
+    const lowUrgencyNeeds = { food_need: 35, fun_need: 50 };
+
+    it('approves a purchase with a usable budget at ~$40 and low urgency (regression)', () => {
+      const decision = lowBalanceEngine.evaluatePurchaseDecision(lowUrgencyNeeds, 40, null, cheapest);
+      expect(decision.urgency).toBe('low');
+      expect(decision.shouldPurchase).toBe(true);
+      expect(decision.maxBudget).toBeGreaterThanOrEqual(cheapest);
+      expect(decision.maxBudget).toBeLessThanOrEqual(40 - reserve);
+    });
+
+    it('approves with a positive budget when catalog price is unknown', () => {
+      const decision = lowBalanceEngine.evaluatePurchaseDecision(lowUrgencyNeeds, 40, null);
+      expect(decision.shouldPurchase).toBe(true);
+      expect(decision.maxBudget).toBeGreaterThan(0);
+    });
+
+    it('raises the budget to the cheapest item when the scaled budget falls short', () => {
+      // spendable $3, low-urgency scaled $0.60 -> raised to the $2.50 cheapest item
+      const decision = lowBalanceEngine.evaluatePurchaseDecision(lowUrgencyNeeds, 13, null, cheapest);
+      expect(decision.shouldPurchase).toBe(true);
+      expect(decision.maxBudget).toBe(cheapest);
+    });
+
+    it('declines when the spendable balance cannot cover the cheapest item', () => {
+      // spendable $2 < $2.50 cheapest
+      const decision = lowBalanceEngine.evaluatePurchaseDecision({ food_need: 5, fun_need: 50 }, 12, null, cheapest);
+      expect(decision.shouldPurchase).toBe(false);
+      expect(decision.maxBudget).toBe(0);
+      expect(decision.reason).toMatch(/cheapest item \$2\.50/);
+    });
+
+    it('declines when balance sits exactly at the reserve', () => {
+      const decision = lowBalanceEngine.evaluatePurchaseDecision({ food_need: 5, fun_need: 50 }, reserve, null);
+      expect(decision.shouldPurchase).toBe(false);
+      expect(decision.maxBudget).toBe(0);
+    });
+
+    it('still reports insufficient balance below the reserve', () => {
+      const decision = lowBalanceEngine.evaluatePurchaseDecision({ food_need: 5, fun_need: 50 }, 9.99, null, cheapest);
+      expect(decision.shouldPurchase).toBe(false);
+      expect(decision.reason).toMatch(/Insufficient balance/);
+    });
+
+    it('never approves a budget that is zero, below the cheapest item, or above spendable', () => {
+      for (const balance of [10, 10.5, 11, 12.49, 12.5, 13, 15, 20, 40, 50, 100]) {
+        for (const food_need of [1, 10, 15, 25, 35, 39]) {
+          const decision = lowBalanceEngine.evaluatePurchaseDecision({ food_need, fun_need: 50 }, balance, null, cheapest);
+          if (decision.shouldPurchase) {
+            expect(decision.maxBudget).toBeGreaterThanOrEqual(cheapest);
+            expect(decision.maxBudget).toBeLessThanOrEqual(balance - reserve + 1e-9);
+          } else {
+            expect(balance - reserve).toBeLessThan(cheapest);
+          }
+        }
+      }
+    });
+  });
+
   describe('calculateNeedRecovery', () => {
     it('increases food_need after purchase', () => {
       const product = { sku: 'main-1', name: 'Burger', price: '5.00', currency: 'AlphaUSD', category: 'main', satisfaction_value: 70, available: true };
