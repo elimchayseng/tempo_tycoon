@@ -1,7 +1,7 @@
 import { createLogger } from '../shared/logger.js';
 import { getStateManager } from './state-manager.js';
 import type { StateManager } from './state-manager.js';
-import { DecisionEngine } from './decision-engine.js';
+import { DecisionEngine, getCheapestPrice } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
 import { PaymentManager } from './payment-manager.js';
 import { getAlphaUsdOnChainBalance, getWalletAddress } from './balance-sync.js';
@@ -208,11 +208,7 @@ export class BuyerAgent {
   private async getCheapestAvailablePrice(): Promise<number | undefined> {
     try {
       const catalog = await this.acpClient.getMerchantCatalog('food', this.abortController?.signal);
-      const prices = catalog.products
-        .filter((p) => p.available)
-        .map((p) => parseFloat(p.price))
-        .filter((price) => Number.isFinite(price) && price > 0);
-      return prices.length > 0 ? Math.min(...prices) : undefined;
+      return getCheapestPrice(catalog.products.filter((p) => p.available));
     } catch (error) {
       log.warn(`[${this.config.agent_id}] Could not load catalog for budget check:`, error);
       return undefined;
@@ -643,6 +639,14 @@ export class BuyerAgent {
    */
   getConfig(): AgentConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Whether this agent could still make any purchase at the given balance, using the
+   * same reserve as its decision engine. Used by the runner's depletion monitor.
+   */
+  canAffordPurchase(balance: number, cheapestPrice?: number): boolean {
+    return this.decisionEngine.canAffordPurchase(balance, cheapestPrice);
   }
 
   /**

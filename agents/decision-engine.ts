@@ -46,6 +46,14 @@ export interface PurchaseDecision {
   estimatedNeedsAfter?: AgentNeeds;
 }
 
+/** Lowest positive price among the given products, or undefined if none parse. */
+export function getCheapestPrice(products: ReadonlyArray<{ price: string }>): number | undefined {
+  const prices = products
+    .map((p) => parseFloat(p.price))
+    .filter((price) => Number.isFinite(price) && price > 0);
+  return prices.length > 0 ? Math.min(...prices) : undefined;
+}
+
 /** Build defaults from env-var config (server/config.ts) falling back to SIMULATION_DEFAULTS */
 function buildConfigDefaults(): DecisionEngineConfig {
   return {
@@ -206,6 +214,20 @@ export class DecisionEngine {
       maxBudget: 0,
       needsBefore: currentNeeds
     };
+  }
+
+  /**
+   * Whether this agent could ever approve a purchase at the given balance, regardless of
+   * needs or timing: the balance must be at or above the reserve and the amount above the
+   * reserve must cover the cheapest item. Mirrors the budget rules in evaluatePurchaseDecision.
+   */
+  canAffordPurchase(currentBalance: number, cheapestPrice?: number): boolean {
+    if (currentBalance < this.config.minBalanceThreshold) return false;
+    const spendable = currentBalance - this.config.minBalanceThreshold;
+    if (cheapestPrice === undefined || !Number.isFinite(cheapestPrice) || cheapestPrice <= 0) {
+      return spendable > 0;
+    }
+    return spendable + 1e-9 >= cheapestPrice;
   }
 
   /**

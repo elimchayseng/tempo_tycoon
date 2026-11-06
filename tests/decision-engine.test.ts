@@ -2,7 +2,7 @@
  * Migrated from scripts/test-unit-logic.ts — DecisionEngine tests using vitest.
  */
 import { describe, it, expect } from 'vitest';
-import { DecisionEngine, SIMULATION_DEFAULTS } from '../agents/decision-engine.js';
+import { DecisionEngine, SIMULATION_DEFAULTS, getCheapestPrice } from '../agents/decision-engine.js';
 
 describe('DecisionEngine', () => {
   const engine = new DecisionEngine('test-agent', {
@@ -138,6 +138,44 @@ describe('DecisionEngine', () => {
           }
         }
       }
+    });
+  });
+
+  describe('canAffordPurchase', () => {
+    const reserveEngine = new DecisionEngine('afford-agent', { minBalanceThreshold: 10 });
+
+    it('is false below the reserve', () => {
+      expect(reserveEngine.canAffordPurchase(9.99, 2.5)).toBe(false);
+    });
+
+    it('is false when the amount above the reserve is below the cheapest item', () => {
+      expect(reserveEngine.canAffordPurchase(12.49, 2.5)).toBe(false);
+    });
+
+    it('is true when the amount above the reserve covers the cheapest item exactly', () => {
+      expect(reserveEngine.canAffordPurchase(12.5, 2.5)).toBe(true);
+    });
+
+    it('requires a positive spendable amount when the price is unknown', () => {
+      expect(reserveEngine.canAffordPurchase(10)).toBe(false);
+      expect(reserveEngine.canAffordPurchase(10.01)).toBe(true);
+    });
+
+    it('agrees with evaluatePurchaseDecision for a hungry agent', () => {
+      for (const balance of [10, 11, 12.49, 12.5, 13, 20, 40]) {
+        const decision = reserveEngine.evaluatePurchaseDecision({ food_need: 5, fun_need: 50 }, balance, null, 2.5);
+        expect(decision.shouldPurchase).toBe(reserveEngine.canAffordPurchase(balance, 2.5));
+      }
+    });
+  });
+
+  describe('getCheapestPrice', () => {
+    it('returns the lowest parseable positive price', () => {
+      expect(getCheapestPrice([{ price: '3.50' }, { price: '2.50' }, { price: 'n/a' }, { price: '0' }])).toBe(2.5);
+    });
+
+    it('returns undefined for an empty list', () => {
+      expect(getCheapestPrice([])).toBeUndefined();
     });
   });
 
