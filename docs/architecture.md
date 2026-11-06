@@ -9,8 +9,10 @@
 │  ← WebSocket (zoo_agents, zoo_purchase, zoo_merchant_state,  │
 │     zoo_restock_event, zoo_needs) →                          │
 ├──────────────────────────────────────────────────────────────┤
-│  Server (Hono)                                               │
-│  server/index.ts — main entry, routes, WebSocket, static     │
+│  Server (Hono) — hosted in a Cloudflare Durable Object       │
+│  server/app.ts — routes (shared by both hosts)               │
+│  worker/zoo-server.ts — DO host: WebSocket, keep-alive alarm │
+│  server/index.ts — Node host (local dev)                     │
 │  ┌────────────────┬──────────────────┬────────────────────┐  │
 │  │ zoo-registry   │ zoo-merchant     │ zoo-agents         │  │
 │  │ /registry      │ /food/catalog    │ /agents/start|stop │  │
@@ -40,8 +42,8 @@
 
 ```
 ┌─────────────────────┐       HTTPS        ┌──────────────────────────┐
-│  Railway App        │────────────────────►│  Heroku Managed Inference│
-│  (tempo-zoo)        │  /v1/chat/completions│  (tempo-tycoon-agent-brain)│
+│  Zoo Durable Object │────────────────────►│  Heroku Managed Inference│
+│  (tempo-tycoon)     │  /v1/chat/completions│  (tempo-tycoon-agent-brain)│
 │                     │◄────────────────────│  Claude 4.5 Haiku        │
 │  BuyerAgent →       │    tool_calls resp  │  INFERENCE_URL + KEY     │
 │  BuyerBrain →       │                     │  (no deployed code)      │
@@ -158,7 +160,7 @@ The MerchantAgent maintains a shared inventory singleton (`merchant-inventory.ts
 | `agents/balance-sync.ts` | On-chain balance synchronization |
 | `agents/wallet-generator.ts` | Generates 5 ephemeral wallets per simulation run |
 | `agents/wallet-funder.ts` | Faucet request + batch distribution to all agents |
-| `agents/state-manager.ts` | Persistent agent state (file-based) |
+| `agents/state-manager.ts` | Per-agent state (file backend on Node, in-memory on Workers) |
 | `shared/logger.ts` | Structured logger with `LOG_LEVEL` support |
 | `shared/types.ts` | Shared TypeScript types for frontend + backend |
 | `web/App.tsx` | Main dashboard — floating window state, simulation lifecycle, results overlay |

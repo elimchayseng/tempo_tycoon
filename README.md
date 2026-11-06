@@ -88,7 +88,7 @@ Full documentation: [docs/api.md](docs/api.md)
 - [ACP Protocol](docs/acp-protocol.md) — Agentic Commerce Protocol spec
 - [Configuration](docs/configuration.md) — environment variables
 - [Security](docs/security.md) — auth, rate limiting, CORS
-- [Deployment](docs/deployment.md) — Railway deployment guide
+- [Deployment](docs/deployment.md) — Cloudflare Workers deployment guide
 - [Development](docs/development.md) — dev workflows, scripts, testing
 - [WebSocket Events](docs/websocket-events.md) — real-time event reference
 
@@ -111,16 +111,15 @@ See [docs/development.md](docs/development.md) for detailed testing instructions
 
 ## Deployment
 
-Deploy to Railway with zero config:
+Runs on Cloudflare Workers, with one Durable Object hosting the simulation:
+https://tempo-tycoon.elimchayseng13.workers.dev
 
 ```bash
-npm install -g @railway/cli
-railway login
-railway init
-railway up
+npx wrangler secret put ADMIN_TOKEN
+VITE_ADMIN_TOKEN=<same token> npm run cf:deploy
 ```
 
-Set `RPC_URL` and `ZOO_SIMULATION_ENABLED=true` in the Railway dashboard. See [docs/deployment.md](docs/deployment.md) for full instructions.
+See [docs/deployment.md](docs/deployment.md) for the architecture, the local Workers runtime (`npm run cf:dev`), and the Node/Railway fallback.
 
 ## Tech Stack
 

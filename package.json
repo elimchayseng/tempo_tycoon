@@ -12,7 +12,10 @@
     "build": "vite build",
     "start": "tsx server/index.ts",
     "start:agents": "tsx agents/simulation-runner.ts",
-    "check": "tsc --noEmit",
+    "cf:build": "vite build && tsx scripts/build-worker-assets.ts",
+    "cf:dev": "npm run cf:build && wrangler dev",
+    "cf:deploy": "npm run cf:build && wrangler deploy",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
     "setup:wallets": "tsx scripts/setup-wallets.ts",
     "fund:agents": "tsx scripts/fund-agents.ts",
     "health:check": "tsx scripts/health-check.ts",
@@ -36,6 +39,7 @@
     "viem": "^2.46.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261106.1",
     "@tailwindcss/vite": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -50,7 +54,8 @@
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "wrangler": "^4.158.0"
   },
   "engines": {
     "node": ">=18.0.0"

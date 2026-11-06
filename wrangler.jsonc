@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tempo-tycoon",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+
+  // The frontend (dist/) is embedded into the bundle by
+  // scripts/build-worker-assets.ts rather than uploaded as Workers Static
+  // Assets, so a deploy is a single script upload.
+
+  // One global Durable Object hosts the simulation (worker/zoo-server.ts).
+  "durable_objects": {
+    "bindings": [{ "name": "ZOO", "class_name": "ZooServer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ZooServer"] }],
+
+  "observability": { "enabled": true },
+
+  // Non-secret configuration (see docs/configuration.md).
+  // Secrets — set with `npx wrangler secret put <NAME>`:
+  //   ADMIN_TOKEN    (required; must match VITE_ADMIN_TOKEN used at build time)
+  //   INFERENCE_KEY  (only if LLM_ENABLED=true)
+  "vars": {
+    "NODE_ENV": "production",
+    "ZOO_SIMULATION_ENABLED": "true",
+    "RPC_URL": "https://rpc.moderato.tempo.xyz",
+    "EXPLORER_URL": "https://explore.moderato.tempo.xyz",
+    "AGENT_POLLING_INTERVAL": "10000",
+    "NEED_DECAY_RATE": "2",
+    "PURCHASE_THRESHOLD": "30",
+    "MIN_BALANCE_THRESHOLD": "10.0",
+    "LOG_LEVEL": "info",
+    "ENABLE_REQUEST_LOGS": "true",
+    "ALLOWED_ORIGINS": "https://tempo-tycoon.elimchayseng13.workers.dev",
+    "LLM_ENABLED": "false"
+  }
+}

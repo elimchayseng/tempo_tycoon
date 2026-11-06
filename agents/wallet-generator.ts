@@ -1,5 +1,4 @@
-import { randomBytes } from 'crypto';
-import { privateKeyToAccount } from 'viem/accounts';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { zooWallets } from '../server/zoo-accounts.js';
 
 export interface GeneratedWallet {
@@ -20,7 +19,7 @@ const WALLET_ROLES = [
 
 export function generateAllWallets(): GeneratedWallet[] {
   return WALLET_ROLES.map(({ label, role, storeKey }) => {
-    const privateKey = `0x${randomBytes(32).toString('hex')}` as `0x${string}`;
+    const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
     return {
       label,

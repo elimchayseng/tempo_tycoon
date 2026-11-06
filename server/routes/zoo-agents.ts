@@ -13,6 +13,7 @@ import type { AgentEventType } from "../../agents/types.js";
 import { getInventorySnapshot } from "../../agents/merchant-inventory.js";
 import { requireAdmin } from "../middleware/admin-auth.js";
 import { createRateLimit } from "../middleware/rate-limit.js";
+import { getClientIp } from "../middleware/client-ip.js";
 
 const log = createLogger('zoo-agents');
 
@@ -40,8 +41,14 @@ function broadcastAgentStates() {
   }
 }
 
-// Initialize AgentRunner if zoo simulation is enabled
-if (config.zoo.enabled) {
+/**
+ * Create the AgentRunner and wire its events to WebSocket broadcasts.
+ * Called once from initApp() — not at module load, because Workers forbid
+ * timers and network I/O in global scope.
+ */
+export function initZooAgents(): void {
+  if (!config.zoo.enabled || getAgentRunner()) return;
+
   const runner = new AgentRunner();
   setAgentRunner(runner);
 
@@ -381,7 +388,7 @@ zooAgentRoutes.post("/agents/start", requireAdmin, createRateLimit(10, 60_000), 
 
     await runner.start();
 
-    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const ip = getClientIp(c);
     demoStartCount++;
     log.info(`Demo simulation started by ${ip} (total demo starts: ${demoStartCount})`);
 

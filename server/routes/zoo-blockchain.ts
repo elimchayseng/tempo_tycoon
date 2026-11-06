@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { formatGwei } from "viem";
+import { formatGwei, hexToString } from "viem";
 import { Abis } from "viem/tempo";
 import { createLogger } from "../../shared/logger.js";
 import { publicClient, ALPHA_USD, CHAIN_CONFIG, TIP20_DECIMALS } from "../tempo-client.js";
@@ -166,9 +166,8 @@ zooBlockchainRoutes.get("/network/tx/:txHash", async (c) => {
       const input = tx.input;
       if (input && input.length > 10) {
         // Last 32 bytes of a transferWithMemo call contain the memo
-        const memoHex = '0x' + input.slice(-64);
-        const bytes = Buffer.from(memoHex.slice(2), 'hex');
-        decodedMemo = bytes.toString('utf8').replace(/\0/g, '').trim();
+        const memoHex = ('0x' + input.slice(-64)) as `0x${string}`;
+        decodedMemo = hexToString(memoHex).replace(/\0/g, '').trim();
       }
     } catch {
       // memo decode is best effort

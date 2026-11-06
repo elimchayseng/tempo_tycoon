@@ -73,3 +73,7 @@ temp/
 
 # Backup directories
 eth_tempo_experiments_backup/
+# Cloudflare
+.wrangler/
+.dev.vars
+worker/static-manifest.generated.js

@@ -27,26 +27,41 @@ function formatMessage(level: LogLevel, component: string, message: string): str
   return `[${timestamp()}] [${level.toUpperCase()}] [${component}] ${message}`;
 }
 
+/**
+ * Inline Error messages into the log line. Cloudflare Workers Logs keep only
+ * the stack frames of a logged Error object, dropping its message; viem's
+ * shortMessage is used when present because its full message is very long.
+ */
+function formatArgs(args: unknown[]): unknown[] {
+  return args.map((arg) => {
+    if (arg instanceof Error) {
+      const short = (arg as { shortMessage?: string }).shortMessage;
+      return `${arg.name}: ${short ?? arg.message}`;
+    }
+    return arg;
+  });
+}
+
 export function createLogger(component: string) {
   return {
     debug(message: string, ...args: unknown[]) {
       if (shouldLog('debug')) {
-        console.debug(formatMessage('debug', component, message), ...args);
+        console.debug(formatMessage('debug', component, message), ...formatArgs(args));
       }
     },
     info(message: string, ...args: unknown[]) {
       if (shouldLog('info')) {
-        console.log(formatMessage('info', component, message), ...args);
+        console.log(formatMessage('info', component, message), ...formatArgs(args));
       }
     },
     warn(message: string, ...args: unknown[]) {
       if (shouldLog('warn')) {
-        console.warn(formatMessage('warn', component, message), ...args);
+        console.warn(formatMessage('warn', component, message), ...formatArgs(args));
       }
     },
     error(message: string, ...args: unknown[]) {
       if (shouldLog('error')) {
-        console.error(formatMessage('error', component, message), ...args);
+        console.error(formatMessage('error', component, message), ...formatArgs(args));
       }
     },
   };

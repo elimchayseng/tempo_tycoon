@@ -59,5 +59,5 @@ docs/             Documentation
 - [API Reference](./api.md) — all HTTP and WebSocket endpoints
 - [Security](./security.md) — authentication, rate limiting, and CORS
 - [Configuration](./configuration.md) — environment variables and config
-- [Deployment](./deployment.md) — Railway deployment guide
+- [Deployment](./deployment.md) — Cloudflare Workers deployment guide
 - [Development](./development.md) — dev workflows and testing
