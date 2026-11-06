@@ -103,6 +103,18 @@ export async function fundZooWallets(
     payments,
   });
 
-  log.info(`Batch distribution complete: ${batchResult.txHashes?.length ?? 0} transactions`);
-  onProgress?.('Wallet funding complete', `${batchResult.txHashes?.length ?? 0} transfers executed`);
+  // Verify on-chain that every recipient actually received its allocation, so
+  // preflight fails loudly instead of handing the agents empty wallets.
+  const unfunded: string[] = [];
+  for (const w of recipients) {
+    const expected = parseAlphaUsd(FUNDING_AMOUNTS[w.storeKey] || '50.00');
+    const bal = await getBalance(w.address);
+    if (bal < expected) unfunded.push(`${w.label} ($${formatAlphaUsd(bal)} < $${formatAlphaUsd(expected)})`);
+  }
+  if (unfunded.length > 0) {
+    throw new Error(`Wallet funding incomplete: ${unfunded.join(', ')}`);
+  }
+
+  log.info(`Batch distribution complete: ${batchResult.txCount} transfers`);
+  onProgress?.('Wallet funding complete', `${batchResult.txCount} transfers executed`);
 }

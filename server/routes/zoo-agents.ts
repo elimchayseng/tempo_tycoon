@@ -379,6 +379,24 @@ zooAgentRoutes.post("/agents/start", requireAdmin, createRateLimit(10, 60_000), 
       return c.json({ error: "Agent runner not initialized", code: "RUNNER_NOT_INITIALIZED" }, 500);
     }
 
+    // Refuse to start on unfunded wallets (e.g. preflight funding failed);
+    // otherwise the depletion monitor would auto-stop the run within seconds.
+    if (!runner.getStatus().is_running) {
+      await refreshZooBalances();
+      const threshold = config.zoo.minBalanceThreshold;
+      const unfunded = (['guest1', 'guest2', 'guest3'] as const).filter((role) => {
+        const acct = getZooAccountByRole(role);
+        return !acct || Number(acct.balances[config.contracts.alphaUsd] ?? 0n) / 1_000_000 < threshold;
+      });
+      if (unfunded.length > 0) {
+        return c.json({
+          error: "Guest wallets are not funded — run preflight again",
+          code: "WALLETS_UNFUNDED",
+          details: `Below $${threshold}: ${unfunded.join(", ")}`,
+        }, 409);
+      }
+    }
+
     await runner.start();
 
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
