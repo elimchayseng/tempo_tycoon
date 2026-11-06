@@ -1,15 +1,11 @@
-import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 import { createLogger } from "../../shared/logger.js";
 import { getZooAccountByRole, getAllZooAccounts } from "../zoo-accounts.js";
 import { publicClient, ALPHA_USD } from "../tempo-client.js";
 import { accountStore } from "../accounts.js";
 import { Abis } from "viem/tempo";
-import { AgentRunner } from "../../agents/agent-runner.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import type { AgentRunner } from "../../agents/agent-runner.js";
+// Bundled at build time (no filesystem on Workers)
+import zooMapJson from "../../config/zoo_map.json";
 
 const log = createLogger('zoo-shared');
 
@@ -36,19 +32,12 @@ export async function refreshZooBalances() {
   }));
 }
 
-/** Cached zoo registry — the static zoo_map.json is read once, then wallet addresses are patched on each call */
-let _cachedZooMap: any = null;
+/** Static zoo registry — wallet addresses are patched on each call */
+const _cachedZooMap: any = zooMapJson;
 
 /** Load and process zoo registry from config/zoo_map.json */
 export function loadZooRegistry() {
   try {
-    // Read and parse the static JSON file only once
-    if (!_cachedZooMap) {
-      const zooMapPath = join(__dirname, '../../config/zoo_map.json');
-      const zooMapContent = readFileSync(zooMapPath, 'utf-8');
-      _cachedZooMap = JSON.parse(zooMapContent);
-    }
-
     // Deep clone to avoid mutating the cache
     const zooMap = JSON.parse(JSON.stringify(_cachedZooMap));
 

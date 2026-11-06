@@ -233,6 +233,11 @@ export class AgentRunner {
     });
   }
 
+  /** True while a simulation is running (used by hosts for keep-alive). */
+  get running(): boolean {
+    return this.isRunning;
+  }
+
   getAgentStatuses(): AgentStatus[] {
     return Array.from(this.agents.values()).map(agent => agent.getStatus());
   }

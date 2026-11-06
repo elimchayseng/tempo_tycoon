@@ -4,8 +4,7 @@ import type { ChainConfig } from "../shared/types.js";
 export const config = {
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 4000,
-    // Railway handles host binding automatically, we just need the port
-    environment: process.env.NODE_ENV || (process.env.RAILWAY_ENVIRONMENT_NAME ? 'production' : 'development'),
+    environment: process.env.NODE_ENV || 'development',
   },
 
   chain: {
@@ -53,7 +52,7 @@ export const config = {
   cors: {
     allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
       .split(',')
-      .map((o) => o.trim())
+      .map((o: string) => o.trim())
       .filter(Boolean),
   },
 

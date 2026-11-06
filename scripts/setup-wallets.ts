@@ -41,7 +41,7 @@ function main() {
   }
 
   console.log("IMPORTANT:");
-  console.log("- Copy these private keys to your .env file or Railway environment variables");
+  console.log("- Copy these private keys to your .env file");
   console.log("- Keep private keys secure and never commit them to git");
   console.log("- Fund these wallets with AlphaUSD on Tempo testnet before starting simulation");
 }

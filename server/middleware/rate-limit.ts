@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { getClientIp } from "./client-ip.js";
 
 interface RequestRecord {
   timestamps: number[];
@@ -12,37 +13,33 @@ interface RequestRecord {
 export function createRateLimit(maxRequests: number, windowMs: number) {
   const store = new Map<string, RequestRecord>();
 
-  // Periodic cleanup of stale entries every 60s
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
+  // Stale entries are swept lazily (at most once per 60s) on incoming
+  // requests rather than via setInterval, which Workers forbid at module load.
+  let lastSweep = 0;
+  function sweep(now: number) {
+    if (now - lastSweep < 60_000) return;
+    lastSweep = now;
     for (const [key, record] of store) {
       record.timestamps = record.timestamps.filter((t) => now - t < windowMs);
       if (record.timestamps.length === 0) {
         store.delete(key);
       }
     }
-  }, 60_000);
-
-  // Allow cleanup timer to not keep the process alive
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
   }
 
   return createMiddleware(async (c, next) => {
-    // Skip rate limiting in development (no Railway env = local dev)
-    const isDev = process.env.NODE_ENV === "development" ||
-                  (!process.env.NODE_ENV && !process.env.RAILWAY_ENVIRONMENT_NAME);
+    // Skip rate limiting in local development (NODE_ENV unset or "development").
+    // The Cloudflare deployment sets NODE_ENV=production in wrangler.jsonc.
+    const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === "development";
     if (isDev) {
       await next();
       return;
     }
 
-    const ip =
-      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-      c.req.header("x-real-ip") ||
-      "unknown";
+    const ip = getClientIp(c);
 
     const now = Date.now();
+    sweep(now);
     let record = store.get(ip);
 
     if (!record) {

@@ -1,5 +1,6 @@
 import { createLogger } from '../shared/logger.js';
 import { merchantCircuitBreaker } from './circuit-breaker.js';
+import { getInternalFetch } from '../server/runtime.js';
 import type {
   ZooRegistry,
   MerchantCatalog,
@@ -329,7 +330,7 @@ export class ACPClient {
           requestOptions.body = JSON.stringify(body);
         }
 
-        const response = await fetch(url, requestOptions);
+        const response = await getInternalFetch()(url, requestOptions);
 
         if (!response.ok) {
           const errorText = await response.text();

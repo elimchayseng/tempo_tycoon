@@ -5,6 +5,7 @@ import { DecisionEngine, getCheapestPrice } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
 import { PaymentManager } from './payment-manager.js';
 import { getAlphaUsdOnChainBalance, getWalletAddress } from './balance-sync.js';
+import { getInternalBaseUrl } from '../server/runtime.js';
 import type {
   AgentConfig,
   AgentState,
@@ -54,7 +55,7 @@ export class BuyerAgent {
       purchaseThreshold: config.purchase_threshold,
       minBalanceThreshold: parseFloat(config.refund_threshold),
     });
-    this.acpClient = new ACPClient(`http://localhost:${process.env.PORT || 4000}`);
+    this.acpClient = new ACPClient(getInternalBaseUrl());
     this.paymentManager = new PaymentManager(config.agent_id, this.getAgentLabel());
 
     log.info(`[${config.agent_id}] All components initialized`);

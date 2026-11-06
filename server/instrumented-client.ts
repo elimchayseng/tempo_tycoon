@@ -1,4 +1,3 @@
-import type { WSContext } from "hono/ws";
 import {
   type Abi,
   type Address,
@@ -30,11 +29,20 @@ function makeId(): string {
   return `log_${Date.now()}_${++entryCounter}`;
 }
 
-// Improved WebSocket connection management
-const clients = new Set<WSContext>();
-const clientMetadata = new WeakMap<WSContext, { connectedAt: number }>();
+/**
+ * Minimal socket surface shared by Hono's Node BroadcastSocket and Cloudflare's
+ * WebSocket, so broadcast() works under either host.
+ */
+export interface BroadcastSocket {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+}
 
-export function addClient(ws: WSContext): boolean {
+// Improved WebSocket connection management
+const clients = new Set<BroadcastSocket>();
+const clientMetadata = new WeakMap<BroadcastSocket, { connectedAt: number }>();
+
+export function addClient(ws: BroadcastSocket): boolean {
   if (clients.size >= config.limits.maxWebSocketConnections) {
     console.warn(`WebSocket connection limit reached (${config.limits.maxWebSocketConnections})`);
     return false;
@@ -46,7 +54,7 @@ export function addClient(ws: WSContext): boolean {
   return true;
 }
 
-export function removeClient(ws: WSContext): void {
+export function removeClient(ws: BroadcastSocket): void {
   const removed = clients.delete(ws);
   clientMetadata.delete(ws);
   if (removed) {
@@ -73,7 +81,7 @@ export function broadcast(message: Record<string, unknown>): void {
   if (clients.size === 0) return;
 
   const json = safeStringify(message);
-  const deadConnections: WSContext[] = [];
+  const deadConnections: BroadcastSocket[] = [];
 
   for (const ws of clients) {
     try {

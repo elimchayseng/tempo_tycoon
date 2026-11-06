@@ -28,16 +28,23 @@ interface CheckoutSession {
 const activeSessions = new Map<string, CheckoutSession>();
 const sessionVerifier = new SessionVerifier();
 
-// Clean up expired sessions periodically
-setInterval(() => {
-  const now = new Date();
+// Expired-session cleanup runs lazily on each checkout request (at most every
+// SESSION_CLEANUP_INTERVAL_MS) rather than on a global setInterval, which
+// Workers do not allow at module load.
+let lastSessionCleanup = 0;
+
+function cleanupExpiredSessions(): void {
+  const nowMs = Date.now();
+  if (nowMs - lastSessionCleanup < SESSION_CLEANUP_INTERVAL_MS) return;
+  lastSessionCleanup = nowMs;
+  const now = new Date(nowMs);
   for (const [sessionId, session] of activeSessions.entries()) {
     if (now > session.expires_at && session.status === 'pending') {
       session.status = 'expired';
       activeSessions.delete(sessionId);
     }
   }
-}, SESSION_CLEANUP_INTERVAL_MS);
+}
 
 // GET /food/catalog - Returns available products with current pricing
 zooMerchantRoutes.get("/food/catalog", async (c) => {
@@ -95,6 +102,7 @@ zooMerchantRoutes.get("/food/catalog", async (c) => {
 // POST /food/checkout/create - Creates a purchase session with payment details
 // Accepts either { items: [{sku, quantity}], buyer_address } (cart) or legacy { sku, quantity, buyer_address }
 zooMerchantRoutes.post("/food/checkout/create", async (c) => {
+  cleanupExpiredSessions();
   try {
     if (!config.zoo.enabled) {
       return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
@@ -227,6 +235,7 @@ zooMerchantRoutes.post("/food/checkout/create", async (c) => {
 
 // POST /food/checkout/complete - Verifies payment and completes the purchase
 zooMerchantRoutes.post("/food/checkout/complete", async (c) => {
+  cleanupExpiredSessions();
   try {
     if (!config.zoo.enabled) {
       return c.json({ error: "Zoo simulation is disabled", code: "ZOO_DISABLED" }, 404);
