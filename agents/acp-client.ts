@@ -224,15 +224,25 @@ export class ACPClient {
   /**
    * Find a random available product from a catalog
    */
-  findRandomProduct(catalog: MerchantCatalog, category?: string): MerchantProduct | null {
+  findRandomProduct(catalog: MerchantCatalog, category?: string, maxBudget?: number): MerchantProduct | null {
     let availableProducts = catalog.products.filter(p => p.available);
 
+    if (maxBudget !== undefined) {
+      availableProducts = availableProducts.filter(p => parseFloat(p.price) <= maxBudget);
+    }
+
     if (category) {
-      availableProducts = availableProducts.filter(p => p.category === category);
+      const inCategory = availableProducts.filter(p => p.category === category);
+      // With a budget, prefer the category but fall back to any affordable product
+      availableProducts = maxBudget !== undefined && inCategory.length === 0 ? availableProducts : inCategory;
     }
 
     if (availableProducts.length === 0) {
-      log.warn(`No available products found${category ? ` in category '${category}'` : ''}`);
+      const filters = [
+        category ? `category '${category}'` : '',
+        maxBudget !== undefined ? `budget $${maxBudget.toFixed(2)}` : '',
+      ].filter(Boolean).join(', ');
+      log.warn(`No available products found${filters ? ` (${filters})` : ''}`);
       return null;
     }
 
@@ -249,7 +259,8 @@ export class ACPClient {
   async initiatePurchase(
     agentAddress: string,
     preferredCategory?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    maxBudget?: number
   ): Promise<{ session: CheckoutSession; product: MerchantProduct; merchantCategory: string } | null> {
     try {
       log.info(`Initiating ACP purchase flow for ${agentAddress}`);
@@ -264,7 +275,7 @@ export class ACPClient {
 
       const catalog = await this.getMerchantCatalog('food', signal);
 
-      const product = this.findRandomProduct(catalog, preferredCategory);
+      const product = this.findRandomProduct(catalog, preferredCategory, maxBudget);
       if (!product) {
         log.warn('No available products found for purchase');
         return null;

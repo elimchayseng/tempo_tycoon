@@ -1,7 +1,7 @@
 import { createLogger } from '../shared/logger.js';
 import { getStateManager } from './state-manager.js';
 import type { StateManager } from './state-manager.js';
-import { DecisionEngine } from './decision-engine.js';
+import { DecisionEngine, getCheapestPrice } from './decision-engine.js';
 import { ACPClient } from './acp-client.js';
 import { PaymentManager } from './payment-manager.js';
 import { getAlphaUsdOnChainBalance, getWalletAddress } from './balance-sync.js';
@@ -161,11 +161,13 @@ export class BuyerAgent {
       const balanceStr = currentBalance.toFixed(2);
       this.state.balance = balanceStr;
 
-      // Step 3: Make purchase decision
+      // Step 3: Make purchase decision (budget must cover the cheapest available item)
+      const cheapestPrice = await this.getCheapestAvailablePrice();
       const decision = this.decisionEngine.evaluatePurchaseDecision(
         this.state.needs,
         currentBalance,
-        this.state.last_purchase_time
+        this.state.last_purchase_time,
+        cheapestPrice
       );
 
       log.info(`[${this.config.agent_id}] Decision: ${decision.shouldPurchase ? 'PURCHASE' : 'WAIT'} (${decision.reason})`);
@@ -201,7 +203,21 @@ export class BuyerAgent {
   }
 
   /**
-   * Execute a deterministic purchase: randomly select a product and create session.
+   * Price of the cheapest available item in the food catalog (cached by ACPClient).
+   * Returns undefined if the catalog cannot be fetched or has no available items.
+   */
+  private async getCheapestAvailablePrice(): Promise<number | undefined> {
+    try {
+      const catalog = await this.acpClient.getMerchantCatalog('food', this.abortController?.signal);
+      return getCheapestPrice(catalog.products.filter((p) => p.available));
+    } catch (error) {
+      log.warn(`[${this.config.agent_id}] Could not load catalog for budget check:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Execute a deterministic purchase: randomly select an affordable product and create session.
    */
   private async executePurchase(maxBudget: number, preferredCategory?: string): Promise<void> {
     if (!this.state) return;
@@ -222,7 +238,7 @@ export class BuyerAgent {
       // Step 1: Initiate ACP purchase flow (random product selection)
       const signal = this.abortController?.signal;
       this.emitTxFlow('checkout_created', { preferred_category: preferredCategory });
-      const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory, signal);
+      const purchaseFlow = await this.acpClient.initiatePurchase(this.config.address, preferredCategory, signal, maxBudget);
 
       if (!purchaseFlow) {
         throw new Error('Failed to initiate ACP purchase flow');
@@ -624,6 +640,14 @@ export class BuyerAgent {
    */
   getConfig(): AgentConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Whether this agent could still make any purchase at the given balance, using the
+   * same reserve as its decision engine. Used by the runner's depletion monitor.
+   */
+  canAffordPurchase(balance: number, cheapestPrice?: number): boolean {
+    return this.decisionEngine.canAffordPurchase(balance, cheapestPrice);
   }
 
   /**

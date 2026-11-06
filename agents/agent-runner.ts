@@ -7,7 +7,9 @@ import { fundZooWallets } from './wallet-funder.js';
 import { resetZooAccounts } from '../server/zoo-accounts.js';
 import { rpcCircuitBreaker, merchantCircuitBreaker } from './circuit-breaker.js';
 import { getAllZooAccounts, getZooAccountByRole } from '../server/zoo-accounts.js';
-import { refreshZooBalances } from '../server/routes/zoo-shared.js';
+import { refreshZooBalances, loadZooRegistry } from '../server/routes/zoo-shared.js';
+import { getInventorySnapshot } from './merchant-inventory.js';
+import { getCheapestPrice } from './decision-engine.js';
 import { ALPHA_USD } from '../server/tempo-client.js';
 import { config } from '../server/config.js';
 import { LLMClient } from './llm/llm-client.js';
@@ -450,6 +452,25 @@ export class AgentRunner {
    * (which is kept fresh by agents' post-purchase balance re-reads).
    * Refreshes from chain every 30s as a fallback to catch drift.
    */
+  /**
+   * Cheapest current price on the food menu, ignoring stock (sold-out items restock,
+   * so they still count as purchasable). Uses live merchant inventory when initialized,
+   * otherwise the static registry menu.
+   */
+  private getCheapestMenuPrice(): number | undefined {
+    const live = getInventorySnapshot();
+    if (live.length > 0) return getCheapestPrice(live);
+
+    try {
+      const registry = loadZooRegistry();
+      const merchant = registry.merchants?.find((m: { category: string }) => m.category === 'food');
+      return merchant ? getCheapestPrice(merchant.menu ?? []) : undefined;
+    } catch (error) {
+      log.warn('Could not load menu prices for depletion check:', error);
+      return undefined;
+    }
+  }
+
   private startDepletionMonitor(): void {
     const threshold = config.zoo.minBalanceThreshold;
     let checkCount = 0;
@@ -464,20 +485,31 @@ export class AgentRunner {
           await refreshZooBalances();
         }
 
-        // Read from in-memory cache (fast, no RPC)
-        const buyerRoles = ['guest1', 'guest2', 'guest3'] as const;
-        const allDepleted = buyerRoles.every(role => {
+        // Read from in-memory cache (fast, no RPC). A buyer counts as depleted when it is
+        // below the threshold, or when what it holds above its reserve cannot cover the
+        // cheapest menu item, since its decision engine will never approve a purchase.
+        const cheapestPrice = this.getCheapestMenuPrice();
+        const buyers = [
+          { role: 'guest1', agentId: 'guest_1' },
+          { role: 'guest2', agentId: 'guest_2' },
+          { role: 'guest3', agentId: 'guest_3' },
+        ] as const;
+        const allDepleted = buyers.every(({ role, agentId }) => {
           const account = getZooAccountByRole(role);
           if (!account) return true;
           const balanceBigInt = account.balances[ALPHA_USD] || BigInt(0);
           const balanceUsd = Number(balanceBigInt) / 1_000_000;
-          return balanceUsd < threshold;
+          if (balanceUsd < threshold) return true;
+          const agent = this.agents.get(agentId);
+          return agent ? !agent.canAffordPurchase(balanceUsd, cheapestPrice) : false;
         });
 
         if (allDepleted) {
-          log.info(`All buyer agents depleted (below $${threshold}). Auto-stopping simulation.`);
+          const priceNote = cheapestPrice !== undefined ? ` or cannot afford the cheapest item ($${cheapestPrice.toFixed(2)})` : '';
+          log.info(`All buyer agents depleted (below $${threshold}${priceNote}). Auto-stopping simulation.`);
           this.emitEvent('simulation_depleted', {
             threshold,
+            cheapest_price: cheapestPrice,
             message: 'All buyer agents have insufficient funds',
           });
           await this.stop();

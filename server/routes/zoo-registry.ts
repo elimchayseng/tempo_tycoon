@@ -92,8 +92,18 @@ zooRegistryRoutes.post("/preflight", requireAdmin, createRateLimit(10, 60_000), 
         getZooAccountByRole("guest2"),
         getZooAccountByRole("guest3"),
       ];
-      check("balances").status = "pass";
-      check("balances").detail = "Master + 3 guests available";
+      const threshold = config.zoo.minBalanceThreshold;
+      const underfunded = guests
+        .map((a, i) => ({ a, label: `Guest ${i + 1}` }))
+        .filter(({ a }) => !a || Number(a.balances[config.contracts.alphaUsd] ?? 0n) / 1_000_000 < threshold)
+        .map(({ label }) => label);
+      if (underfunded.length === 0) {
+        check("balances").status = "pass";
+        check("balances").detail = "Master + 3 guests available";
+      } else {
+        check("balances").status = "fail";
+        check("balances").detail = `Unfunded (below $${threshold}): ${underfunded.join(", ")}`;
+      }
       const walletList: { label: string; address: string; balance: string }[] = [];
       if (master) {
         const bal = master.balances[config.contracts.alphaUsd]?.toString() ?? "0";
