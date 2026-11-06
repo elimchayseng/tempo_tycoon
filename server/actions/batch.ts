@@ -1,5 +1,5 @@
 import { toHex, formatGwei } from "viem";
-import { Actions, Abis } from "viem/tempo";
+import { Abis } from "viem/tempo";
 import { accountStore } from "../accounts.js";
 import {
   publicClient,
@@ -13,6 +13,7 @@ import {
 } from "../tempo-client.js";
 import { emitLog } from "../instrumented-client.js";
 import { annotations } from "../annotations.js";
+import { transferWithRetry, describeError } from "./transfer-retry.js";
 
 const ACTION = "batch";
 
@@ -158,7 +159,8 @@ export async function batchAction(params: {
   // by executing multiple transfers sequentially. The key concept demonstration
   // remains valid: multiple operations, single fee structure.
   let totalGasUsed = BigInt(0);
-  const results = [];
+  const receipts: any[] = [];
+  let recoveredCount = 0;
 
   for (let i = 0; i < processedPayments.length; i++) {
     const payment = processedPayments[i];
@@ -175,27 +177,64 @@ export async function batchAction(params: {
       indent: 2,
     });
 
-    const result = await Actions.token.transferSync(walletClient, {
-      token: ALPHA_USD,
-      to: payment.recipientAcct.address,
-      amount: payment.rawAmount,
-      memo: payment.memoHex as `0x${string}`,
-    } as any);
+    let outcome;
+    try {
+      outcome = await transferWithRetry({
+        walletClient,
+        publicClient,
+        token: ALPHA_USD,
+        to: payment.recipientAcct.address,
+        amount: payment.rawAmount,
+        memo: payment.memoHex as `0x${string}`,
+        onRetry: ({ attempt, delayMs, error }) => {
+          emitLog({
+            action: ACTION,
+            type: "info",
+            label: `Payment ${i + 1} attempt ${attempt} failed (${describeError(error)}), retrying in ${delayMs / 1000}s`,
+            data: {
+              to: payment.recipientAcct.label,
+              note: "Same nonce is reused and recipient balance is re-checked before resending",
+            },
+            indent: 3,
+          });
+        },
+      });
+    } catch (error) {
+      throw new Error(
+        `Payment ${i + 1}/${processedPayments.length} to ${payment.recipientAcct.label} failed (${i} earlier payment(s) succeeded): ${describeError(error)}`,
+        { cause: error }
+      );
+    }
 
-    results.push(result);
-    totalGasUsed += result.receipt.gasUsed as bigint;
+    if (outcome.recovered) {
+      recoveredCount++;
+      emitLog({
+        action: ACTION,
+        type: "info",
+        label: `Payment ${i + 1} landed on-chain despite RPC error — not resending`,
+        data: { to: payment.recipientAcct.label, amount: `$${payment.amount}` },
+        indent: 3,
+      });
+      continue;
+    }
+
+    receipts.push(outcome.result.receipt);
+    totalGasUsed += outcome.result.receipt.gasUsed as bigint;
   }
 
-  // Use the last receipt for reporting (all should be very similar)
-  const receipt = results[results.length - 1].receipt;
+  // Use the last receipt for reporting (all should be very similar). Undefined
+  // only if every transfer was recovered without a receipt.
+  const receipt = receipts[receipts.length - 1];
+  const txCount = receipts.length + recoveredCount;
 
   emitLog({
     action: ACTION,
     type: "tx_submitted",
     label: `Batch payroll submitted`,
     data: {
-      tx_count: results.length,
-      tx_hashes: results.map((r, i) => `payment ${i + 1}: ${r.receipt.transactionHash}`),
+      tx_count: txCount,
+      tx_hashes: receipts.map((r) => r.transactionHash),
+      ...(recoveredCount > 0 ? { recovered_without_receipt: recoveredCount } : {}),
       rpc: "eth_sendRawTransaction",
       endpoint: CHAIN_CONFIG.rpcUrl,
       note: `${payments.length} sequential transferWithMemo transactions`,
@@ -209,12 +248,12 @@ export async function batchAction(params: {
     label: `All ${payments.length} payments confirmed ✓`,
     data: {
       status: "success",
-      last_tx_hash: receipt.transactionHash,
-      last_block_number: receipt.blockNumber.toString(),
+      last_tx_hash: receipt?.transactionHash ?? "n/a",
+      last_block_number: receipt?.blockNumber?.toString() ?? "n/a",
       total_gas_used: totalGasUsed.toString(),
       cost_efficiency: `${payments.length} payments = ~$${formatAlphaUsd(totalGasUsed / BigInt(payments.length))} gas per payment`,
       batch_result: `✓ All ${payments.length} payments succeeded`,
-      explorer: `${CHAIN_CONFIG.explorerUrl}/tx/${receipt.transactionHash}`,
+      explorer: receipt ? `${CHAIN_CONFIG.explorerUrl}/tx/${receipt.transactionHash}` : "n/a",
     },
   });
 
@@ -289,7 +328,7 @@ export async function batchAction(params: {
   // Fee math breakdown - calculate total fees from all transactions
   const totalFeePaid = senderTotalDeducted - totalAmount;
   const avgGasUsed = totalGasUsed / BigInt(payments.length);
-  const effectiveGasPrice = receipt.effectiveGasPrice as bigint;
+  const effectiveGasPrice = (receipt?.effectiveGasPrice ?? BigInt(0)) as bigint;
   const computedFeeWei = totalGasUsed * effectiveGasPrice;
   const WEI_TO_TIP20 = BigInt(10 ** 12);
   const computedFeeTip20 = computedFeeWei / WEI_TO_TIP20;
@@ -329,7 +368,8 @@ export async function batchAction(params: {
 
   // Return transaction hashes for verification
   return {
-    txHashes: results.map(r => r.receipt.transactionHash),
+    txHashes: receipts.map((r) => r.transactionHash),
+    txCount,
     totalGasUsed: totalGasUsed.toString(),
     feePerPayment: feePerPayment.toFixed(6)
   };
