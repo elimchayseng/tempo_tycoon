@@ -55,6 +55,15 @@ therefore Worker invocations. To switch to Static Assets later, add an
 `run_worker_first: ["/api/*", "/ws"]`) and return `env.ASSETS.fetch(request)`
 in `worker/index.ts`.
 
+### Custom domain
+
+`tempo-tycoon.com` and `www.tempo-tycoon.com` are attached to the Worker as
+Custom Domains (`routes` in `wrangler.jsonc`). Cloudflare manages their DNS
+records and certificates, and every `wrangler deploy` keeps them attached.
+`www` returns a 301 to the apex (`worker/index.ts`). To attach another
+hostname, add it to `routes`; Cloudflare refuses if the hostname already has an
+A/AAAA/CNAME record, so delete that record first.
+
 ### Deploy
 
 Requires a Cloudflare API token with **Workers Scripts: Edit** (the "Edit

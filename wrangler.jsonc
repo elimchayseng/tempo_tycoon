@@ -7,6 +7,14 @@
   "workers_dev": true,
   "preview_urls": false,
 
+  // tempo-tycoon.com is served by this Worker (Custom Domains; Cloudflare
+  // manages the DNS records and certificates). www redirects to the apex in
+  // worker/index.ts.
+  "routes": [
+    { "pattern": "tempo-tycoon.com", "custom_domain": true },
+    { "pattern": "www.tempo-tycoon.com", "custom_domain": true }
+  ],
+
   // The frontend (dist/) is embedded into the bundle by
   // scripts/build-worker-assets.ts rather than uploaded as Workers Static
   // Assets, so a deploy is a single script upload.
