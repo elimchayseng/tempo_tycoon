@@ -28,9 +28,9 @@ export function createRateLimit(maxRequests: number, windowMs: number) {
   }
 
   return createMiddleware(async (c, next) => {
-    // Skip rate limiting in development (no NODE_ENV and no hosting env = local dev)
-    const isDev = process.env.NODE_ENV === "development" ||
-                  (!process.env.NODE_ENV && !process.env.RAILWAY_ENVIRONMENT_NAME);
+    // Skip rate limiting in local development (NODE_ENV unset or "development").
+    // The Cloudflare deployment sets NODE_ENV=production in wrangler.jsonc.
+    const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === "development";
     if (isDev) {
       await next();
       return;

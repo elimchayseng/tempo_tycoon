@@ -22,6 +22,12 @@ export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
 
+    // www.tempo-tycoon.com → tempo-tycoon.com (both hostnames are attached to this Worker)
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.toString(), 301);
+    }
+
     // Liveness check answered at the edge, without waking the Durable Object.
     if (url.pathname === "/api/health") {
       return Response.json({ status: "ok", timestamp: new Date().toISOString() });

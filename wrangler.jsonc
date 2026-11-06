@@ -34,7 +34,7 @@
     "MIN_BALANCE_THRESHOLD": "10.0",
     "LOG_LEVEL": "info",
     "ENABLE_REQUEST_LOGS": "true",
-    "ALLOWED_ORIGINS": "https://tempo-tycoon.elimchayseng13.workers.dev",
+    "ALLOWED_ORIGINS": "https://tempo-tycoon.com,https://tempo-tycoon.elimchayseng13.workers.dev",
     "LLM_ENABLED": "false"
   }
 }

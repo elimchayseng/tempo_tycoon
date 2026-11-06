@@ -97,4 +97,4 @@ npx vitest run tests/admin-auth.test.ts tests/rate-limit.test.ts
 - [ ] `ADMIN_TOKEN` is set to a strong, unique value (not committed to source)
 - [ ] `NODE_ENV=production` is set (enables auth enforcement + rate limiting)
 - [ ] CORS origins are configured for the production domain
-- [ ] Rate limiting keys on `cf-connecting-ip` (Cloudflare), falling back to `x-forwarded-for` (Railway/other proxies)
+- [ ] Rate limiting keys on `cf-connecting-ip` (Cloudflare), falling back to `x-forwarded-for` (other proxies, local tooling)

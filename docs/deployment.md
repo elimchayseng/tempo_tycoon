@@ -2,7 +2,8 @@
 
 ## Cloudflare Workers (primary)
 
-Live at **https://tempo-tycoon.elimchayseng13.workers.dev**.
+Live at **https://tempo-tycoon.com** (also
+https://tempo-tycoon.elimchayseng13.workers.dev).
 
 ### How it runs
 
@@ -33,8 +34,8 @@ object is in memory. Two things keep it resident during a simulation:
 
 When the simulation stops, the alarm stops re-arming and the object is evicted
 once idle. If it is evicted mid-run (a deploy, a runtime restart), the run is
-lost. That is the same as a Railway restart: wallets are ephemeral testnet
-wallets that every preflight regenerates.
+lost. Wallets are ephemeral testnet wallets that every preflight regenerates,
+so nothing durable is lost.
 
 **Runtime differences handled in code:**
 
@@ -111,24 +112,8 @@ curl -X POST https://tempo-tycoon.elimchayseng13.workers.dev/api/zoo/preflight \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
-## Node (Railway or any Node host)
+## Node (local development)
 
-The Node entry (`server/index.ts`) still works and shares `server/app.ts` with
-the Worker. `railway.toml` is kept until the Railway service is retired.
-
-1. Build command: `npm run build`
-2. Start command: `npm run start`
-3. Environment variables (see [Configuration](./configuration.md)):
-
-```
-PORT=4000
-NODE_ENV=production
-ADMIN_TOKEN=<strong-random-token>
-RPC_URL=https://rpc.moderato.tempo.xyz
-ZOO_SIMULATION_ENABLED=true
-LOG_LEVEL=info
-```
-
-> **Note:** `ADMIN_TOKEN` is required in production. The server refuses to start without it. No private keys are needed: wallets are generated automatically each simulation run.
-
-Health check path: `/api/health`. No external databases are required; all state is in memory.
+`server/index.ts` runs the same app (`server/app.ts`) on Node, which is what
+`npm run dev` and `npm start` use. It is not deployed anywhere. Production is
+the Cloudflare Worker above.

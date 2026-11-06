@@ -31,7 +31,7 @@ const INTERNAL_ORIGIN = "http://zoo.internal";
  * in memory. Connected (non-hibernating) WebSockets keep it resident, and a
  * self-rescheduling alarm keeps it resident for the whole simulation even if
  * every viewer disconnects. If the object is evicted anyway (deploy, crash),
- * the in-flight simulation is lost — same as a Railway restart; wallets are
+ * the in-flight simulation is lost — same as a Node server restart; wallets are
  * ephemeral testnet wallets regenerated on every preflight.
  */
 export class ZooServer extends DurableObject<Env> {

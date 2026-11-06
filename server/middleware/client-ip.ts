@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 
 /**
- * Best-effort client IP. Cloudflare sets cf-connecting-ip; Railway and other
- * reverse proxies set x-forwarded-for.
+ * Best-effort client IP. Cloudflare sets cf-connecting-ip; other reverse
+ * proxies (and local tooling) set x-forwarded-for.
  */
 export function getClientIp(c: Context): string {
   return (

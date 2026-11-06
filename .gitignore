@@ -57,9 +57,6 @@ coverage/
 ehthumbs.db
 Thumbs.db
 
-# Railway deployment
-.railway/
-
 # Simulation state
 simulation-state/
 agent-states/
