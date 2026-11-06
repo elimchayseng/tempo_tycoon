@@ -219,6 +219,7 @@ zooRegistryRoutes.post("/preflight", requireAdmin, createRateLimit(10, 60_000), 
         ? config.llm.inferenceKey.slice(0, 8) + "..." + config.llm.inferenceKey.slice(-4)
         : "(not set)";
       check("llm").metadata = {
+        enabled: true,
         model: config.llm.model,
         endpoint: config.llm.inferenceUrl || "(not set)",
         apiKey: maskedKey,
@@ -229,6 +230,7 @@ zooRegistryRoutes.post("/preflight", requireAdmin, createRateLimit(10, 60_000), 
       check("llm").status = "pass";
       check("llm").detail = "Disabled (rule-based fallback active)";
       check("llm").metadata = {
+        enabled: false,
         model: "N/A",
         endpoint: "N/A",
         maxTokens: "N/A",

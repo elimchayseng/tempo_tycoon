@@ -191,6 +191,15 @@ function FundingMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function LLMMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  if (metadata.enabled === false) {
+    return (
+      <p className="font-pixel text-[7px] leading-relaxed text-[var(--zt-tan)]">
+        LLM decision-making is disabled for this public demo. Buyer and merchant
+        agents use the built-in rules-based engine instead: purchases, restocks
+        and payments still run on-chain the same way.
+      </p>
+    );
+  }
   return (
     <div className="space-y-0.5">
       <MetadataDetail label="Model" value={String(metadata.model)} />
